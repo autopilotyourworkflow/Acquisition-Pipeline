@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   Brand tokens — Hotel Plus / Acquisition Pipeline
+   Navy + Cream + Terracotta. No gradients. Generous whitespace.
+   =========================================================================== */
+
+:root {
+  /* Brand core */
+  --navy:           218 35% 14%;
+  --navy-soft:      218 22% 24%;
+  --charcoal:       220 12% 35%;
+  --slate-mid:      220 9% 55%;
+  --slate-deep:     220 11% 38%;
+
+  /* Terracotta accent */
+  --terracotta:     14 55% 48%;
+  --terracotta-50:  14 70% 96%;
+  --terracotta-700: 14 60% 36%;
+
+  /* Neutrals (warm, not cold) */
+  --cream:          36 33% 97%;
+  --warm-white:     36 25% 99%;
+  --sand-100:       34 18% 92%;
+  --sand-200:       32 14% 84%;
+
+  /* Semantic */
+  --success: 150 45% 38%;
+  --warning:  38 85% 48%;
+  --danger:    2 65% 48%;
+  --info:    210 60% 45%;
+
+  /* Radii — corporate, never playful */
+  --radius-sm: 0.25rem;
+  --radius:    0.375rem;
+  --radius-lg: 0.5rem;
+}
+
+/* Tell Tailwind about our tokens so utility classes are generated.
+   Naming follows --color-{name} so we get bg-{name}, text-{name}, border-{name}. */
+@theme inline {
+  --color-navy:           hsl(var(--navy));
+  --color-navy-soft:      hsl(var(--navy-soft));
+  --color-charcoal:       hsl(var(--charcoal));
+  --color-slate-mid:      hsl(var(--slate-mid));
+  --color-slate-deep:     hsl(var(--slate-deep));
+
+  --color-terracotta:     hsl(var(--terracotta));
+  --color-terracotta-50:  hsl(var(--terracotta-50));
+  --color-terracotta-700: hsl(var(--terracotta-700));
+
+  --color-cream:          hsl(var(--cream));
+  --color-warm-white:     hsl(var(--warm-white));
+  --color-sand-100:       hsl(var(--sand-100));
+  --color-sand-200:       hsl(var(--sand-200));
+
+  --color-success:        hsl(var(--success));
+  --color-warning:        hsl(var(--warning));
+  --color-danger:         hsl(var(--danger));
+  --color-info:           hsl(var(--info));
+
+  /* shadcn-compatible semantic aliases — future shadcn components will pick these up */
+  --color-background:           hsl(var(--cream));
+  --color-foreground:           hsl(var(--navy));
+  --color-card:                 hsl(var(--warm-white));
+  --color-card-foreground:      hsl(var(--navy));
+  --color-popover:              hsl(var(--warm-white));
+  --color-popover-foreground:   hsl(var(--navy));
+  --color-primary:              hsl(var(--terracotta));
+  --color-primary-foreground:   hsl(var(--cream));
+  --color-secondary:            hsl(var(--sand-100));
+  --color-secondary-foreground: hsl(var(--navy));
+  --color-muted:                hsl(var(--sand-100));
+  --color-muted-foreground:     hsl(var(--charcoal));
+  --color-accent:               hsl(var(--terracotta-50));
+  --color-accent-foreground:    hsl(var(--terracotta-700));
+  --color-destructive:          hsl(var(--danger));
+  --color-destructive-foreground: hsl(var(--cream));
+  --color-border:               hsl(var(--sand-200));
+  --color-input:                hsl(var(--sand-200));
+  --color-ring:                 hsl(var(--terracotta));
+
+  /* Typography */
+  --font-display: var(--font-display);
+  --font-sans:    var(--font-sans);
+  --font-mono:    var(--font-mono);
+
+  /* Subtle shadows — cards rely on borders, not heavy lifts */
+  --shadow-xs: 0 1px 2px 0 hsl(218 35% 14% / 0.04);
+  --shadow-sm: 0 1px 3px 0 hsl(218 35% 14% / 0.06), 0 1px 2px 0 hsl(218 35% 14% / 0.04);
+  --shadow-md: 0 4px 12px -2px hsl(218 35% 14% / 0.08), 0 2px 4px -1px hsl(218 35% 14% / 0.04);
+  --shadow-lg: 0 12px 32px -8px hsl(218 35% 14% / 0.12);
+}
+
+@layer base {
+  html { color-scheme: light; }
+
+  body {
+    background-color: hsl(var(--cream));
+    color: hsl(var(--charcoal));
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display), Georgia, serif;
+    color: hsl(var(--navy));
+    letter-spacing: -0.015em;
+  }
+
+  /* Focus ring — always terracotta, always visible */
+  :where(:focus-visible) {
+    outline: 2px solid hsl(var(--terracotta));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: hsl(var(--terracotta-50));
+    color: hsl(var(--terracotta-700));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; }
+  }
+}
