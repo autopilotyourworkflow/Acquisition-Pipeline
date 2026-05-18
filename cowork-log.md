@@ -129,4 +129,58 @@ The same principle applies at the end of the project for the **Final Phase secre
 
 ---
 
-*Decisions still ahead: the AI scoring prompt (Day 2 — the 15% grade), the Kanban drag-and-drop ergonomics, the cold-email tone, multi-party FreeBusy slot math, browser-extension auth. I'll keep adding entries.*
+*Day 2 — 2026-05-18*
+
+## 9. Foundation contracts: thin HOFs over middleware sprawl
+
+How much abstraction is the right amount for the two wrappers everything else depends on?
+
+The audit log and the Claude client are both on the critical path. Every mutation goes through one; every AI call goes through the other. The temptation, when something is this load-bearing, is to over-engineer: middleware chains, decorator metaprogramming, plugin hooks. All of those make the framework feel cleaner and make individual call sites confusing.
+
+I went thin both places. `withAudit` is a single higher-order function: takes the actor, the table, the before-state, and a closure that does the actual mutation. It computes the after-hash, writes the audit row, returns `{ after, logId, afterHash }`. The whole thing is ~80 lines. The call site reads top-to-bottom — there's no magic.
+
+The Claude wrapper is the same shape: one `callWithTool` that does retry + cache + telemetry + tool-use forcing, and one `streamWithTool` for UX-critical surfaces. Tool definitions are zod schemas with a `validate` function, so the call site gets typed values back, not `unknown`. Telemetry is *returned* — the caller decides where to persist it, no surprise side effects.
+
+The one non-obvious move: the audit insert uses the service-role client (the `activity_log` table has SELECT-only RLS — writes from a user-scoped client would be denied), while the actual mutation runs on whatever client the caller closes over. That asymmetry is documented at the top of `lib/audit/wrap.ts` so the next reader doesn't have to reverse-engineer the reasoning.
+
+**A foundation file that needs a wiki page to use isn't a foundation, it's a tax. Keep wrappers narrow enough to read in one sitting.**
+
+---
+
+## 10. Scoring prompt v1: anti-bias as a quality lever
+
+The 15% AI grade lives almost entirely inside one prompt. What goes in it?
+
+The naive version is "rate this CV against this JD on skills, experience, culture, 0-10 each." That gets a score. It also gets the model's full set of priors about which schools matter, which name origins feel "professional," which career arcs read as ambitious. None of that is what a hiring team wants from a screening tool.
+
+So v1 leans into anti-bias as an *explicit* instruction, not an implicit hope. The system prompt names the things to **discount** (school prestige, gender markers, name origin, birthplace) and the things to **weight** (demonstrated work, project specificity, ownership). That's both the right thing to do for an HR tool and a quality lever — it forces the model to look at concrete claims in the CV instead of pattern-matching to prestige signals.
+
+Two other moves matter. Every score's reasoning has to cite a specific line of the CV — reduces hallucination, makes the rationale spot-checkable. And the rubric anchors at 3 / 5 / 7 / 9 are explicit ("3 — clear miss; 7 — solid match; 9 — exceptional fit"), so two different runs converge on the same numeric scale rather than drifting.
+
+Output is forced through the `submit_score` tool — never free text. That makes the response shape contractual, makes telemetry honest, and lets us version the prompt (`scores.prompt_version = 'scoring.v1'`) so when v2 ships we can A/B against v1 on the same JD+CV pair.
+
+The smoke test against the seed JD with a synthetic Bangkok-based candidate returned 9 / 8.5 / 8 → 8.60 weighted in 26 seconds at $0.16. The reasoning quotes "40% FRT reduction" and "Ruby→TypeScript migration" — verbatim phrases from the CV. That's the grounding clause earning its keep.
+
+**The prompt is product code. Version it, ground it in evidence, write the anti-bias clauses out loud.**
+
+---
+
+## 11. Stream the tool, not the spinner
+
+An Opus 4.7 scoring call takes 25-40 seconds. How should the UI reflect that the model is working?
+
+The lazy choice is a spinner. A spinner makes 30 seconds feel like five minutes — the user has no signal anything is happening, and the model could be stuck for all they know.
+
+The other extreme is to parse the streaming tool input as it arrives and live-update the score bars. That fails on a real engineering basis: the streamed JSON is invalid until the very last token. You'd need a tolerant partial-JSON parser, and even then you're showing numbers that might change in the next 500ms. Pretending you have a number when you don't is worse than admitting you don't.
+
+The middle path: stream the raw tool input — the JSON-as-it-types — into a small monospace box on the ScoreCard. The user watches the JSON keys appear, then the score values, then the prose reasoning. It's honest: the model is generating, here's what it's saying, and when it's done the formatted card replaces the stream.
+
+Implementation is SSE-frames over a POST handler. `score_partial { text: <accumulated_tool_input> }` per delta, `score_complete { scoreId, value, telemetry, weighted_total }` on stream close. The client uses `fetch` + `ReadableStream` rather than `EventSource` (POST isn't supported by the latter), but the wire format is still SSE-conventional so the server stays simple.
+
+One detail that earned itself: `max_tokens: 8192` (not 4096) plus a "150-250 word hiring_report" cap in the prompt. The first attempt with 4096 succeeded once and failed once — the model was non-deterministically verbose enough to truncate the JSON before the last field. Headroom + a length cap on the verbose field fixed it.
+
+**Honesty beats theatre. If you can't show the user real progress, show them the real work.**
+
+---
+
+*Decisions still ahead: the cold-email tone (Day 4 — generated drafts have to feel hand-written), multi-party FreeBusy slot math (Day 4 — three calendars intersected client-side without crashing the browser), browser-extension auth (Day 5 — long-lived JWT vs short-lived rotation). I'll keep adding entries.*

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "./sign-out-button.client";
+import { Toaster } from "@/components/ui/sonner";
 
 export default async function DashboardLayout({
   children,
@@ -27,9 +28,9 @@ export default async function DashboardLayout({
           </Link>
           <nav className="flex items-center gap-2 text-sm">
             <NavLink href="/tracker">Tracker</NavLink>
-            <NavLink href="/candidates">Candidates</NavLink>
-            <NavLink href="/scraper">Scraper</NavLink>
+            <NavLink href="/jds">JDs</NavLink>
             <NavLink href="/screener">Screener</NavLink>
+            <NavLink href="/scraper">Scraper</NavLink>
             <NavLink href="/schedule">Schedule</NavLink>
             <NavLink href="/settings">Settings</NavLink>
           </nav>
@@ -42,6 +43,7 @@ export default async function DashboardLayout({
       <main className="mx-auto w-full max-w-7xl flex-1 px-8 py-10">
         {children}
       </main>
+      <Toaster />
     </div>
   );
 }

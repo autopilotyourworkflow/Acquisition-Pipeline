@@ -53,7 +53,7 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | Phase | Days | Status |
 |---|---|---|
 | 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
-| 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | not started |
+| 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ `withAudit` HOF + Claude client (retry / cache / telemetry / tool-use forcing) + `scoring.v1` prompt + Tracker (Kanban + Table + JD CRUD) + Screener (SSE stream, ScoreCard, unpdf upload). Live smoke test: 8.60 weighted in 26s at $0.16 against seed JD. |
 | 3 — Scraper + Scheduler basics | Day 3 | not started |
 | 4 — Overdelivery (cold email, FreeBusy, undo/redo, invites) | Day 4 | not started |
 | 5 — Browser extension + polish + demo | Day 5 | not started |
