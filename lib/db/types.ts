@@ -77,6 +77,8 @@ export type ScoreRow = {
   hiring_report: string | null;
   model: string;
   prompt_version: string;
+  scoring_mode: "single" | "team";
+  team_agents: unknown[] | null;
   input_tokens: number | null;
   output_tokens: number | null;
   cost_usd: number | null;

@@ -9,7 +9,11 @@ export const metadata = {
 export default async function TrackerPage() {
   const supabase = await createClient();
 
-  const [{ data: candidates, error: cErr }, { data: jds, error: jErr }] = await Promise.all([
+  const [
+    { data: candidates, error: cErr },
+    { data: jds, error: jErr },
+    { data: scores },
+  ] = await Promise.all([
     supabase
       .from("candidates")
       .select("*, job_descriptions(title)")
@@ -17,6 +21,10 @@ export default async function TrackerPage() {
     supabase
       .from("job_descriptions")
       .select("*")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("scores")
+      .select("candidate_id, weighted_total, created_at")
       .order("created_at", { ascending: false }),
   ]);
 
@@ -32,6 +40,16 @@ export default async function TrackerPage() {
     );
   }
 
+  // Build a "latest score per candidate" lookup. Scores are already ordered
+  // by created_at desc, so the first hit per candidate_id is the latest.
+  const latestScoreByCandidate: Record<string, number> = {};
+  for (const s of scores ?? []) {
+    const cid = s.candidate_id as string;
+    if (latestScoreByCandidate[cid] === undefined) {
+      latestScoreByCandidate[cid] = Number(s.weighted_total);
+    }
+  }
+
   const flattened = (candidates ?? []).map((row) => {
     const { job_descriptions, ...rest } = row as CandidateRow & {
       job_descriptions: { title: string } | null;
@@ -39,6 +57,7 @@ export default async function TrackerPage() {
     return {
       ...(rest as CandidateRow),
       jd_title: job_descriptions?.title ?? null,
+      latest_score: latestScoreByCandidate[row.id] ?? null,
     };
   });
 
@@ -48,7 +67,7 @@ export default async function TrackerPage() {
         <h1 className="font-display text-3xl font-medium text-navy">Tracker</h1>
         <p className="mt-1 text-sm text-charcoal">
           Your recruiting pipeline. Drag candidates between stages — every move
-          is captured in the activity log.
+          is captured in the activity log. Click a card to see candidate detail.
         </p>
       </div>
 

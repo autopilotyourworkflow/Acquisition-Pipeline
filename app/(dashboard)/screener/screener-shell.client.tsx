@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -93,7 +93,16 @@ export function ScreenerShell({
   pastScores,
 }: Props) {
   const router = useRouter();
-  const [candidateId, setCandidateId] = useState(candidates[0]?.id ?? "");
+  const searchParams = useSearchParams();
+  // Honor ?candidate=<id> on landing (used by the candidate detail page's
+  // "Run a new score" link). Falls back to the most recent candidate.
+  const preselectedCandidateId = searchParams.get("candidate");
+  const initialCandidateId =
+    preselectedCandidateId &&
+    candidates.some((c) => c.id === preselectedCandidateId)
+      ? preselectedCandidateId
+      : candidates[0]?.id ?? "";
+  const [candidateId, setCandidateId] = useState(initialCandidateId);
   const candidate = candidates.find((c) => c.id === candidateId) ?? null;
   const [jdId, setJdId] = useState<string>(candidate?.jd_id ?? jds[0]?.id ?? "");
   const jd = jds.find((j) => j.id === jdId) ?? null;
@@ -185,22 +194,26 @@ export function ScreenerShell({
   if (candidates.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-        <p className="font-display text-xl text-navy">No candidates to score yet</p>
-        <p className="mt-2 text-sm text-charcoal">
-          Add one from the{" "}
-          <a className="text-terracotta-700 underline" href="/tracker">Tracker</a>.
+        <p className="font-display text-xl text-navy">Nobody to score yet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+          The Screener needs a candidate to evaluate. Add one from the Tracker first.
         </p>
+        <Button asChild className="mt-4">
+          <a href="/tracker">Go to Tracker</a>
+        </Button>
       </div>
     );
   }
   if (jds.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-        <p className="font-display text-xl text-navy">No JDs to score against</p>
-        <p className="mt-2 text-sm text-charcoal">
-          Create one from the{" "}
-          <a className="text-terracotta-700 underline" href="/jds/new">JDs page</a>.
+        <p className="font-display text-xl text-navy">No job descriptions yet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+          Scoring is candidate-against-JD. Create your first JD to define the role.
         </p>
+        <Button asChild className="mt-4">
+          <a href="/jds/new">Create a JD</a>
+        </Button>
       </div>
     );
   }

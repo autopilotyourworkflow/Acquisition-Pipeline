@@ -50,17 +50,15 @@ function summarize(row: ActivityRow): string {
   return String(subject);
 }
 
-// Undo only meaningful within 30 minutes of the action (plan default).
-// Older entries are read-only audit history.
-const UNDO_WINDOW_MS = 30 * 60 * 1000;
-
-type UndoState = "ok" | "expired" | "already-undone" | "is-undo-entry";
+// Undo is available for any entry that hasn't been undone yet (regardless of
+// age). Day-4 conflict detection will be the safety net for stale undos —
+// compares the row's current hash to the recorded after_hash and prompts
+// before clobbering downstream changes.
+type UndoState = "ok" | "already-undone" | "is-undo-entry";
 
 function undoState(row: ActivityRow): UndoState {
   if (row.undone_at) return "already-undone";
   if (row.redo_of) return "is-undo-entry";
-  const ageMs = Date.now() - new Date(row.created_at).getTime();
-  if (ageMs >= UNDO_WINDOW_MS) return "expired";
   return "ok";
 }
 
@@ -127,7 +125,7 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
                   hour12: false,
                 })}
               </span>
-              {state === "ok" ? (
+              {state === "ok" && (
                 <Button
                   size="xs"
                   variant="outline"
@@ -136,14 +134,7 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
                 >
                   {pendingId === row.id ? "Reverting…" : "Undo"}
                 </Button>
-              ) : state === "expired" ? (
-                <span
-                  className="rounded-sm border border-sand-200 px-2 py-0.5 text-[10px] text-slate-mid"
-                  title="Undo expires 30 minutes after the action"
-                >
-                  Undo window passed
-                </span>
-              ) : null}
+              )}
             </div>
           </li>
         );

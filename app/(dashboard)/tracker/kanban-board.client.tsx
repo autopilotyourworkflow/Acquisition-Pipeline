@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragEndEvent,
@@ -17,7 +18,10 @@ import { SourceBadge } from "@/components/candidates/SourceBadge";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
-type CandidateWithJd = CandidateRow & { jd_title: string | null };
+type CandidateWithJd = CandidateRow & {
+  jd_title: string | null;
+  latest_score: number | null;
+};
 
 /**
  * KanbanBoard is now a controlled component. The mutation is owned by
@@ -97,25 +101,59 @@ function KanbanColumn({
 }
 
 function KanbanCard({ candidate }: { candidate: CandidateWithJd }) {
+  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: candidate.id,
   });
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
+
+  // dnd-kit's PointerSensor with activationConstraint distance:5 means a quick
+  // click (no movement) won't initiate drag — so onPointerUp without a drag
+  // start is treated as a navigation click. We track the pointer-down position
+  // and only navigate if movement was below the drag threshold.
+  let downX = 0;
+  let downY = 0;
+  let dragStarted = false;
+
+  function onPointerDown(e: React.PointerEvent) {
+    downX = e.clientX;
+    downY = e.clientY;
+    dragStarted = false;
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) {
+      dragStarted = true;
+    }
+  }
+  function onPointerUp() {
+    if (!dragStarted && !isDragging) {
+      router.push(`/candidates/${candidate.id}`);
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
+      onPointerDownCapture={onPointerDown}
+      onPointerMoveCapture={onPointerMove}
+      onPointerUpCapture={onPointerUp}
       className={cn(
         "cursor-grab rounded-md border border-sand-200 bg-warm-white p-3 text-left shadow-xs transition-shadow",
         "hover:shadow-sm focus-visible:outline-2 focus-visible:outline-terracotta",
         isDragging && "opacity-50 shadow-md cursor-grabbing",
       )}
     >
-      <p className="text-sm font-medium text-navy">{candidate.full_name}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-navy">{candidate.full_name}</p>
+        {candidate.latest_score !== null && (
+          <ScoreBadge score={candidate.latest_score} />
+        )}
+      </div>
       {candidate.current_title && (
         <p className="mt-0.5 text-xs text-charcoal">{candidate.current_title}</p>
       )}
@@ -126,5 +164,22 @@ function KanbanCard({ candidate }: { candidate: CandidateWithJd }) {
         )}
       </div>
     </div>
+  );
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  // Tone: low (red), mid (warning), high (success). Thresholds are advisory.
+  const tone =
+    score >= 8 ? "bg-success/15 text-success" : score >= 6 ? "bg-warning/15 text-warning" : "bg-danger/10 text-danger";
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-mono text-[11px] font-medium",
+        tone,
+      )}
+      title="Latest weighted score"
+    >
+      {score.toFixed(1)}
+    </span>
   );
 }

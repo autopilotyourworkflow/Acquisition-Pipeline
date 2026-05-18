@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import {
@@ -12,8 +13,12 @@ import {
   type CandidateStage,
 } from "@/lib/db/enums";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
+import { cn } from "@/lib/utils";
 
-type CandidateWithJd = CandidateRow & { jd_title: string | null };
+type CandidateWithJd = CandidateRow & {
+  jd_title: string | null;
+  latest_score: number | null;
+};
 
 export function CandidateTable({
   candidates,
@@ -22,6 +27,7 @@ export function CandidateTable({
   candidates: CandidateWithJd[];
   jds: JdRow[];
 }) {
+  const router = useRouter();
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
   const [sourceFilter, setSourceFilter] = useState<CandidateSource | "all">("all");
   const [jdFilter, setJdFilter] = useState<string | "all">("all");
@@ -75,6 +81,7 @@ export function CandidateTable({
               <th className="px-3 py-2.5 font-medium">Name</th>
               <th className="px-3 py-2.5 font-medium">Title</th>
               <th className="px-3 py-2.5 font-medium">Stage</th>
+              <th className="px-3 py-2.5 font-medium">Score</th>
               <th className="px-3 py-2.5 font-medium">Source</th>
               <th className="px-3 py-2.5 font-medium">JD</th>
               <th className="px-3 py-2.5 font-medium">Applied</th>
@@ -82,11 +89,18 @@ export function CandidateTable({
           </thead>
           <tbody>
             {filtered.map((c) => (
-              <tr key={c.id} className="border-b border-sand-100 last:border-0 hover:bg-cream/50">
+              <tr
+                key={c.id}
+                onClick={() => router.push(`/candidates/${c.id}`)}
+                className="cursor-pointer border-b border-sand-100 last:border-0 hover:bg-cream/50"
+              >
                 <td className="px-3 py-2.5 font-medium text-navy">{c.full_name}</td>
                 <td className="px-3 py-2.5 text-charcoal">{c.current_title ?? "—"}</td>
                 <td className="px-3 py-2.5">
                   <StageBadge stage={c.stage} />
+                </td>
+                <td className="px-3 py-2.5">
+                  {c.latest_score !== null ? <ScoreCell score={c.latest_score} /> : <span className="text-slate-mid">—</span>}
                 </td>
                 <td className="px-3 py-2.5">
                   <SourceBadge source={c.source} />
@@ -97,7 +111,7 @@ export function CandidateTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-10 text-center text-sm text-slate-mid">
+                <td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-mid">
                   No candidates match the current filters.
                 </td>
               </tr>
@@ -106,6 +120,21 @@ export function CandidateTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function ScoreCell({ score }: { score: number }) {
+  const tone =
+    score >= 8 ? "bg-success/15 text-success" : score >= 6 ? "bg-warning/15 text-warning" : "bg-danger/10 text-danger";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-sm px-1.5 py-0.5 font-mono text-[11px] font-medium",
+        tone,
+      )}
+    >
+      {score.toFixed(1)}
+    </span>
   );
 }
 

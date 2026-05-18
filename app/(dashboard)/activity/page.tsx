@@ -20,8 +20,8 @@ export default async function ActivityPage() {
         <h1 className="font-display text-3xl font-medium text-navy">Activity</h1>
         <p className="mt-1 text-sm text-charcoal">
           Every mutation that flows through <code className="font-mono text-xs">withAudit()</code> lands here.
-          Undo reverts the row to its <code className="font-mono text-xs">before</code> state. Available for actions in the last 30 minutes.
-          Conflict detection (when someone else has modified the row since) comes in Day 4.
+          Undo reverts the row to its <code className="font-mono text-xs">before</code> state, any age.
+          Conflict detection (warn before clobbering downstream edits) lands in Day 4.
         </p>
       </div>
 

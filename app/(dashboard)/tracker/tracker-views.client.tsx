@@ -14,7 +14,10 @@ import { cn } from "@/lib/utils";
 type ViewKey = "kanban" | "table";
 const LS_KEY = "tracker.view";
 
-type CandidateWithJd = CandidateRow & { jd_title: string | null };
+type CandidateWithJd = CandidateRow & {
+  jd_title: string | null;
+  latest_score: number | null;
+};
 
 export function TrackerViews({
   candidates: initialCandidates,
@@ -115,13 +118,13 @@ export function TrackerViews({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-end gap-3">
         <div className="inline-flex rounded-md border border-sand-200 bg-warm-white p-0.5 text-sm">
-          <ViewTab active={view === "kanban"} onClick={() => setView("kanban")}>
-            Kanban
-          </ViewTab>
           <ViewTab active={view === "table"} onClick={() => setView("table")}>
             Table
+          </ViewTab>
+          <ViewTab active={view === "kanban"} onClick={() => setView("kanban")}>
+            Kanban
           </ViewTab>
         </div>
         <NewCandidateDialog jds={jds} />
@@ -168,14 +171,14 @@ function ViewTab({
 function EmptyState() {
   return (
     <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-      <p className="font-display text-xl text-navy">No candidates yet</p>
+      <p className="font-display text-xl text-navy">Empty pipeline</p>
       <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
-        Add one manually with{" "}
+        Use{" "}
         <span className="rounded-sm bg-terracotta-50 px-1.5 py-0.5 font-medium text-terracotta-700">
           + New candidate
-        </span>
-        , or wait for Day 3 when the Scraper module pulls candidates from
-        LinkedIn / pasted text / PDFs / screenshots.
+        </span>{" "}
+        to add someone manually. Bulk import from LinkedIn, paste, PDF, and
+        screenshot is coming next.
       </p>
     </div>
   );
