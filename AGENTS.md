@@ -55,7 +55,7 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
 | 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ `withAudit` HOF + Claude client (retry / cache / telemetry / tool-use forcing) + `scoring.v1` prompt + Tracker (Kanban + Table + JD CRUD) + Screener (SSE stream, ScoreCard, unpdf upload). Live smoke test: 8.60 weighted in 26s at $0.16 against seed JD. |
 | 3 — Scraper + Scheduler basics | Day 3 | not started |
-| 4 — Overdelivery (cold email, FreeBusy, undo/redo conflict, invites, **auto-email-reader**) | Day 4 | not started |
+| 4 — Overdelivery (cold email, FreeBusy, undo/redo conflict, invites, **auto-email-reader**, **AI prompt-builder interview**) | Day 4 | not started |
 | 5 — Browser extension + polish + demo | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |
 
@@ -79,6 +79,52 @@ A user-requested overdelivery feature added during Phase 2 conversations:
 - Notifications: in-app "New candidate auto-scored" toast or a "New" badge on the tracker (push beyond scope for take-home — could be Day 5 polish).
 
 **Why Phase 4:** depends on Phase-3 work (Gmail OAuth flow + Calendar integration patterns) and the scoring pipeline being solid. Slots cleanly into the existing scrape → score → email-draft pipeline.
+
+**Status:** PLANNED, not yet built.
+
+---
+
+## Phase 4 — AI prompt-builder interview (added 2026-05-19)
+
+A user-requested overdelivery feature: when a user creates or edits a JD, offer an AI-driven "interview" that asks 4-6 focused questions about the role and then drafts a tailored scoring persona for it. Output gets saved as the JD's `scoring_persona_override`.
+
+**Why this matters:** the per-JD prompt override (Phase 2, migration 0004) is powerful but cold-start hostile — most users won't know how to write a good scoring persona from scratch. This feature turns the override from a power-user feature into something anyone can use well.
+
+**Flow (UX):**
+1. On the JD editor page (`app/(dashboard)/jds/jd-editor.client.tsx`), next to the "Advanced — custom scoring persona" section, add a button: **"AI-assisted: help me write this"**.
+2. Click → opens a chat-style dialog (or sidesheet) running Haiku 4.5.
+3. The interviewer asks the user one or two questions at a time, conversationally — not all at once. Questions cover:
+   - Seniority bracket (entry / mid / senior / principal / executive)
+   - The single most important quality (shipping speed / technical depth / collaboration / business acumen / creative judgment / domain expertise)
+   - Anti-bias considerations specific to this role (e.g., for design roles: "don't penalize CVs without CS coursework"; for sales: "weight outcomes over titles")
+   - Describe a candidate this team would call to congratulate (the 9/10 picture)
+   - Describe a candidate that would clearly miss (the 3/10 picture)
+   - Domain-specific signals worth weighting (industry tenure, certifications, language fluency, etc.)
+4. User can answer in free text, or pick "skip — use smart default" on any question.
+5. After enough information is gathered, the interviewer calls a tool `propose_scoring_persona` which returns:
+   - `persona_text: string` — the full scoring persona, inheriting the global default's structure (rubric, anti-bias framing, tool-only output requirement) and customizing the role-specific guidance
+   - `summary: string` — a one-paragraph rationale for the choices made (shown to the user for confidence-building)
+6. User sees the proposed persona in a pre-filled textarea, can edit, then clicks **"Use for this JD"** which saves it to `scoring_persona_override` on the JD row.
+
+**Files to create when implemented:**
+- `lib/anthropic/prompts/persona-interview.ts` — the interviewer's system prompt (questions list, conversation strategy, when to call the tool)
+- `lib/anthropic/tools/propose_scoring_persona.ts` — zod schema + tool definition
+- `app/api/jds/propose-prompt/route.ts` — SSE-streaming endpoint that handles multi-turn conversation (POST per turn, body includes message history)
+- `components/jds/PromptInterview.client.tsx` — chat UI with input box, message bubbles, "Save persona" CTA at the end
+- Wire into `app/(dashboard)/jds/jd-editor.client.tsx` next to the Advanced section
+
+**Implementation notes:**
+- Use Haiku 4.5 — conversational, low-stakes, ~$0.005-0.01 per full interview
+- Multi-turn: client sends `{ messages: [...] }` per turn; route handler appends the model's response and streams it back. Client manages the conversation array.
+- Tool-use forcing only on the FINAL turn — when the model decides it has enough info, it calls `propose_scoring_persona`. Up to that point, free text (questions to the user).
+- A safety net: cap conversations at ~10 turns. If the model hasn't called the tool by then, force the tool call with a directive.
+- Persona generation references the GLOBAL active prompt as a structural template — the AI shouldn't reinvent the rubric/anti-bias framing, just customize the role-specific layer.
+
+**Why Phase 4 / Day 4:**
+- Depends on per-JD prompt override (✅ Phase 2, migration 0004)
+- It's overdelivery — not in the rubric's 4 modules
+- Pairs naturally with auto-email-reader (both are "AI helping the user set up the system")
+- High UX-grade ROI (25% of the rubric) — reviewer sees the system *teaching* the user how to use it well
 
 **Status:** PLANNED, not yet built.
 
