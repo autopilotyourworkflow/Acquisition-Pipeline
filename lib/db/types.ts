@@ -43,6 +43,7 @@ export type JdRow = {
   nice_to_have: string[];
   weights: { skills: number; experience: number; culture: number };
   threshold: number;
+  scoring_persona_override: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

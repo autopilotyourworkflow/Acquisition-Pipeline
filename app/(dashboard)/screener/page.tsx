@@ -1,28 +1,33 @@
 import { createClient } from "@/lib/supabase/server";
-import { ScreenerShell } from "./screener-shell.client";
+import { ScreenerShell, type PastScore } from "./screener-shell.client";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
 export const metadata = { title: "Screener · Acquisition" };
+export const dynamic = "force-dynamic";
 
 export default async function ScreenerPage() {
   const supabase = await createClient();
 
-  const [{ data: candidates }, { data: jds }, { data: attachments }] = await Promise.all([
-    supabase
-      .from("candidates")
-      .select("*")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("job_descriptions")
-      .select("*")
-      .order("created_at", { ascending: false }),
+  const [
+    { data: candidates },
+    { data: jds },
+    { data: attachments },
+    { data: scores },
+  ] = await Promise.all([
+    supabase.from("candidates").select("*").order("created_at", { ascending: false }),
+    supabase.from("job_descriptions").select("*").order("created_at", { ascending: false }),
     supabase
       .from("attachments")
       .select("candidate_id, parsed_text")
       .eq("kind", "cv_pdf"),
+    supabase
+      .from("scores")
+      .select(
+        "id, candidate_id, jd_id, skills_score, experience_score, culture_score, weighted_total, reasoning, strengths, gaps, prep_questions, hiring_report, model, prompt_version, scoring_mode, cost_usd, created_at",
+      )
+      .order("created_at", { ascending: false }),
   ]);
 
-  // Tally parsed text length per candidate for the "X chars cached" UI hint.
   const parsedTextLengths: Record<string, number> = {};
   for (const a of attachments ?? []) {
     const cid = a.candidate_id as string | null;
@@ -38,9 +43,8 @@ export default async function ScreenerPage() {
       <div>
         <h1 className="font-display text-3xl font-medium text-navy">Resume Screener</h1>
         <p className="mt-1 text-sm text-charcoal">
-          Score a candidate against a JD with{" "}
-          <span className="font-mono text-xs">claude-opus-4-7</span>. Output streams
-          live; the final score row is persisted with telemetry + prompt version.
+          Pick a candidate + JD, run a score. Every run is saved — the latest is
+          shown below, past runs are kept for comparison.
         </p>
       </div>
 
@@ -48,6 +52,7 @@ export default async function ScreenerPage() {
         candidates={(candidates ?? []) as CandidateRow[]}
         jds={(jds ?? []) as JdRow[]}
         parsedTextLengths={parsedTextLengths}
+        pastScores={(scores ?? []) as unknown as PastScore[]}
       />
     </div>
   );

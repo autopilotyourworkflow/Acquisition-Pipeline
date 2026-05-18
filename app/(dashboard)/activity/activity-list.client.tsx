@@ -52,11 +52,16 @@ function summarize(row: ActivityRow): string {
 
 // Undo only meaningful within 30 minutes of the action (plan default).
 // Older entries are read-only audit history.
-function canUndo(row: ActivityRow): boolean {
-  if (row.undone_at) return false;
-  if (row.redo_of) return false; // undo entries themselves aren't undoable here
+const UNDO_WINDOW_MS = 30 * 60 * 1000;
+
+type UndoState = "ok" | "expired" | "already-undone" | "is-undo-entry";
+
+function undoState(row: ActivityRow): UndoState {
+  if (row.undone_at) return "already-undone";
+  if (row.redo_of) return "is-undo-entry";
   const ageMs = Date.now() - new Date(row.created_at).getTime();
-  return ageMs < 30 * 60 * 1000;
+  if (ageMs >= UNDO_WINDOW_MS) return "expired";
+  return "ok";
 }
 
 export function ActivityList({ rows }: { rows: ActivityRow[] }) {
@@ -87,7 +92,7 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
   return (
     <ul className="space-y-1">
       {rows.map((row) => {
-        const undoable = canUndo(row);
+        const state = undoState(row);
         return (
           <li
             key={row.id}
@@ -103,12 +108,12 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
                 {row.target_table}
               </span>
               <span className="text-navy">{summarize(row)}</span>
-              {row.undone_at && (
+              {state === "already-undone" && (
                 <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 text-[10px] text-charcoal">
                   undone
                 </span>
               )}
-              {row.redo_of && (
+              {state === "is-undo-entry" && (
                 <span className="rounded-sm bg-info/15 px-1.5 py-0.5 text-[10px] text-info">
                   undo entry
                 </span>
@@ -122,7 +127,7 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
                   hour12: false,
                 })}
               </span>
-              {undoable && (
+              {state === "ok" ? (
                 <Button
                   size="xs"
                   variant="outline"
@@ -131,7 +136,14 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
                 >
                   {pendingId === row.id ? "Reverting…" : "Undo"}
                 </Button>
-              )}
+              ) : state === "expired" ? (
+                <span
+                  className="rounded-sm border border-sand-200 px-2 py-0.5 text-[10px] text-slate-mid"
+                  title="Undo expires 30 minutes after the action"
+                >
+                  Undo window passed
+                </span>
+              ) : null}
             </div>
           </li>
         );

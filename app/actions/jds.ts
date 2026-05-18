@@ -79,6 +79,7 @@ export async function updateJd(input: {
     must_have: string[];
     nice_to_have: string[];
     threshold: number;
+    scoring_persona_override: string | null;
   }>;
 }): Promise<ActionResult<{ logId: string }>> {
   try {

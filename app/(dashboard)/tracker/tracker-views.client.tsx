@@ -24,7 +24,10 @@ export function TrackerViews({
   jds: JdRow[];
 }) {
   const router = useRouter();
-  const [view, setView] = useState<ViewKey>("kanban");
+  // Default to table — denser information display for a recruiting team that
+  // mostly scans names + stages. Kanban is one click away and persists in
+  // localStorage once chosen.
+  const [view, setView] = useState<ViewKey>("table");
   const [hydrated, setHydrated] = useState(false);
 
   // Lifted state: TrackerViews owns the candidates list. Kanban and Table
@@ -75,11 +78,35 @@ export function TrackerViews({
           toast.error("Couldn't move candidate", { description: result.error });
           return;
         }
-        toast.success(
-          `Moved ${target.full_name} → ${STAGE_LABELS[nextStage]}`,
-          { description: "Activity logged. Undo coming Day 4." },
-        );
-        // Background sync — pulls in any related changes (updated_at, row_hash).
+
+        const logId = result.data.logId;
+        toast.success(`Moved ${target.full_name} → ${STAGE_LABELS[nextStage]}`, {
+          description: "Click Undo within 30 seconds to revert.",
+          duration: 30000,
+          action: logId
+            ? {
+                label: "Undo",
+                onClick: async () => {
+                  const resp = await fetch("/api/audit/undo", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ logId }),
+                  });
+                  const json = await resp.json().catch(() => ({}));
+                  if (!resp.ok) {
+                    toast.error("Undo failed", {
+                      description: json?.error ?? `HTTP ${resp.status}`,
+                    });
+                    return;
+                  }
+                  // Server reverted — restore the snapshot locally too.
+                  setCandidates(before);
+                  toast.success("Reverted");
+                  router.refresh();
+                },
+              }
+            : undefined,
+        });
         router.refresh();
       });
     },

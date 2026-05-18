@@ -18,6 +18,7 @@ type Form = {
   must_have_csv: string;
   nice_to_have_csv: string;
   threshold: string;
+  scoring_persona_override: string;
 };
 
 function rowToForm(jd?: JdRow): Form {
@@ -29,6 +30,7 @@ function rowToForm(jd?: JdRow): Form {
     must_have_csv: jd?.must_have.join(", ") ?? "",
     nice_to_have_csv: jd?.nice_to_have.join(", ") ?? "",
     threshold: jd?.threshold?.toString() ?? "7.0",
+    scoring_persona_override: jd?.scoring_persona_override ?? "",
   };
 }
 
@@ -67,6 +69,7 @@ export function JdEditor({
       return;
     }
 
+    const override = form.scoring_persona_override.trim();
     const payload = {
       title: form.title.trim(),
       department: form.department.trim() || null,
@@ -75,6 +78,7 @@ export function JdEditor({
       must_have: csvToArray(form.must_have_csv),
       nice_to_have: csvToArray(form.nice_to_have_csv),
       threshold,
+      scoring_persona_override: override.length > 0 ? override : null,
     };
 
     startTransition(async () => {
@@ -173,6 +177,41 @@ export function JdEditor({
           className="font-mono text-xs"
         />
       </Field>
+
+      <details className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-sm">
+        <summary className="cursor-pointer text-charcoal">
+          Advanced — custom scoring persona for this role{" "}
+          <span className="ml-1 text-[11px] text-slate-mid">
+            {form.scoring_persona_override.trim().length > 0
+              ? "(override active)"
+              : "(uses global default)"}
+          </span>
+        </summary>
+        <div className="mt-3 space-y-2">
+          <p className="text-[11px] text-slate-deep">
+            Leave empty to use the org-wide default from{" "}
+            <code className="font-mono">/settings/prompts</code>. Fill this in
+            when this role needs different scoring guidance (e.g. for academic
+            roles where credentials matter, or for sales roles where track
+            record outweighs technical depth). The override is stored on the JD
+            and used at scoring time only for THIS role.
+          </p>
+          <Textarea
+            id="scoring_persona_override"
+            rows={12}
+            value={form.scoring_persona_override}
+            onChange={(e) =>
+              setForm({ ...form, scoring_persona_override: e.target.value })
+            }
+            placeholder="Empty = use global. Otherwise this overrides the system prompt for scoring runs against this JD."
+            className="font-mono text-xs"
+          />
+          <p className="text-[11px] text-slate-mid">
+            Reminder: keep the &quot;output via the submit_score tool&quot;
+            instruction — without it scoring will fail validation.
+          </p>
+        </div>
+      </details>
 
       <div className="flex items-center justify-between border-t border-sand-100 pt-3">
         <div>

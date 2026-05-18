@@ -55,11 +55,34 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
 | 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ `withAudit` HOF + Claude client (retry / cache / telemetry / tool-use forcing) + `scoring.v1` prompt + Tracker (Kanban + Table + JD CRUD) + Screener (SSE stream, ScoreCard, unpdf upload). Live smoke test: 8.60 weighted in 26s at $0.16 against seed JD. |
 | 3 — Scraper + Scheduler basics | Day 3 | not started |
-| 4 — Overdelivery (cold email, FreeBusy, undo/redo, invites) | Day 4 | not started |
+| 4 — Overdelivery (cold email, FreeBusy, undo/redo conflict, invites, **auto-email-reader**) | Day 4 | not started |
 | 5 — Browser extension + polish + demo | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |
 
 Update this table at the end of each phase. Append a fresh entry to `cowork-log.md` after every major decision or successfully completed module.
+
+## Phase 4 — auto-email-reader feature (added 2026-05-19)
+
+A user-requested overdelivery feature added during Phase 2 conversations:
+
+**Goal:** automatically watch a chosen Gmail inbox for incoming candidate emails (resumes, CVs, cover letters as PDF attachments) and auto-create + auto-score the candidates against a default JD. Opt-in, per-user.
+
+**Implementation sketch** (Day 4):
+- Add `gmail.readonly` to the bundled OAuth scopes in `app/(auth)/login/login-form.client.tsx`. Drop `prompt=consent` only if we need to re-prompt existing users; otherwise add the scope to the request list and Google will re-consent on next sign-in.
+- New table `gmail_watch_configs` (one per user): `user_id`, `is_active`, `from_filter` (optional list of allowed senders), `subject_filter` (default: `resume OR CV OR "cover letter" OR application`), `default_jd_id`, `last_polled_at`, `last_message_id`.
+- New endpoint `app/api/cron/gmail-poll/route.ts` invoked by Vercel Cron every 15 minutes (`vercel.json` cron config). For each active config:
+  - Decrypt + refresh the user's Google access token via `oauth_tokens`.
+  - `gmail.users.messages.list?q=...&after=<last_polled_at>` to find new matches.
+  - For each message: download any PDF attachments, run them through `app/api/attachments/upload` logic (hash-dedup'd), create a `candidates` row with `source: 'email'` (new enum value — migration), trigger a single-mode score against the configured default JD.
+  - Update `last_polled_at` + `last_message_id` to skip the same message next poll.
+- UI at `/settings/integrations`: toggle, sender filter, default JD picker, last-poll status.
+- Notifications: in-app "New candidate auto-scored" toast or a "New" badge on the tracker (push beyond scope for take-home — could be Day 5 polish).
+
+**Why Phase 4:** depends on Phase-3 work (Gmail OAuth flow + Calendar integration patterns) and the scoring pipeline being solid. Slots cleanly into the existing scrape → score → email-draft pipeline.
+
+**Status:** PLANNED, not yet built.
+
+---
 
 ## Cowork-log voice
 The cowork log is a graded deliverable. Read the existing entries before adding a new one — match their voice. The voice is:

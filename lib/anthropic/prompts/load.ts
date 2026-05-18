@@ -36,6 +36,25 @@ export async function loadActiveScoringPrompt(): Promise<ActivePrompt> {
 }
 
 /**
+ * Resolve the scoring persona for a specific JD. If the JD has a non-empty
+ * `scoring_persona_override`, use it (with a JD-specific version label). Else
+ * fall back to the org-wide active prompt.
+ */
+export async function loadScoringPromptForJd(jd: {
+  id: string;
+  scoring_persona_override: string | null;
+}): Promise<ActivePrompt> {
+  const override = jd.scoring_persona_override?.trim();
+  if (override && override.length > 50) {
+    return {
+      version: `jd-${jd.id.slice(0, 8)}:custom`,
+      personaText: override,
+    };
+  }
+  return loadActiveScoringPrompt();
+}
+
+/**
  * Build the scoring messages using a specific persona — separated out so the
  * route handler can use the active prompt from DB while keeping the message
  * structure (cacheable JD block, user message) constant.

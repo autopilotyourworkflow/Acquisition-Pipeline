@@ -6,10 +6,32 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScoreStream } from "@/components/screener/ScoreStream.client";
+import { ScoreCard, type ScoreCardData } from "@/components/screener/ScoreCard";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
+import { cn } from "@/lib/utils";
 
 type ModelChoice = "claude-haiku-4-5" | "claude-opus-4-7";
 type ScoringMode = "single" | "team";
+
+export type PastScore = {
+  id: string;
+  candidate_id: string;
+  jd_id: string;
+  skills_score: number;
+  experience_score: number;
+  culture_score: number;
+  weighted_total: number;
+  reasoning: { skills: string; experience: string; culture: string };
+  strengths: string[];
+  gaps: string[];
+  prep_questions: string[];
+  hiring_report: string | null;
+  model: string;
+  prompt_version: string;
+  scoring_mode: "single" | "team";
+  cost_usd: number | null;
+  created_at: string;
+};
 
 const MODEL_OPTIONS: { value: ModelChoice; label: string; hint: string }[] = [
   {
@@ -41,9 +63,35 @@ type Props = {
   candidates: CandidateRow[];
   jds: JdRow[];
   parsedTextLengths: Record<string, number>;
+  pastScores: PastScore[];
 };
 
-export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
+function pastScoreToCardData(
+  s: PastScore,
+  threshold: number | null,
+): ScoreCardData {
+  return {
+    scoreId: s.id,
+    skills_score: s.skills_score,
+    experience_score: s.experience_score,
+    culture_score: s.culture_score,
+    weighted_total: s.weighted_total,
+    reasoning: s.reasoning,
+    strengths: s.strengths,
+    gaps: s.gaps,
+    prep_questions: s.prep_questions,
+    hiring_report: s.hiring_report ?? "",
+    passes_threshold: threshold !== null ? s.weighted_total >= threshold : null,
+    cost_usd: s.cost_usd ?? undefined,
+  };
+}
+
+export function ScreenerShell({
+  candidates,
+  jds,
+  parsedTextLengths,
+  pastScores,
+}: Props) {
   const router = useRouter();
   const [candidateId, setCandidateId] = useState(candidates[0]?.id ?? "");
   const candidate = candidates.find((c) => c.id === candidateId) ?? null;
@@ -57,16 +105,44 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
     model: ModelChoice;
     mode: ScoringMode;
   } | null>(null);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [uploading, startUploadTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parsedLen = useMemo(() => parsedTextLengths[candidateId] ?? 0, [candidateId, parsedTextLengths]);
+  const parsedLen = useMemo(
+    () => parsedTextLengths[candidateId] ?? 0,
+    [candidateId, parsedTextLengths],
+  );
+
+  // Past runs for the currently-selected (candidate, JD) pair.
+  const relevantHistory = useMemo(
+    () =>
+      pastScores
+        .filter((s) => s.candidate_id === candidateId && s.jd_id === jdId)
+        .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at)),
+    [pastScores, candidateId, jdId],
+  );
+
+  const displayedScore = useMemo(() => {
+    if (relevantHistory.length === 0) return null;
+    if (selectedHistoryId) {
+      return relevantHistory.find((s) => s.id === selectedHistoryId) ?? relevantHistory[0];
+    }
+    return relevantHistory[0];
+  }, [relevantHistory, selectedHistoryId]);
 
   function onPickCandidate(id: string) {
     setCandidateId(id);
     const c = candidates.find((x) => x.id === id);
     if (c?.jd_id) setJdId(c.jd_id);
     setRun(null);
+    setSelectedHistoryId(null);
+  }
+
+  function onPickJd(id: string) {
+    setJdId(id);
+    setRun(null);
+    setSelectedHistoryId(null);
   }
 
   function onUploadCv(file: File) {
@@ -103,6 +179,7 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
       return;
     }
     setRun({ candidateId, jdId, model, mode });
+    setSelectedHistoryId(null);
   }
 
   if (candidates.length === 0) {
@@ -157,7 +234,7 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
           <select
             id="jd"
             value={jdId}
-            onChange={(e) => setJdId(e.target.value)}
+            onChange={(e) => onPickJd(e.target.value)}
             className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
           >
             {jds.map((j) => (
@@ -166,6 +243,11 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
               </option>
             ))}
           </select>
+          {jd?.scoring_persona_override && (
+            <p className="text-[11px] text-terracotta-700">
+              ✱ This JD uses a custom scoring persona override.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -259,11 +341,12 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
           )}
         </div>
         <Button onClick={onRunScore} disabled={!candidateId || !jdId || uploading}>
-          Run score
+          {relevantHistory.length > 0 ? "Score again" : "Run score"}
         </Button>
       </div>
 
-      {run && (
+      {/* Live run takes precedence when active. */}
+      {run ? (
         <ScoreStream
           key={`${run.candidateId}:${run.jdId}:${run.model}:${run.mode}:${Date.now()}`}
           candidateId={run.candidateId}
@@ -271,8 +354,134 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
           model={run.model}
           mode={run.mode}
           threshold={jd?.threshold ?? 7}
+          onDone={() => router.refresh()}
         />
+      ) : displayedScore ? (
+        <div className="space-y-3">
+          <PastRunBadge
+            score={displayedScore}
+            isLatest={displayedScore.id === relevantHistory[0]?.id}
+          />
+          <ScoreCard data={pastScoreToCardData(displayedScore, jd?.threshold ?? null)} />
+          {relevantHistory.length > 1 && (
+            <PastRunsList
+              runs={relevantHistory}
+              selectedId={displayedScore.id}
+              onSelect={setSelectedHistoryId}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-8 text-center text-sm text-charcoal">
+          No previous scores for this candidate + JD. Click <span className="font-medium">Run score</span> to start.
+        </div>
       )}
     </div>
+  );
+}
+
+function PastRunBadge({
+  score,
+  isLatest,
+}: {
+  score: PastScore;
+  isLatest: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-sand-200 bg-warm-white px-3 py-2 text-[11px] text-charcoal">
+      <span className="font-medium text-navy">
+        {isLatest ? "Latest score" : "Past score"}
+      </span>
+      <span className="font-mono text-slate-deep">
+        {new Date(score.created_at).toLocaleString("en-GB", {
+          timeZone: "Asia/Bangkok",
+          hour12: false,
+        })}
+      </span>
+      <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono">
+        {score.model}
+      </span>
+      <span
+        className={cn(
+          "rounded-sm px-1.5 py-0.5",
+          score.scoring_mode === "team"
+            ? "bg-terracotta-50 text-terracotta-700"
+            : "bg-sand-100",
+        )}
+      >
+        {score.scoring_mode === "team" ? "team (3+1)" : "single"}
+      </span>
+      <span className="font-mono text-slate-mid">
+        prompt: {score.prompt_version}
+      </span>
+      {score.cost_usd !== null && (
+        <span className="ml-auto font-mono text-slate-deep">
+          ${score.cost_usd.toFixed(4)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PastRunsList({
+  runs,
+  selectedId,
+  onSelect,
+}: {
+  runs: PastScore[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <details className="rounded-md border border-sand-200 bg-warm-white">
+      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
+        Previous runs ({runs.length - 1} more)
+      </summary>
+      <ul className="divide-y divide-sand-100 border-t border-sand-100">
+        {runs.map((r) => {
+          const isSelected = r.id === selectedId;
+          return (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(r.id)}
+                className={cn(
+                  "flex w-full items-center justify-between px-4 py-2 text-left text-sm",
+                  isSelected ? "bg-terracotta-50/50" : "hover:bg-cream",
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-base font-medium text-navy">
+                    {r.weighted_total.toFixed(2)}
+                  </span>
+                  <span className="text-[11px] text-slate-deep">
+                    {new Date(r.created_at).toLocaleString("en-GB", {
+                      timeZone: "Asia/Bangkok",
+                      hour12: false,
+                    })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-slate-mid">
+                  <span className="font-mono">{r.model}</span>
+                  <span
+                    className={cn(
+                      "rounded-sm px-1.5 py-0.5",
+                      r.scoring_mode === "team"
+                        ? "bg-terracotta-50 text-terracotta-700"
+                        : "bg-sand-100",
+                    )}
+                  >
+                    {r.scoring_mode}
+                  </span>
+                  {isSelected && (
+                    <span className="font-medium text-terracotta-700">viewing</span>
+                  )}
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }

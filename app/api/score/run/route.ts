@@ -10,7 +10,7 @@ import {
 } from "@/lib/anthropic/client";
 import { submitScoreTool, type SubmitScoreInput } from "@/lib/anthropic/tools/submit_score";
 import {
-  loadActiveScoringPrompt,
+  loadScoringPromptForJd,
   buildScoringMessagesWithPersona,
 } from "@/lib/anthropic/prompts/load";
 import {
@@ -117,7 +117,6 @@ export async function POST(req: NextRequest) {
     { data: candidate, error: cErr },
     { data: jd, error: jErr },
     { data: cv },
-    activePrompt,
   ] = await Promise.all([
     supabase.from("candidates").select("*").eq("id", body.candidateId).single(),
     supabase.from("job_descriptions").select("*").eq("id", body.jdId).single(),
@@ -129,7 +128,6 @@ export async function POST(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    loadActiveScoringPrompt(),
   ]);
 
   if (cErr || !candidate) {
@@ -145,6 +143,11 @@ export async function POST(req: NextRequest) {
 
   const candidateRow = candidate as CandidateRow;
   const jdRow = jd as JdRow;
+  // Per-JD prompt override first, then org-wide active, then file-based fallback.
+  const activePrompt = await loadScoringPromptForJd({
+    id: jdRow.id,
+    scoring_persona_override: jdRow.scoring_persona_override,
+  });
   const candidateText = buildCandidateText(candidateRow, cv?.parsed_text ?? null);
 
   const { system: scorerSystem, messages: scorerMessages } = buildScoringMessagesWithPersona(
