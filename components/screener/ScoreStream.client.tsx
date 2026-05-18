@@ -3,36 +3,40 @@
 import { useEffect, useRef, useState } from "react";
 import { ScoreCard, type ScoreCardData } from "./ScoreCard";
 
-/**
- * Hosts the SSE EventSource lifecycle for /api/score/run. Renders a streaming
- * view of accumulated tool-input text while Claude scores, then swaps to the
- * final ScoreCard on `score_complete`.
- *
- * EventSource is GET-only by spec, so we fall back to a fetch() + ReadableStream
- * reader for our POST endpoint. The protocol on the wire is still SSE-formatted
- * (event: / data: / blank line), which keeps the server side conventional.
- */
+type ErrorTelemetry = {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  cost_usd: number;
+};
+
 export function ScoreStream({
   candidateId,
   jdId,
+  model,
   threshold,
   onDone,
 }: {
   candidateId: string;
   jdId: string;
+  model: string;
   threshold: number;
   onDone?: () => void;
 }) {
   const [partialText, setPartialText] = useState("");
   const [final, setFinal] = useState<ScoreCardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{
+    message: string;
+    telemetry?: ErrorTelemetry;
+    raw?: unknown;
+  } | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const startedRef = useRef<number>(Date.now());
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    abortRef.current = controller;
     startedRef.current = Date.now();
     const tick = setInterval(() => {
       setElapsedMs(Date.now() - startedRef.current);
@@ -43,12 +47,12 @@ export function ScoreStream({
         const resp = await fetch("/api/score/run", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ candidateId, jdId }),
+          body: JSON.stringify({ candidateId, jdId, model }),
           signal: controller.signal,
         });
         if (!resp.ok || !resp.body) {
           const text = await resp.text().catch(() => "");
-          setError(text || `Request failed (${resp.status})`);
+          setError({ message: text || `Request failed (${resp.status})` });
           return;
         }
 
@@ -58,7 +62,6 @@ export function ScoreStream({
           const { done, value } = await reader.read();
           if (done) break;
           buffer += value;
-          // Parse SSE frames: events terminated by blank line.
           let idx: number;
           while ((idx = buffer.indexOf("\n\n")) !== -1) {
             const frame = buffer.slice(0, idx);
@@ -68,7 +71,7 @@ export function ScoreStream({
         }
       } catch (err) {
         if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "Stream failed");
+        setError({ message: err instanceof Error ? err.message : "Stream failed" });
       } finally {
         clearInterval(tick);
         onDone?.();
@@ -77,7 +80,7 @@ export function ScoreStream({
 
     function handleFrame(frame: string) {
       let event = "message";
-      let dataLines: string[] = [];
+      const dataLines: string[] = [];
       for (const line of frame.split("\n")) {
         if (line.startsWith("event:")) event = line.slice(6).trim();
         else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
@@ -111,7 +114,11 @@ export function ScoreStream({
           cost_usd: data.telemetry?.cost_usd,
         });
       } else if (event === "score_error") {
-        setError(data.message ?? "Unknown error");
+        setError({
+          message: data.message ?? "Unknown error",
+          telemetry: data.telemetry,
+          raw: data.raw,
+        });
       }
     }
 
@@ -121,13 +128,48 @@ export function ScoreStream({
       controller.abort();
       clearInterval(tick);
     };
-  }, [candidateId, jdId, threshold, onDone]);
+  }, [candidateId, jdId, model, threshold, onDone]);
 
   if (error) {
     return (
-      <div className="rounded-md border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
-        <p className="font-medium">Scoring failed</p>
-        <p className="mt-1 font-mono text-xs">{error}</p>
+      <div className="space-y-3 rounded-md border border-danger/30 bg-danger/5 p-4">
+        <div>
+          <p className="text-sm font-medium text-danger">Scoring failed</p>
+          <p className="mt-1 text-sm text-danger/90">{error.message}</p>
+        </div>
+        {error.telemetry && (
+          <div className="rounded-md border border-danger/20 bg-warm-white px-3 py-2 text-[11px] text-charcoal">
+            <p className="mb-1 font-medium text-navy">
+              Tokens were spent — here&apos;s what it cost:
+            </p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono">
+              <span>model</span>
+              <span>{error.telemetry.model}</span>
+              <span>input</span>
+              <span>{error.telemetry.input_tokens.toLocaleString()}</span>
+              <span>output</span>
+              <span>{error.telemetry.output_tokens.toLocaleString()}</span>
+              <span>cache read</span>
+              <span>{error.telemetry.cache_read_input_tokens.toLocaleString()}</span>
+              <span>cache write</span>
+              <span>{error.telemetry.cache_creation_input_tokens.toLocaleString()}</span>
+              <span className="font-medium text-terracotta-700">cost</span>
+              <span className="font-medium text-terracotta-700">
+                ${error.telemetry.cost_usd.toFixed(4)}
+              </span>
+            </div>
+          </div>
+        )}
+        {error.raw !== undefined && (
+          <details className="text-[11px]">
+            <summary className="cursor-pointer text-slate-deep">
+              Show what Claude actually returned
+            </summary>
+            <pre className="mt-2 max-h-48 overflow-y-auto rounded-md bg-warm-white p-3 font-mono text-charcoal">
+              {JSON.stringify(error.raw, null, 2)}
+            </pre>
+          </details>
+        )}
       </div>
     );
   }
@@ -139,7 +181,9 @@ export function ScoreStream({
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-sand-200 bg-cream/40 p-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-navy">Claude is scoring…</p>
+        <p className="text-sm font-medium text-navy">
+          Claude is scoring… <span className="text-xs text-slate-mid">({model})</span>
+        </p>
         <span className="font-mono text-xs text-slate-mid">
           {(elapsedMs / 1000).toFixed(1)}s
         </span>

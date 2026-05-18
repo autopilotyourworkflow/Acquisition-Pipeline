@@ -60,11 +60,12 @@ async function main() {
 
   const started = Date.now();
   const { value, telemetry } = await callWithTool({
-    model: "claude-opus-4-7",
+    model: "claude-haiku-4-5",
     system,
     messages,
     tool: submitScoreTool,
     maxTokens: 8192,
+    temperature: 0,
   });
 
   console.log(`\n✅ Score returned in ${((Date.now() - started) / 1000).toFixed(1)}s`);

@@ -1,38 +1,44 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { streamWithTool } from "@/lib/anthropic/client";
+import {
+  streamWithTool,
+  ClaudeValidationError,
+  type ClaudeTelemetry,
+  type ModelId,
+} from "@/lib/anthropic/client";
 import { submitScoreTool, type SubmitScoreInput } from "@/lib/anthropic/tools/submit_score";
-import { PROMPT_VERSION, buildScoringMessages } from "@/lib/anthropic/prompts/scoring.v1";
+import {
+  loadActiveScoringPrompt,
+  buildScoringMessagesWithPersona,
+} from "@/lib/anthropic/prompts/load";
 import { ORG_ID } from "@/lib/db/constants";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
 /**
  * POST /api/score/run
- * Body: { candidateId: string, jdId: string }
+ * Body: { candidateId, jdId, model? ('claude-opus-4-7' | 'claude-haiku-4-5') }
  *
- * Streams Server-Sent Events with three event types:
- *   - score_partial: { text: <accumulated_tool_input_string> }
- *       Periodic updates so the UI can show that Claude is working.
- *   - score_complete: { scoreId, value, telemetry }
- *       Final validated score with the scores.id persisted in Postgres.
- *   - score_error: { message }
- *
- * Node runtime required (unpdf and the Anthropic SDK both depend on Node APIs).
+ * Streams Server-Sent Events:
+ *   - score_partial { text }                              — typewriter view
+ *   - score_complete { scoreId, value, telemetry, ... }   — final result
+ *   - score_error    { message, telemetry?, raw? }        — failure, with cost
+ *                                                            if tokens were spent
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RequestBody = { candidateId: string; jdId: string };
+type RequestBody = { candidateId: string; jdId: string; model?: ModelId };
+
+const ALLOWED_MODELS: ModelId[] = ["claude-opus-4-7", "claude-haiku-4-5"];
+const DEFAULT_MODEL: ModelId = "claude-haiku-4-5"; // cheap by default; UI exposes Opus
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 function buildCandidateText(candidate: CandidateRow, parsedCv: string | null): string {
-  // Prefer parsed CV text; fall back to whatever structured signal we have.
   if (parsedCv && parsedCv.trim().length > 100) return parsedCv;
-
   const lines: string[] = [];
   lines.push(`Name: ${candidate.full_name}`);
   if (candidate.current_title) lines.push(`Current title: ${candidate.current_title}`);
@@ -70,11 +76,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Fetch candidate + JD + most-recent CV parsed_text in parallel.
+  const model: ModelId =
+    body.model && ALLOWED_MODELS.includes(body.model) ? body.model : DEFAULT_MODEL;
+
   const [
     { data: candidate, error: cErr },
     { data: jd, error: jErr },
     { data: cv },
+    activePrompt,
   ] = await Promise.all([
     supabase.from("candidates").select("*").eq("id", body.candidateId).single(),
     supabase.from("job_descriptions").select("*").eq("id", body.jdId).single(),
@@ -86,6 +95,7 @@ export async function POST(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    loadActiveScoringPrompt(),
   ]);
 
   if (cErr || !candidate) {
@@ -103,7 +113,7 @@ export async function POST(req: NextRequest) {
   const jdRow = jd as JdRow;
   const candidateText = buildCandidateText(candidateRow, cv?.parsed_text ?? null);
 
-  const { system, messages } = buildScoringMessages({
+  const { system, messages } = buildScoringMessagesWithPersona(activePrompt.personaText, {
     jdTitle: jdRow.title,
     jdBody: jdRow.body_markdown,
     jdMustHave: jdRow.must_have,
@@ -113,21 +123,23 @@ export async function POST(req: NextRequest) {
   });
 
   const { stream, result } = streamWithTool<SubmitScoreInput>({
-    model: "claude-opus-4-7",
+    model,
     system,
     messages,
     tool: submitScoreTool,
     maxTokens: 8192,
+    temperature: 0,
   });
 
   const encoder = new TextEncoder();
   const responseStream = new ReadableStream({
     async start(controller) {
       let accumulated = "";
+      const emit = (event: string, data: unknown) =>
+        controller.enqueue(encoder.encode(sseEvent(event, data)));
+
       try {
         for await (const event of stream) {
-          // Anthropic's stream events: we only care about input_json_delta for the
-          // tool_use content block — that's the streaming structured output.
           if (
             event &&
             typeof event === "object" &&
@@ -137,16 +149,13 @@ export async function POST(req: NextRequest) {
             const delta = (event as { delta?: { type?: string; partial_json?: string } }).delta;
             if (delta?.type === "input_json_delta" && typeof delta.partial_json === "string") {
               accumulated += delta.partial_json;
-              controller.enqueue(
-                encoder.encode(sseEvent("score_partial", { text: accumulated })),
-              );
+              emit("score_partial", { text: accumulated, model });
             }
           }
         }
 
         const { value, telemetry } = await result;
 
-        // Persist the score row.
         const admin = createAdminClient();
         const { data: scoreRow, error: insertErr } = await admin
           .from("scores")
@@ -163,7 +172,7 @@ export async function POST(req: NextRequest) {
             prep_questions: value.prep_questions,
             hiring_report: value.hiring_report,
             model: telemetry.model,
-            prompt_version: PROMPT_VERSION,
+            prompt_version: activePrompt.version,
             input_tokens: telemetry.input_tokens,
             output_tokens: telemetry.output_tokens,
             cost_usd: Number(telemetry.cost_usd.toFixed(4)),
@@ -173,34 +182,48 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (insertErr || !scoreRow) {
-          controller.enqueue(
-            encoder.encode(
-              sseEvent("score_error", {
-                message: `Score generated but DB persist failed: ${insertErr?.message ?? "unknown"}`,
-                value,
-              }),
-            ),
-          );
+          emit("score_error", {
+            message: `Score generated but DB persist failed: ${insertErr?.message ?? "unknown"}`,
+            telemetry,
+            value,
+          });
         } else {
-          controller.enqueue(
-            encoder.encode(
-              sseEvent("score_complete", {
-                scoreId: scoreRow.id,
-                value,
-                telemetry,
-                weighted_total: scoreRow.weighted_total,
-              }),
-            ),
-          );
+          emit("score_complete", {
+            scoreId: scoreRow.id,
+            value,
+            telemetry,
+            weighted_total: scoreRow.weighted_total,
+            prompt_version: activePrompt.version,
+          });
         }
       } catch (err) {
-        controller.enqueue(
-          encoder.encode(
-            sseEvent("score_error", {
-              message: err instanceof Error ? err.message : "Unknown error",
-            }),
-          ),
-        );
+        // ClaudeValidationError carries the telemetry through — surface it so
+        // the UI can show "X tokens / $Y spent on a failed score".
+        if (err instanceof ClaudeValidationError) {
+          emit("score_error", {
+            message:
+              "Claude returned output that failed validation. " +
+              "Often a sign the model truncated the JSON — try a different model or shorter prompt.",
+            telemetry: err.telemetry,
+            issues: err.issues,
+            raw: err.rawInput,
+          });
+        } else {
+          // Other errors (network, auth, etc.) — telemetry not available.
+          let telemetry: ClaudeTelemetry | undefined;
+          if (
+            typeof err === "object" &&
+            err !== null &&
+            "telemetry" in err &&
+            (err as { telemetry: unknown }).telemetry
+          ) {
+            telemetry = (err as { telemetry: ClaudeTelemetry }).telemetry;
+          }
+          emit("score_error", {
+            message: err instanceof Error ? err.message : "Unknown error",
+            telemetry,
+          });
+        }
       } finally {
         controller.close();
       }
@@ -211,7 +234,7 @@ export async function POST(req: NextRequest) {
     headers: {
       "content-type": "text/event-stream; charset=utf-8",
       "cache-control": "no-cache, no-transform",
-      "connection": "keep-alive",
+      connection: "keep-alive",
       "x-accel-buffering": "no",
     },
   });

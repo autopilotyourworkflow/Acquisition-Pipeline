@@ -8,10 +8,25 @@ import { Label } from "@/components/ui/label";
 import { ScoreStream } from "@/components/screener/ScoreStream.client";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
+type ModelChoice = "claude-haiku-4-5" | "claude-opus-4-7";
+
+const MODEL_OPTIONS: { value: ModelChoice; label: string; hint: string }[] = [
+  {
+    value: "claude-haiku-4-5",
+    label: "Haiku 4.5 — fast & cheap",
+    hint: "~$0.01–0.03 per score · 8–15s · use while testing",
+  },
+  {
+    value: "claude-opus-4-7",
+    label: "Opus 4.7 — top quality",
+    hint: "~$0.15–0.25 per score · 25–40s · final decisions",
+  },
+];
+
 type Props = {
   candidates: CandidateRow[];
   jds: JdRow[];
-  parsedTextLengths: Record<string, number>; // candidateId -> total cached parsed_text bytes
+  parsedTextLengths: Record<string, number>;
 };
 
 export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
@@ -20,7 +35,12 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
   const candidate = candidates.find((c) => c.id === candidateId) ?? null;
   const [jdId, setJdId] = useState<string>(candidate?.jd_id ?? jds[0]?.id ?? "");
   const jd = jds.find((j) => j.id === jdId) ?? null;
-  const [run, setRun] = useState<{ candidateId: string; jdId: string } | null>(null);
+  const [model, setModel] = useState<ModelChoice>("claude-haiku-4-5");
+  const [run, setRun] = useState<{
+    candidateId: string;
+    jdId: string;
+    model: ModelChoice;
+  } | null>(null);
   const [uploading, startUploadTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,9 +72,11 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
         toast.error("Upload failed", { description: json?.error ?? `HTTP ${resp.status}` });
         return;
       }
-      toast.success("CV uploaded + parsed", {
-        description: `${json.parsedTextLength?.toLocaleString?.() ?? "?"} chars cached`,
-      });
+      const chars = json.parsedTextLength?.toLocaleString?.() ?? "?";
+      toast.success(
+        json.reused ? "Same PDF detected — reused cached extract" : "CV uploaded + parsed",
+        { description: `${chars} chars cached${json.reused ? " (no re-parse)" : ""}` },
+      );
       router.refresh();
     });
   }
@@ -64,7 +86,7 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
       toast.error("Pick a candidate and a JD");
       return;
     }
-    setRun({ candidateId, jdId });
+    setRun({ candidateId, jdId, model });
   }
 
   if (candidates.length === 0) {
@@ -92,7 +114,7 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 rounded-lg border border-sand-200 bg-warm-white p-5 md:grid-cols-3">
+      <div className="grid gap-4 rounded-lg border border-sand-200 bg-warm-white p-5 md:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="candidate" className="text-xs text-slate-deep">
             Candidate
@@ -131,6 +153,27 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
         </div>
 
         <div className="space-y-1.5">
+          <Label htmlFor="model" className="text-xs text-slate-deep">
+            Model
+          </Label>
+          <select
+            id="model"
+            value={model}
+            onChange={(e) => setModel(e.target.value as ModelChoice)}
+            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+          >
+            {MODEL_OPTIONS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-mid">
+            {MODEL_OPTIONS.find((m) => m.value === model)?.hint}
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
           <Label className="text-xs text-slate-deep">CV PDF</Label>
           <div className="flex items-center gap-2">
             <input
@@ -154,7 +197,9 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
               {uploading ? "Parsing…" : parsedLen > 0 ? "Replace PDF" : "Upload PDF"}
             </Button>
             <span className="text-[11px] text-slate-mid">
-              {parsedLen > 0 ? `${parsedLen.toLocaleString()} chars cached` : "No CV uploaded"}
+              {parsedLen > 0
+                ? `${parsedLen.toLocaleString()} chars cached (dedup'd on re-upload)`
+                : "No CV uploaded"}
             </span>
           </div>
         </div>
@@ -183,9 +228,10 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
 
       {run && (
         <ScoreStream
-          key={`${run.candidateId}:${run.jdId}:${Date.now()}`}
+          key={`${run.candidateId}:${run.jdId}:${run.model}:${Date.now()}`}
           candidateId={run.candidateId}
           jdId={run.jdId}
+          model={run.model}
           threshold={jd?.threshold ?? 7}
         />
       )}

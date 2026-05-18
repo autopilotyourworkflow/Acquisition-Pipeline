@@ -1,6 +1,5 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -12,9 +11,7 @@ import {
   useDroppable,
   closestCenter,
 } from "@dnd-kit/core";
-import { toast } from "sonner";
-import { updateCandidateStage } from "@/app/actions/candidates";
-import { CANDIDATE_STAGES, STAGE_LABELS, type CandidateStage } from "@/lib/db/enums";
+import { CANDIDATE_STAGES, type CandidateStage } from "@/lib/db/enums";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
@@ -22,25 +19,20 @@ import { cn } from "@/lib/utils";
 
 type CandidateWithJd = CandidateRow & { jd_title: string | null };
 
+/**
+ * KanbanBoard is now a controlled component. The mutation is owned by
+ * TrackerViews so view-switching during a drop doesn't lose the optimistic
+ * state, and the Table view sees the move instantly.
+ */
 export function KanbanBoard({
   candidates,
   jds: _jds,
+  onMove,
 }: {
   candidates: CandidateWithJd[];
   jds: JdRow[];
+  onMove: (candidateId: string, nextStage: CandidateStage) => void;
 }) {
-  const [, startTransition] = useTransition();
-  const [optimistic, setOptimistic] = useOptimistic(
-    candidates,
-    (
-      state,
-      change: { id: string; stage: CandidateStage },
-    ): CandidateWithJd[] =>
-      state.map((c) =>
-        c.id === change.id ? { ...c, stage: change.stage } : c,
-      ),
-  );
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
@@ -49,39 +41,14 @@ export function KanbanBoard({
   const byStage: Record<CandidateStage, CandidateWithJd[]> = Object.fromEntries(
     CANDIDATE_STAGES.map((s) => [s, [] as CandidateWithJd[]]),
   ) as Record<CandidateStage, CandidateWithJd[]>;
-  for (const c of optimistic) byStage[c.stage].push(c);
+  for (const c of candidates) byStage[c.stage].push(c);
 
   function onDragEnd(event: DragEndEvent) {
     const overId = event.over?.id;
     const activeId = event.active.id;
     if (!overId || typeof overId !== "string" || typeof activeId !== "string") return;
     if (!CANDIDATE_STAGES.includes(overId as CandidateStage)) return;
-
-    const candidate = optimistic.find((c) => c.id === activeId);
-    if (!candidate) return;
-    const nextStage = overId as CandidateStage;
-    if (candidate.stage === nextStage) return;
-
-    startTransition(async () => {
-      setOptimistic({ id: activeId, stage: nextStage });
-      const result = await updateCandidateStage({
-        candidateId: activeId,
-        stage: nextStage,
-      });
-      if (!result.ok) {
-        toast.error("Couldn't move candidate", { description: result.error });
-        // The transition will revert when revalidatePath runs from the action,
-        // but we've already shown the user the right state. Sonner explains
-        // the failure.
-      } else {
-        toast.success(
-          `Moved ${candidate.full_name} → ${STAGE_LABELS[nextStage]}`,
-          {
-            description: "Activity logged. Undo coming Day 4.",
-          },
-        );
-      }
-    });
+    onMove(activeId, overId as CandidateStage);
   }
 
   return (

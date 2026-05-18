@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { extractText, getDocumentProxy } from "unpdf";
 import { createClient } from "@/lib/supabase/server";
@@ -8,13 +9,17 @@ import { ORG_ID } from "@/lib/db/constants";
  * POST /api/attachments/upload (multipart/form-data)
  *   fields: candidateId (uuid), file (PDF)
  *
- * Uploads the PDF to the `cvs` Supabase Storage bucket, parses text via unpdf,
- * caches `parsed_text` on the attachments row so re-scoring the same CV
- * against a different JD doesn't re-parse.
+ * Dedup flow:
+ *   1. Hash the file bytes (sha256).
+ *   2. Check if this candidate already has an attachment with the same hash.
+ *   3. If yes: return the cached attachment id + parsed_text length. Zero
+ *      bytes uploaded, zero tokens spent, zero pdf-parsing CPU.
+ *   4. If no: upload to Storage, parse via unpdf, insert attachment row with
+ *      content_hash so the next identical upload short-circuits here.
  */
 export const runtime = "nodejs";
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB cap
+const MAX_BYTES = 8 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -38,7 +43,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "File too large (max 8MB)" }, { status: 413 });
   }
 
-  // Verify candidate exists + visible to this user (RLS will block otherwise).
   const { data: candidate, error: cErr } = await supabase
     .from("candidates")
     .select("id")
@@ -52,8 +56,28 @@ export async function POST(req: NextRequest) {
   }
 
   const buf = new Uint8Array(await file.arrayBuffer());
+  const contentHash = createHash("sha256").update(buf).digest("hex");
 
-  // Parse the PDF text with unpdf.
+  // Dedup: if this candidate already has an attachment with the same content
+  // hash, reuse it — no upload, no parse, no cost.
+  const { data: existing } = await supabase
+    .from("attachments")
+    .select("id, parsed_text")
+    .eq("candidate_id", candidateId)
+    .eq("content_hash", contentHash)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json({
+      ok: true,
+      attachmentId: existing.id,
+      parsedTextLength: (existing.parsed_text as string | null)?.length ?? 0,
+      reused: true,
+    });
+  }
+
   let parsedText = "";
   try {
     const pdf = await getDocumentProxy(buf);
@@ -68,7 +92,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Upload to Supabase Storage.
   const admin = createAdminClient();
   const storagePath = `org/${ORG_ID}/candidate/${candidateId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   const { error: uploadErr } = await admin.storage
@@ -78,10 +101,12 @@ export async function POST(req: NextRequest) {
       upsert: false,
     });
   if (uploadErr) {
-    return NextResponse.json({ error: `Storage upload failed: ${uploadErr.message}` }, { status: 500 });
+    return NextResponse.json(
+      { error: `Storage upload failed: ${uploadErr.message}` },
+      { status: 500 },
+    );
   }
 
-  // Insert the attachments row with parsed_text cached.
   const { data: attachment, error: insertErr } = await supabase
     .from("attachments")
     .insert({
@@ -92,6 +117,7 @@ export async function POST(req: NextRequest) {
       mime_type: file.type || "application/pdf",
       bytes: file.size,
       parsed_text: parsedText,
+      content_hash: contentHash,
     })
     .select("id")
     .single();
@@ -106,5 +132,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     attachmentId: attachment.id,
     parsedTextLength: parsedText.length,
+    reused: false,
   });
 }

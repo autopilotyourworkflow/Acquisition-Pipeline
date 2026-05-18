@@ -105,6 +105,23 @@ export class ClaudeCallError extends Error {
   }
 }
 
+/**
+ * Validation failure on the tool input. Wraps a ZodError but ALSO carries the
+ * telemetry from the underlying API call — so the UI can show the user that
+ * tokens were spent even on a failed score.
+ */
+export class ClaudeValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly telemetry: ClaudeTelemetry,
+    public readonly issues: unknown,
+    public readonly rawInput: unknown,
+  ) {
+    super(message);
+    this.name = "ClaudeValidationError";
+  }
+}
+
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 const RETRY_MAX_DELAY_MS = 8000;
@@ -226,6 +243,10 @@ function extractToolInput(message: Message, toolName: string): unknown {
  * One-shot Claude call with structured output via tool-use forcing.
  * The model is required to call `args.tool` — its response is validated
  * by the tool's zod parser and returned alongside cost telemetry.
+ *
+ * `temperature` defaults to 0 for maximum determinism — we want the same
+ * inputs to produce the same outputs as much as the model allows. Callers
+ * can override per-call if they need creative diversity.
  */
 export async function callWithTool<T>(args: {
   model: ModelId;
@@ -233,6 +254,7 @@ export async function callWithTool<T>(args: {
   messages: MessageParam[];
   tool: ToolDefinition<T>;
   maxTokens?: number;
+  temperature?: number;
 }): Promise<ToolCallResult<T>> {
   const client = getClient();
   const started = Date.now();
@@ -241,6 +263,7 @@ export async function callWithTool<T>(args: {
     client.messages.create({
       model: args.model,
       max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
+      temperature: args.temperature ?? 0,
       system: toSystemBlocks(args.system),
       messages: args.messages,
       tools: [
@@ -253,9 +276,6 @@ export async function callWithTool<T>(args: {
       tool_choice: { type: "tool", name: args.tool.name },
     }),
   );
-
-  const rawInput = extractToolInput(message, args.tool.name);
-  const value = args.tool.validate(rawInput);
 
   const usage = {
     input_tokens: message.usage?.input_tokens ?? 0,
@@ -272,6 +292,21 @@ export async function callWithTool<T>(args: {
     retries,
     duration_ms: Date.now() - started,
   };
+
+  const rawInput = extractToolInput(message, args.tool.name);
+  let value: T;
+  try {
+    value = args.tool.validate(rawInput);
+  } catch (err) {
+    // Tokens were spent even though the validation failed — carry the
+    // telemetry through so the UI can surface the cost honestly.
+    throw new ClaudeValidationError(
+      err instanceof Error ? err.message : "Validation failed",
+      telemetry,
+      err,
+      rawInput,
+    );
+  }
 
   return { value, telemetry };
 }
@@ -291,6 +326,7 @@ export function streamWithTool<T>(args: {
   messages: MessageParam[];
   tool: ToolDefinition<T>;
   maxTokens?: number;
+  temperature?: number;
 }): StreamingToolCall<T> {
   const client = getClient();
   const started = Date.now();
@@ -308,6 +344,7 @@ export function streamWithTool<T>(args: {
         client.messages.stream({
           model: args.model,
           max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
+          temperature: args.temperature ?? 0,
           system: toSystemBlocks(args.system),
           messages: args.messages,
           tools: [
@@ -327,9 +364,6 @@ export function streamWithTool<T>(args: {
       }
 
       const finalMessage = await stream.finalMessage();
-      const rawInput = extractToolInput(finalMessage, args.tool.name);
-      const value = args.tool.validate(rawInput);
-
       const usage = {
         input_tokens: finalMessage.usage?.input_tokens ?? 0,
         output_tokens: finalMessage.usage?.output_tokens ?? 0,
@@ -337,17 +371,31 @@ export function streamWithTool<T>(args: {
           finalMessage.usage?.cache_creation_input_tokens ?? 0,
         cache_read_input_tokens: finalMessage.usage?.cache_read_input_tokens ?? 0,
       };
+      const telemetry: ClaudeTelemetry = {
+        model: args.model,
+        ...usage,
+        cost_usd: computeCost(args.model, usage),
+        retries,
+        duration_ms: Date.now() - started,
+      };
 
-      resolveResult({
-        value,
-        telemetry: {
-          model: args.model,
-          ...usage,
-          cost_usd: computeCost(args.model, usage),
-          retries,
-          duration_ms: Date.now() - started,
-        },
-      });
+      const rawInput = extractToolInput(finalMessage, args.tool.name);
+      let value: T;
+      try {
+        value = args.tool.validate(rawInput);
+      } catch (err) {
+        rejectResult(
+          new ClaudeValidationError(
+            err instanceof Error ? err.message : "Validation failed",
+            telemetry,
+            err,
+            rawInput,
+          ),
+        );
+        return;
+      }
+
+      resolveResult({ value, telemetry });
     } catch (err) {
       rejectResult(err);
       throw err;

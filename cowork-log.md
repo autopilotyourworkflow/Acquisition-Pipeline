@@ -183,4 +183,78 @@ One detail that earned itself: `max_tokens: 8192` (not 4096) plus a "150-250 wor
 
 ---
 
-*Decisions still ahead: the cold-email tone (Day 4 — generated drafts have to feel hand-written), multi-party FreeBusy slot math (Day 4 — three calendars intersected client-side without crashing the browser), browser-extension auth (Day 5 — long-lived JWT vs short-lived rotation). I'll keep adding entries.*
+---
+
+*Day 2 cont. — 2026-05-19*
+
+## 12. Default to Haiku, expose Opus — and turn the temperature down
+
+After yesterday's smoke tests I went looking at the bill and got uncomfortable. Opus 4.7 was the right showcase model for the AI grade, but it's the wrong default for *iteration*. Every "let me retry the wording of this prompt" cost ~$0.16 and 30 seconds. That's a tax on getting better.
+
+Switched the default to **Haiku 4.5** and surfaced both models in a UI dropdown on the screener. Haiku at temperature 0 returned an identical 8.60 weighted total on the same synthetic candidate as Opus did — for $0.009 in 15 seconds. ~27x cheaper, ~2x faster. For early-stage screening (which is what this whole module *is*), the Haiku output is indistinguishable from the Opus one in terms of decision usefulness. Opus is one click away when the user wants the more careful read.
+
+The temperature change is the unglamorous one but might be the biggest stability win. Set `temperature: 0` as the default in `lib/anthropic/client.ts` for all tool-use calls. LLMs are non-deterministic by nature, but temperature 0 collapses most of the variance for scoring tasks. The user had reported the same CV+JD giving different scores between runs — that was the temperature default at work. Now those repeat runs converge on near-identical scores.
+
+The next layer of stability — if needed — is the ensemble pattern: three parallel scoring calls, take the median, have a fourth call write the report. Costs 3-4x but produces statistically stable scores. Holding that for Day 5 polish; temperature 0 should cover us until then.
+
+**Cheap is not the same as worse. Pick the smallest model that does the job, then make it easy to escalate.**
+
+---
+
+## 13. Telemetry on the failure path
+
+The user noticed that when scoring fails (Claude's tool output failed zod validation — model truncated the JSON), the UI just shows the validation error. But the API call already succeeded — tokens were paid for. The cost vanishes silently.
+
+That's exactly the kind of thing that erodes trust in your own observability. "I clicked the button, it broke, where did my $0.30 go?"
+
+Added a `ClaudeValidationError` class that wraps the zod issues but *also* carries the telemetry from the (successful, expensive) underlying API call. The route handler catches it specifically and emits a `score_error` SSE frame that includes the model, input/output tokens, cache stats, and the dollar cost. The ScoreCard error UI now renders that as a small "Tokens were spent — here's what it cost" panel below the error message, with a collapsible "Show what Claude actually returned" detail for debugging the truncation.
+
+This is one of those features that doesn't add value when everything works. It adds enormous value the moment something doesn't, because the user can see whether the failure was free (network) or expensive (validation), and act accordingly — escalate to Opus, shorten the JD, whatever.
+
+**A failure mode without telemetry is a failure mode you'll fix the wrong way.**
+
+---
+
+## 14. Lift the optimistic state, or watch it disappear
+
+Dragging a candidate card to a new column was working — until you switched to Table view mid-drag. The card would reset.
+
+The cause: `useOptimistic` lived inside the Kanban component. When you switched views, Kanban unmounted, the optimistic state went with it, and Table received the (still-stale) server-fetched candidates. The server `revalidatePath` does run, but lazily — sometimes after the view switch had already happened.
+
+Fix: lifted the candidates state out of Kanban and into the parent `TrackerViews` component. Both Kanban and Table now read from the same source. Drag-drop mutates the parent state synchronously, then the Server Action runs in a transition, and on success the parent calls `router.refresh()` to background-sync with server data. On failure: revert the parent state to the snapshot taken before the drag, toast the error.
+
+It's a more honest pattern than `useOptimistic` for this case — that hook is great when you have a single source of truth that React itself can reset for you, but our reality has *two views* reading the same data. Shared state with manual revert is the right answer.
+
+**`useOptimistic` is a hook, not a discipline. The discipline is "wherever your data is visible, your optimistic update has to be visible too."**
+
+---
+
+## 15. The prompt is the product — make it editable
+
+Hardcoding `SCORING_SYSTEM_PERSONA` in `lib/anthropic/prompts/scoring.v1.ts` was fine for getting started. But the user is going to want to iterate on that prompt the way you iterate on a landing-page headline: tweak, score a candidate, compare, tweak again. Forcing a code change + redeploy for every iteration is the wrong loop.
+
+Built `/settings/prompts`. New table `scoring_prompts` (version, persona_text, is_active, created_by, created_at). Editing the textarea and clicking "Save as new version" creates a new row, deactivates the old one, and the next score will use the new persona. The route handler now loads the active prompt from the DB at call time (with a fallback to the hardcoded constant if the migration hasn't been applied yet — never break scoring because of a settings page outage).
+
+Versioning matters here. `scores.prompt_version` continues to record whichever version produced each row, so when v3 lands you can A/B against v2 against v1 on the same JD+CV pair. The version label auto-increments (`scoring.v1` → `scoring.v2` → `scoring.v3`) by parsing the existing rows.
+
+The interesting design decision was *what* to make editable. Just the persona — the structural prompt pieces (the cacheable JD block, the user-message containing the CV text) stay in code. Those affect the prompt-cache key and the streaming protocol; they're not what a non-engineer should tune. The persona is the part that drives bias, rubric, voice, tone — exactly the right edit surface.
+
+**Iteration speed is a product feature. Hardcoding the prompt was a Day-1 shortcut; turning it into a stored, versioned, editable artifact is the real shape.**
+
+---
+
+## 16. Same file? Same hash. No tokens.
+
+The screener has a CV upload. The user pointed out: if they accidentally remove and re-upload the same PDF, do we re-parse and re-score-from-scratch? Today, yes. That's a waste.
+
+Added a `content_hash` column on `attachments` (sha256 of the file bytes). The upload route now hashes the buffer first, looks up an existing attachment with the same hash for the same candidate, and short-circuits if found — returns the cached attachment id and parsed_text length, with `reused: true` so the UI can show "Same PDF detected — reused cached extract" instead of "CV uploaded + parsed."
+
+Cost analysis: PDF parsing itself doesn't use AI tokens — `unpdf` is pure Node, costs $0. But the bytes upload, the storage write, and the parsing CPU all add up. More importantly, the Anthropic prompt cache *only* hits when the exact same text reaches Claude — so reusing the same `parsed_text` row is what makes the JD-body cache write from an earlier scoring run still hit on the next run for the same CV.
+
+Markdown vs plain text for the cached extract: roughly equivalent on token count, plain text is fine. The structure already comes through from the original CV's layout when unpdf preserves paragraph breaks.
+
+**Dedup is the cheapest cache. Hash the bytes, skip the work.**
+
+---
+
+*Decisions still ahead: the cold-email tone (Day 4 — generated drafts have to feel hand-written), multi-party FreeBusy slot math (Day 4), browser-extension auth (Day 5), and the ensemble-scoring "high confidence mode" if temperature 0 isn't stable enough.*
