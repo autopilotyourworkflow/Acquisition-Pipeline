@@ -9,17 +9,31 @@ import { ScoreStream } from "@/components/screener/ScoreStream.client";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
 type ModelChoice = "claude-haiku-4-5" | "claude-opus-4-7";
+type ScoringMode = "single" | "team";
 
 const MODEL_OPTIONS: { value: ModelChoice; label: string; hint: string }[] = [
   {
     value: "claude-haiku-4-5",
     label: "Haiku 4.5 — fast & cheap",
-    hint: "~$0.01–0.03 per score · 8–15s · use while testing",
+    hint: "~$0.01 single · ~$0.04 team · 8–15s",
   },
   {
     value: "claude-opus-4-7",
     label: "Opus 4.7 — top quality",
-    hint: "~$0.15–0.25 per score · 25–40s · final decisions",
+    hint: "~$0.20 single · ~$0.80 team · 25–40s",
+  },
+];
+
+const MODE_OPTIONS: { value: ScoringMode; label: string; hint: string }[] = [
+  {
+    value: "single",
+    label: "Single agent",
+    hint: "One Claude call at temperature 0. Fast, cheap, mostly stable.",
+  },
+  {
+    value: "team",
+    label: "Team of 3 + manager",
+    hint: "3 scorers at temps 0/0.3/0.6 in parallel → manager consolidates. ~4x cost, very stable.",
   },
 ];
 
@@ -36,10 +50,12 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
   const [jdId, setJdId] = useState<string>(candidate?.jd_id ?? jds[0]?.id ?? "");
   const jd = jds.find((j) => j.id === jdId) ?? null;
   const [model, setModel] = useState<ModelChoice>("claude-haiku-4-5");
+  const [mode, setMode] = useState<ScoringMode>("single");
   const [run, setRun] = useState<{
     candidateId: string;
     jdId: string;
     model: ModelChoice;
+    mode: ScoringMode;
   } | null>(null);
   const [uploading, startUploadTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,7 +102,7 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
       toast.error("Pick a candidate and a JD");
       return;
     }
-    setRun({ candidateId, jdId, model });
+    setRun({ candidateId, jdId, model, mode });
   }
 
   if (candidates.length === 0) {
@@ -174,6 +190,27 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
         </div>
 
         <div className="space-y-1.5">
+          <Label htmlFor="mode" className="text-xs text-slate-deep">
+            Scoring mode
+          </Label>
+          <select
+            id="mode"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as ScoringMode)}
+            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+          >
+            {MODE_OPTIONS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-mid">
+            {MODE_OPTIONS.find((m) => m.value === mode)?.hint}
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
           <Label className="text-xs text-slate-deep">CV PDF</Label>
           <div className="flex items-center gap-2">
             <input
@@ -228,10 +265,11 @@ export function ScreenerShell({ candidates, jds, parsedTextLengths }: Props) {
 
       {run && (
         <ScoreStream
-          key={`${run.candidateId}:${run.jdId}:${run.model}:${Date.now()}`}
+          key={`${run.candidateId}:${run.jdId}:${run.model}:${run.mode}:${Date.now()}`}
           candidateId={run.candidateId}
           jdId={run.jdId}
           model={run.model}
+          mode={run.mode}
           threshold={jd?.threshold ?? 7}
         />
       )}

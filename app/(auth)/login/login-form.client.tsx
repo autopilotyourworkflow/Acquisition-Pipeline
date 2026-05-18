@@ -22,10 +22,32 @@ export function LoginForm() {
   async function handleGoogle() {
     setPending(true);
     setError(null);
+    // Bundle Calendar + Gmail scopes upfront. We're a recruiting tool —
+    // 100% of users will want these eventually, so making them grant once
+    // beats sending them back to /settings/integrations later.
+    //
+    // access_type=offline + prompt=consent forces Google to issue a
+    // refresh_token (otherwise we'd lose API access after ~1h). The token
+    // storage + use happens in the Day-3 Scheduler/Email modules.
+    const SCOPES = [
+      "openid",
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/calendar.freebusy",
+      "https://www.googleapis.com/auth/gmail.compose",
+      "https://www.googleapis.com/auth/gmail.send",
+    ].join(" ");
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        scopes: SCOPES,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
     if (error) {

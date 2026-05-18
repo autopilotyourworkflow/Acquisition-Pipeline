@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  callWithTool,
   streamWithTool,
   ClaudeValidationError,
   type ClaudeTelemetry,
@@ -12,26 +13,44 @@ import {
   loadActiveScoringPrompt,
   buildScoringMessagesWithPersona,
 } from "@/lib/anthropic/prompts/load";
+import {
+  MANAGER_SYSTEM_PROMPT,
+  MANAGER_PROMPT_VERSION,
+  buildManagerUserMessage,
+} from "@/lib/anthropic/prompts/manager";
 import { ORG_ID } from "@/lib/db/constants";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
 /**
  * POST /api/score/run
- * Body: { candidateId, jdId, model? ('claude-opus-4-7' | 'claude-haiku-4-5') }
  *
- * Streams Server-Sent Events:
- *   - score_partial { text }                              — typewriter view
- *   - score_complete { scoreId, value, telemetry, ... }   — final result
- *   - score_error    { message, telemetry?, raw? }        — failure, with cost
- *                                                            if tokens were spent
+ * Body: {
+ *   candidateId: string,
+ *   jdId: string,
+ *   model?: 'claude-opus-4-7' | 'claude-haiku-4-5',
+ *   mode?: 'single' | 'team'
+ * }
+ *
+ * SSE event types:
+ *   - score_partial   { text }                         single-mode typewriter
+ *   - team_progress   { stage, completed, total, ... } team-mode status
+ *   - score_complete  { scoreId, value, telemetry }    final result
+ *   - score_error     { message, telemetry?, raw? }    failure
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RequestBody = { candidateId: string; jdId: string; model?: ModelId };
+type ScoringMode = "single" | "team";
+type RequestBody = {
+  candidateId: string;
+  jdId: string;
+  model?: ModelId;
+  mode?: ScoringMode;
+};
 
 const ALLOWED_MODELS: ModelId[] = ["claude-opus-4-7", "claude-haiku-4-5"];
-const DEFAULT_MODEL: ModelId = "claude-haiku-4-5"; // cheap by default; UI exposes Opus
+const DEFAULT_MODEL: ModelId = "claude-haiku-4-5";
+const TEAM_TEMPERATURES = [0, 0.3, 0.6] as const;
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -49,6 +68,20 @@ function buildCandidateText(candidate: CandidateRow, parsedCv: string | null): s
     lines.push(`\nProfile (JSON):\n${JSON.stringify(candidate.raw_profile, null, 2)}`);
   }
   return lines.join("\n");
+}
+
+function addTelemetry(a: ClaudeTelemetry, b: ClaudeTelemetry): ClaudeTelemetry {
+  return {
+    model: a.model,
+    input_tokens: a.input_tokens + b.input_tokens,
+    output_tokens: a.output_tokens + b.output_tokens,
+    cache_creation_input_tokens:
+      a.cache_creation_input_tokens + b.cache_creation_input_tokens,
+    cache_read_input_tokens: a.cache_read_input_tokens + b.cache_read_input_tokens,
+    cost_usd: a.cost_usd + b.cost_usd,
+    retries: a.retries + b.retries,
+    duration_ms: Math.max(a.duration_ms, b.duration_ms),
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -78,6 +111,7 @@ export async function POST(req: NextRequest) {
 
   const model: ModelId =
     body.model && ALLOWED_MODELS.includes(body.model) ? body.model : DEFAULT_MODEL;
+  const mode: ScoringMode = body.mode === "team" ? "team" : "single";
 
   const [
     { data: candidate, error: cErr },
@@ -113,92 +147,51 @@ export async function POST(req: NextRequest) {
   const jdRow = jd as JdRow;
   const candidateText = buildCandidateText(candidateRow, cv?.parsed_text ?? null);
 
-  const { system, messages } = buildScoringMessagesWithPersona(activePrompt.personaText, {
-    jdTitle: jdRow.title,
-    jdBody: jdRow.body_markdown,
-    jdMustHave: jdRow.must_have,
-    jdNiceToHave: jdRow.nice_to_have,
-    candidateName: candidateRow.full_name,
-    candidateText,
-  });
-
-  const { stream, result } = streamWithTool<SubmitScoreInput>({
-    model,
-    system,
-    messages,
-    tool: submitScoreTool,
-    maxTokens: 8192,
-    temperature: 0,
-  });
+  const { system: scorerSystem, messages: scorerMessages } = buildScoringMessagesWithPersona(
+    activePrompt.personaText,
+    {
+      jdTitle: jdRow.title,
+      jdBody: jdRow.body_markdown,
+      jdMustHave: jdRow.must_have,
+      jdNiceToHave: jdRow.nice_to_have,
+      candidateName: candidateRow.full_name,
+      candidateText,
+    },
+  );
 
   const encoder = new TextEncoder();
   const responseStream = new ReadableStream({
     async start(controller) {
-      let accumulated = "";
       const emit = (event: string, data: unknown) =>
         controller.enqueue(encoder.encode(sseEvent(event, data)));
 
       try {
-        for await (const event of stream) {
-          if (
-            event &&
-            typeof event === "object" &&
-            "type" in event &&
-            event.type === "content_block_delta"
-          ) {
-            const delta = (event as { delta?: { type?: string; partial_json?: string } }).delta;
-            if (delta?.type === "input_json_delta" && typeof delta.partial_json === "string") {
-              accumulated += delta.partial_json;
-              emit("score_partial", { text: accumulated, model });
-            }
-          }
-        }
-
-        const { value, telemetry } = await result;
-
-        const admin = createAdminClient();
-        const { data: scoreRow, error: insertErr } = await admin
-          .from("scores")
-          .insert({
-            org_id: ORG_ID,
-            candidate_id: candidateRow.id,
-            jd_id: jdRow.id,
-            skills_score: value.skills_score,
-            experience_score: value.experience_score,
-            culture_score: value.culture_score,
-            reasoning: value.reasoning,
-            strengths: value.strengths,
-            gaps: value.gaps,
-            prep_questions: value.prep_questions,
-            hiring_report: value.hiring_report,
-            model: telemetry.model,
-            prompt_version: activePrompt.version,
-            input_tokens: telemetry.input_tokens,
-            output_tokens: telemetry.output_tokens,
-            cost_usd: Number(telemetry.cost_usd.toFixed(4)),
-            created_by: user.id,
-          })
-          .select()
-          .single();
-
-        if (insertErr || !scoreRow) {
-          emit("score_error", {
-            message: `Score generated but DB persist failed: ${insertErr?.message ?? "unknown"}`,
-            telemetry,
-            value,
+        if (mode === "team") {
+          await runTeamMode({
+            model,
+            scorerSystem,
+            scorerMessages,
+            promptVersion: activePrompt.version,
+            candidateId: candidateRow.id,
+            jdId: jdRow.id,
+            userId: user.id,
+            emit,
           });
         } else {
-          emit("score_complete", {
-            scoreId: scoreRow.id,
-            value,
-            telemetry,
-            weighted_total: scoreRow.weighted_total,
-            prompt_version: activePrompt.version,
+          await runSingleMode({
+            model,
+            scorerSystem,
+            scorerMessages,
+            promptVersion: activePrompt.version,
+            candidateId: candidateRow.id,
+            jdId: jdRow.id,
+            userId: user.id,
+            emit,
           });
         }
       } catch (err) {
-        // ClaudeValidationError carries the telemetry through — surface it so
-        // the UI can show "X tokens / $Y spent on a failed score".
+        // Top-level catch — single/team handlers already emit their own
+        // score_error for known failure modes.
         if (err instanceof ClaudeValidationError) {
           emit("score_error", {
             message:
@@ -209,19 +202,8 @@ export async function POST(req: NextRequest) {
             raw: err.rawInput,
           });
         } else {
-          // Other errors (network, auth, etc.) — telemetry not available.
-          let telemetry: ClaudeTelemetry | undefined;
-          if (
-            typeof err === "object" &&
-            err !== null &&
-            "telemetry" in err &&
-            (err as { telemetry: unknown }).telemetry
-          ) {
-            telemetry = (err as { telemetry: ClaudeTelemetry }).telemetry;
-          }
           emit("score_error", {
             message: err instanceof Error ? err.message : "Unknown error",
-            telemetry,
           });
         }
       } finally {
@@ -237,5 +219,240 @@ export async function POST(req: NextRequest) {
       connection: "keep-alive",
       "x-accel-buffering": "no",
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Single-mode: stream the tool input as Claude generates it.
+// ---------------------------------------------------------------------------
+
+type ModeArgs = {
+  model: ModelId;
+  scorerSystem: Parameters<typeof streamWithTool>[0]["system"];
+  scorerMessages: Parameters<typeof streamWithTool>[0]["messages"];
+  promptVersion: string;
+  candidateId: string;
+  jdId: string;
+  userId: string;
+  emit: (event: string, data: unknown) => void;
+};
+
+async function runSingleMode(args: ModeArgs) {
+  const { stream, result } = streamWithTool<SubmitScoreInput>({
+    model: args.model,
+    system: args.scorerSystem,
+    messages: args.scorerMessages,
+    tool: submitScoreTool,
+    maxTokens: 8192,
+    temperature: 0,
+  });
+
+  let accumulated = "";
+  for await (const event of stream) {
+    if (
+      event &&
+      typeof event === "object" &&
+      "type" in event &&
+      event.type === "content_block_delta"
+    ) {
+      const delta = (event as { delta?: { type?: string; partial_json?: string } }).delta;
+      if (delta?.type === "input_json_delta" && typeof delta.partial_json === "string") {
+        accumulated += delta.partial_json;
+        args.emit("score_partial", { text: accumulated, model: args.model });
+      }
+    }
+  }
+
+  const { value, telemetry } = await result;
+  await persistAndComplete({
+    args,
+    value,
+    telemetry,
+    scoringMode: "single",
+    teamAgents: null,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Team-mode: 3 scorers in parallel + 1 manager.
+// ---------------------------------------------------------------------------
+
+async function runTeamMode(args: ModeArgs) {
+  args.emit("team_progress", {
+    stage: "scorers_started",
+    completed: 0,
+    total: TEAM_TEMPERATURES.length,
+    model: args.model,
+  });
+
+  // Run the three scorers in parallel. Use Promise.allSettled so a single
+  // agent's failure doesn't blow up the whole team — we can still consolidate
+  // from the survivors (with a minimum of 2).
+  const scorerPromises = TEAM_TEMPERATURES.map((temperature, idx) =>
+    callWithTool<SubmitScoreInput>({
+      model: args.model,
+      system: args.scorerSystem,
+      messages: args.scorerMessages,
+      tool: submitScoreTool,
+      maxTokens: 8192,
+      temperature,
+    })
+      .then((r) => {
+        args.emit("team_progress", {
+          stage: "scorer_done",
+          agent: idx + 1,
+          temperature,
+          telemetry: r.telemetry,
+        });
+        return { idx, temperature, ok: true as const, ...r };
+      })
+      .catch((err) => {
+        args.emit("team_progress", {
+          stage: "scorer_failed",
+          agent: idx + 1,
+          temperature,
+          message: err instanceof Error ? err.message : "Unknown error",
+        });
+        return { idx, temperature, ok: false as const, err };
+      }),
+  );
+
+  const settled = await Promise.all(scorerPromises);
+  const successful = settled.filter(
+    (s): s is Extract<typeof s, { ok: true }> => s.ok,
+  );
+
+  if (successful.length < 2) {
+    args.emit("score_error", {
+      message: `Team scoring needs at least 2 healthy scorers; got ${successful.length}.`,
+    });
+    return;
+  }
+
+  // Manager pass: consolidate the surviving outputs.
+  args.emit("team_progress", {
+    stage: "manager_started",
+    surviving: successful.length,
+  });
+
+  const managerInput = successful.map((s) => ({
+    agent: s.idx + 1,
+    temperature: s.temperature,
+    output: s.value,
+  }));
+
+  const { value: managerValue, telemetry: managerTelemetry } = await callWithTool<SubmitScoreInput>(
+    {
+      model: args.model,
+      system: [{ type: "text", text: MANAGER_SYSTEM_PROMPT }],
+      messages: [
+        {
+          role: "user",
+          content: buildManagerUserMessage(managerInput),
+        },
+      ],
+      tool: submitScoreTool,
+      maxTokens: 8192,
+      temperature: 0,
+    },
+  );
+
+  args.emit("team_progress", { stage: "manager_done", telemetry: managerTelemetry });
+
+  // Aggregate telemetry: total tokens across all 4 calls, sum cost,
+  // duration = max (calls were parallel).
+  const aggregated: ClaudeTelemetry = successful.reduce(
+    (acc, s) => addTelemetry(acc, s.telemetry),
+    managerTelemetry,
+  );
+
+  // Per-agent breakdown for the team_agents JSONB column.
+  const teamAgents = [
+    ...successful.map((s) => ({
+      agent: s.idx + 1,
+      temperature: s.temperature,
+      scores: {
+        skills: s.value.skills_score,
+        experience: s.value.experience_score,
+        culture: s.value.culture_score,
+      },
+      telemetry: s.telemetry,
+    })),
+    {
+      agent: "manager",
+      manager_version: MANAGER_PROMPT_VERSION,
+      scores: {
+        skills: managerValue.skills_score,
+        experience: managerValue.experience_score,
+        culture: managerValue.culture_score,
+      },
+      telemetry: managerTelemetry,
+    },
+  ];
+
+  await persistAndComplete({
+    args,
+    value: managerValue,
+    telemetry: aggregated,
+    scoringMode: "team",
+    teamAgents,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Shared persistence + score_complete emission.
+// ---------------------------------------------------------------------------
+
+async function persistAndComplete(opts: {
+  args: ModeArgs;
+  value: SubmitScoreInput;
+  telemetry: ClaudeTelemetry;
+  scoringMode: ScoringMode;
+  teamAgents: unknown[] | null;
+}) {
+  const admin = createAdminClient();
+  const { data: scoreRow, error: insertErr } = await admin
+    .from("scores")
+    .insert({
+      org_id: ORG_ID,
+      candidate_id: opts.args.candidateId,
+      jd_id: opts.args.jdId,
+      skills_score: opts.value.skills_score,
+      experience_score: opts.value.experience_score,
+      culture_score: opts.value.culture_score,
+      reasoning: opts.value.reasoning,
+      strengths: opts.value.strengths,
+      gaps: opts.value.gaps,
+      prep_questions: opts.value.prep_questions,
+      hiring_report: opts.value.hiring_report,
+      model: opts.telemetry.model,
+      prompt_version: opts.args.promptVersion,
+      input_tokens: opts.telemetry.input_tokens,
+      output_tokens: opts.telemetry.output_tokens,
+      cost_usd: Number(opts.telemetry.cost_usd.toFixed(4)),
+      created_by: opts.args.userId,
+      scoring_mode: opts.scoringMode,
+      team_agents: opts.teamAgents,
+    })
+    .select()
+    .single();
+
+  if (insertErr || !scoreRow) {
+    opts.args.emit("score_error", {
+      message: `Score generated but DB persist failed: ${insertErr?.message ?? "unknown"}`,
+      telemetry: opts.telemetry,
+      value: opts.value,
+    });
+    return;
+  }
+
+  opts.args.emit("score_complete", {
+    scoreId: scoreRow.id,
+    value: opts.value,
+    telemetry: opts.telemetry,
+    weighted_total: scoreRow.weighted_total,
+    prompt_version: opts.args.promptVersion,
+    scoring_mode: opts.scoringMode,
+    team_agents: opts.teamAgents,
   });
 }

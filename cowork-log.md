@@ -257,4 +257,64 @@ Markdown vs plain text for the cached extract: roughly equivalent on token count
 
 ---
 
-*Decisions still ahead: the cold-email tone (Day 4 — generated drafts have to feel hand-written), multi-party FreeBusy slot math (Day 4), browser-extension auth (Day 5), and the ensemble-scoring "high confidence mode" if temperature 0 isn't stable enough.*
+---
+
+## 17. Bundle the scopes — reversing a Day-1 call
+
+The original auth design separated identity ("who you are") from delegated permissions ("what the app does on your behalf"). Sign in with `openid email profile` only, grant Calendar / Gmail later in `/settings/integrations`. I thought it was the right move at the time — gentler first impression, supports email-OTP users who never want to grant Google API access.
+
+Reversed it. For *this* product — a recruiting tool where 100% of HR users will end up wanting Calendar and Gmail — the decoupling was theoretical politeness at the cost of real UX friction. The user pointed it out: why are we asking them to grant Google access twice? At sign-in for identity, then again later for each scope? It's two flows, two consent screens, two trips to settings.
+
+So Google sign-in now requests `openid email profile calendar.events calendar.freebusy gmail.compose gmail.send` upfront, with `access_type=offline` + `prompt=consent` to guarantee a refresh token. One scary-looking consent screen instead of two underwhelming ones. Email-OTP users still skip all of this — they just lose Calendar/Gmail features until they connect Google later, same as before.
+
+What this teaches me: "principled" design choices that the user would have had no opinion about can become drag the moment you describe them. The principle (identity vs delegated permissions are different) is correct. The application (force every user through two flows to express it) was wrong for this scale of product.
+
+**A separation of concerns the user doesn't feel is just two clicks.**
+
+---
+
+## 18. Scoring teams: 3 + 1, parallel, manager consolidates
+
+The user has been worried about score stability since v1 — same CV+JD shouldn't give different numbers on different days. Yesterday's fix was `temperature: 0`, which collapses ~90% of the variance. The user wanted the rest of it: a real team-mode toggle so high-stakes scoring runs are robust.
+
+Built three scorer agents that run in parallel at temperatures 0, 0.3, and 0.6, all using the same active scoring persona. The temperature spread is the *only* source of variation — same prompt, same JD, same CV. Each one produces a full `submit_score` output independently. Then a manager agent (its own system prompt, hardcoded for now) consolidates: median when the three agree, evidence-weighted when they don't, deduped strengths/gaps, best-of prep questions, one unified hiring report.
+
+Cost is ~4x a single call (3 scorers + 1 manager). With Haiku at ~$0.04, that's still a rounding error for HR work. With Opus at ~$0.80, you'd reserve it for final-round decisions.
+
+What I deliberately didn't do: vary the persona across the 3 scorers ("skeptical", "optimistic", "neutral"). The temptation was real — diverse perspectives would make the manager's job juicier. But that turns into a prompt-engineering hairball, and we'd lose the ability to A/B the persona uniformly. The temperature spread alone produces enough variance to make the manager pass meaningful, and it keeps the source of truth (the active persona) clean.
+
+The UI shows each agent as a row with a live status indicator (running → done → cost displayed). Failures degrade gracefully: if 1 of 3 scorers errors, the manager runs with 2; if 2 fail, we abort with a clear message. Per-agent telemetry lands in `scores.team_agents` JSONB for traceability.
+
+**Variance is not a flaw of LLMs; it's a feature you can harness if you average across it. Three at different temperatures is the cheapest valid sample.**
+
+---
+
+## 19. Loading skeletons aren't decoration — they're the perceived speed
+
+The user reported pages feeling slow. Cold-start latency on Vercel free-tier is real (1-3 seconds for a serverless function that hasn't run recently); paid tier keeps them warm but that's an infrastructure call, not a code one.
+
+What I *can* do from the code side: render the page shell instantly while the server is still fetching data. Next 16's `loading.tsx` convention does exactly this — when you navigate to `/tracker`, the loading.tsx renders immediately on the route segment, replaced by the real page only when its async data resolves.
+
+Added skeletons for `/tracker`, `/jds`, `/screener`, `/activity`, `/settings`, `/settings/prompts`. Each one is hand-tuned to roughly match the real layout — Kanban columns for the tracker, table rows for the activity feed, a textarea-shaped box for the prompt editor. Reduced-motion media query disables the pulse for users who've asked for it (already wired globally in app/globals.css).
+
+The fix isn't faster server. The fix is the user not staring at white space.
+
+**The page that renders in 50ms doesn't *exist* faster — it *feels* faster, which is what matters.**
+
+---
+
+## 20. Pull basic Undo forward — the audit log was getting jealous
+
+The user clicked through to `/activity`, saw the rows accumulating, and asked the question I expected to come on Day 4: "Where's the Undo button?"
+
+Built it. Day-2 simplification (no conflict detection yet): `POST /api/audit/undo { logId }` fetches the audit row, applies the inverse mutation via the service-role client (insert → DELETE, update → UPDATE before, delete → INSERT before), marks the original row `undone_at`+`undone_by`, then inserts an inverse audit row pointing at the original via `redo_of`. The activity page renders an Undo button on entries less than 30 minutes old, hidden once a row has already been undone (or is itself an undo entry).
+
+What's missing vs. the full Day-4 plan: conflict detection. If someone else has changed the row since this action, the current code happily reverts to the original `before` — clobbering their work. Day 4 will compare the current row's hash to the action's `after_hash` and prompt the user with a diff before clobbering.
+
+For Day 2 demo purposes, with one user at a time, this is fine. The audit log finally has interactivity.
+
+**A read-only audit log is a museum. Add Undo and it becomes a tool.**
+
+---
+
+*Decisions still ahead: the cold-email tone (Day 4), multi-party FreeBusy slot math (Day 4), undo conflict detection + diff prompt (Day 4 — finishes what 0.20 started), browser-extension auth (Day 5).*

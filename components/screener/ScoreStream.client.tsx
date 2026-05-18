@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ScoreCard, type ScoreCardData } from "./ScoreCard";
+import { cn } from "@/lib/utils";
 
 type ErrorTelemetry = {
   model: string;
@@ -12,16 +13,25 @@ type ErrorTelemetry = {
   cost_usd: number;
 };
 
+type AgentState = {
+  agent: number | "manager";
+  temperature?: number;
+  status: "pending" | "running" | "done" | "failed";
+  cost_usd?: number;
+};
+
 export function ScoreStream({
   candidateId,
   jdId,
   model,
+  mode,
   threshold,
   onDone,
 }: {
   candidateId: string;
   jdId: string;
   model: string;
+  mode: "single" | "team";
   threshold: number;
   onDone?: () => void;
 }) {
@@ -33,6 +43,16 @@ export function ScoreStream({
     raw?: unknown;
   } | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [agents, setAgents] = useState<AgentState[]>(
+    mode === "team"
+      ? [
+          { agent: 1, temperature: 0, status: "running" },
+          { agent: 2, temperature: 0.3, status: "running" },
+          { agent: 3, temperature: 0.6, status: "running" },
+          { agent: "manager", status: "pending" },
+        ]
+      : [],
+  );
   const startedRef = useRef<number>(Date.now());
 
   useEffect(() => {
@@ -47,7 +67,7 @@ export function ScoreStream({
         const resp = await fetch("/api/score/run", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ candidateId, jdId, model }),
+          body: JSON.stringify({ candidateId, jdId, model, mode }),
           signal: controller.signal,
         });
         if (!resp.ok || !resp.body) {
@@ -97,6 +117,34 @@ export function ScoreStream({
 
       if (event === "score_partial") {
         setPartialText(data.text ?? "");
+      } else if (event === "team_progress") {
+        setAgents((cur) => {
+          if (data.stage === "scorer_done") {
+            return cur.map((a) =>
+              a.agent === data.agent
+                ? { ...a, status: "done", cost_usd: data.telemetry?.cost_usd }
+                : a,
+            );
+          }
+          if (data.stage === "scorer_failed") {
+            return cur.map((a) =>
+              a.agent === data.agent ? { ...a, status: "failed" } : a,
+            );
+          }
+          if (data.stage === "manager_started") {
+            return cur.map((a) =>
+              a.agent === "manager" ? { ...a, status: "running" } : a,
+            );
+          }
+          if (data.stage === "manager_done") {
+            return cur.map((a) =>
+              a.agent === "manager"
+                ? { ...a, status: "done", cost_usd: data.telemetry?.cost_usd }
+                : a,
+            );
+          }
+          return cur;
+        });
       } else if (event === "score_complete") {
         const v = data.value as ScoreCardData;
         setFinal({
@@ -123,12 +171,11 @@ export function ScoreStream({
     }
 
     run();
-
     return () => {
       controller.abort();
       clearInterval(tick);
     };
-  }, [candidateId, jdId, model, threshold, onDone]);
+  }, [candidateId, jdId, model, mode, threshold, onDone]);
 
   if (error) {
     return (
@@ -178,6 +225,70 @@ export function ScoreStream({
     return <ScoreCard data={final} />;
   }
 
+  if (mode === "team") {
+    return (
+      <div className="space-y-3 rounded-lg border border-dashed border-sand-200 bg-cream/40 p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-navy">
+            Team scoring… <span className="text-xs text-slate-mid">({model})</span>
+          </p>
+          <span className="font-mono text-xs text-slate-mid">
+            {(elapsedMs / 1000).toFixed(1)}s
+          </span>
+        </div>
+        <ul className="space-y-1.5">
+          {agents.map((a) => (
+            <li
+              key={typeof a.agent === "number" ? `agent-${a.agent}` : "manager"}
+              className={cn(
+                "flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors",
+                a.status === "done"
+                  ? "border-success/30 bg-success/5"
+                  : a.status === "failed"
+                    ? "border-danger/30 bg-danger/5"
+                    : a.status === "running"
+                      ? "border-info/30 bg-info/5"
+                      : "border-sand-200 bg-warm-white",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <StatusDot status={a.status} />
+                <span className="text-navy">
+                  {a.agent === "manager"
+                    ? "Manager (consolidates the 3 scorers)"
+                    : `Scorer ${a.agent}`}
+                </span>
+                {typeof a.temperature === "number" && (
+                  <span className="font-mono text-[10px] text-slate-mid">
+                    temp {a.temperature}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 font-mono text-[11px] text-slate-deep">
+                {typeof a.cost_usd === "number" && (
+                  <span>${a.cost_usd.toFixed(4)}</span>
+                )}
+                <span>
+                  {a.status === "done"
+                    ? "done"
+                    : a.status === "running"
+                      ? "running…"
+                      : a.status === "failed"
+                        ? "failed"
+                        : "waiting"}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11px] text-slate-mid">
+          3 scorers run in parallel at different temperatures. Manager consolidates
+          into one final assessment.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-sand-200 bg-cream/40 p-5">
       <div className="flex items-center justify-between">
@@ -197,4 +308,16 @@ export function ScoreStream({
       </p>
     </div>
   );
+}
+
+function StatusDot({ status }: { status: AgentState["status"] }) {
+  const cls =
+    status === "done"
+      ? "bg-success"
+      : status === "failed"
+        ? "bg-danger"
+        : status === "running"
+          ? "bg-info animate-pulse"
+          : "bg-sand-200";
+  return <span className={cn("inline-block h-2 w-2 rounded-full", cls)} />;
 }
