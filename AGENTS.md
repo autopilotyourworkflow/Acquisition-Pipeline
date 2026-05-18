@@ -65,7 +65,7 @@ Update this table at the end of each phase. Append a fresh entry to `cowork-log.
 The cowork log is a graded deliverable. Read the existing entries before adding a new one — match their voice. The voice is:
 - First-person, narrative, opinionated. The user is the protagonist making the call; AI is the collaborator.
 - Show *thinking*, not specs. The plan file has the specs. The log captures the reasoning that produced them.
-- No date stamps. Chronological order communicates the timeline.
+- One date marker per day (e.g. `*Day 2 — 2026-05-19*`) inserted once before that day's first entry. Don't repeat the date on every entry.
 - Skip the Objective/Pros/Cons/Outcome template for routine entries. Use it only where the structure adds clarity.
 - Each entry: ~150–300 words. Bold the key takeaway. Lead with the framing question.
 - Goal: a reviewer skimming this should feel they understand how this team thinks, not just what was built.

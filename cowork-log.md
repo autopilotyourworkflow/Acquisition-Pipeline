@@ -9,6 +9,8 @@
 
 ---
 
+*Day 1 — 2026-05-18*
+
 ## 1. Five days, "any stack," no hand-holding
 
 The brief said *any stack, no restrictions*. That's the dangerous kind of freedom — every modern framework has a defensible answer, so the choice is really about what lets me ship the most surface area in five days without compromising review-ability.
