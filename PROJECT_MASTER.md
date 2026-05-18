@@ -17,8 +17,8 @@ After every major decision, architectural choice, or successfully completed modu
 * **Outcome:** (What was built)
 
 **Task Tracker:**
-- [ ] Phase 1: Tech Stack Selection & Architecture Planning
-- [ ] Phase 2: Setup Repository and boilerplate
+- [x] Phase 1: Tech Stack Selection & Architecture Planning
+- [x] Phase 2: Setup Repository and boilerplate
 - [ ] Phase 3: Module 1 - Candidate Data Scraper
 - [ ] Phase 4: Module 2 - AI Resume Screener
 - [ ] Phase 5: Module 3 - Applicant Tracker
