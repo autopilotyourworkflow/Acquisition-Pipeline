@@ -118,7 +118,7 @@ export function TrackerViews({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-between">
         <div className="inline-flex rounded-md border border-sand-200 bg-warm-white p-0.5 text-sm">
           <ViewTab active={view === "table"} onClick={() => setView("table")}>
             Table

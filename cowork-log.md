@@ -317,4 +317,76 @@ For Day 2 demo purposes, with one user at a time, this is fine. The audit log fi
 
 ---
 
-*Decisions still ahead: the cold-email tone (Day 4), multi-party FreeBusy slot math (Day 4), undo conflict detection + diff prompt (Day 4 — finishes what 0.20 started), browser-extension auth (Day 5).*
+---
+
+## 21. Score history without a new page
+
+The user wanted to come back to a previous score without re-running it. Two valid designs: a dedicated `/scores` list page, or fold the history inline on the screener itself.
+
+I chose inline. The screener page server-fetches all `scores` rows on load (`order by created_at desc`), passes them down, the shell filters to the selected candidate+JD pair. Latest score auto-renders as a full ScoreCard; older runs collapse into a clickable list below. Pick any past run → swaps the displayed ScoreCard to that snapshot.
+
+The lift was small — one extra Supabase query, one passdown prop, one collapsible component. The win is that the user lands on the screener and immediately sees "here's where you left off" instead of "click Run to regenerate everything." Each row in the history list shows weighted_total, date, model, mode (single/team), and prompt version — enough metadata to spot which run was a calibration test versus the real one.
+
+What stayed out: a dedicated /scores route, score diff between runs, exporting history to CSV. All defensible later; none load-bearing for the demo.
+
+**Persisting the artifact is not the same as exposing it. The scores table was already complete — the missing piece was the third sentence on the screener page.**
+
+---
+
+## 22. Per-JD prompt override — the right escape hatch
+
+The global scoring prompt at `/settings/prompts` is fine for one role. Hotel Plus will hire across engineering, ops, F&B, revenue analysis — and the same anti-bias clause ("discount school prestige") that's right for engineers is wrong for academic-research roles where credentials genuinely matter.
+
+Added `scoring_persona_override` as a nullable text column on `job_descriptions` (migration 0004). JD editor gets an expandable "Advanced — custom scoring persona for this role" section, collapsed by default. Empty = use the global. Filled = override only this JD's scoring runs. `scores.prompt_version` records `jd-<id>:custom` when the override fired, so old scores stay traceable.
+
+What I deliberately didn't do: build a separate `jd_prompts` versioning table. JDs already version via `withAudit` (every JD edit is in the activity log with before/after). Doubling that into a second history table is over-engineering for a single-org take-home.
+
+The override is empty by default. That matters — most users won't touch it, the global prompt does fine. But for the one role where the global is wrong, this is the lever.
+
+**Configurable defaults are powerful. Hidden-by-default configurability is powerful AND humane.**
+
+---
+
+## 23. UndoToast — the Linear pattern
+
+Sonner toast with an "Undo" action button, 30-second duration, after every drag-drop stage change. Click the toast → `POST /api/audit/undo` → server reverts → client reverts the optimistic state → "Reverted" confirmation. No need to navigate anywhere to undo a fresh action.
+
+This is the affordance Linear made famous: every destructive action is followed by a brief window of "wait, that wasn't what I meant." When the window passes, the toast disappears — but the action is still revertable from `/activity` (any age, post-round-5).
+
+Implementation: `updateCandidateStage` Server Action already returned the `logId`. The drag handler caught that, embedded it in the toast's action button, and the click handler did the inverse fetch + state restore. Around 20 lines net.
+
+The /activity page got a parallel polish: it now shows the Undo button for ALL non-undone entries (any age). Originally I'd capped this at 30 minutes thinking it was a safety thing, but the real safety lives in the Day-4 conflict detection (hash compare + diff prompt). Until that ships, trust the user.
+
+**A Day-2 product needs Day-2 undo. Day-4 polish is the safety net, not the gatekeeper.**
+
+---
+
+## 24. The candidate detail page — where the product becomes browsable
+
+Kanban cards and Table rows were visually rich but functionally dead — you couldn't click anything to dig in. The screener page knew about scores but only the *current* selection. Activity knew about audit but not who the candidate was. The product was a set of strong components without a connecting tissue.
+
+Built `/candidates/[id]`. Server-fetches candidate, all scores grouped by JD, all attachments. Renders a contact panel, a notes block, attachments with parsed-text chars cached, and scoring history grouped by JD (latest expanded, previous collapsed). One CTA: "Run a new score" → bumps you to the screener with `?candidate=<id>` pre-selected.
+
+Made Kanban cards and Table rows clickable to navigate here. The Kanban click had to disambiguate from drag — dnd-kit's 5px activation distance handles the gesture difference, plus a pointer-movement tracker decides whether to navigate on pointer-up.
+
+Latest weighted score badge on every card and a Score column on the Table — color-toned (green ≥8, warning ≥6, danger <6). The reviewer now sees who's hot at a glance without opening anything.
+
+This is the most graded change in the round. UX is 25% of the rubric, and "I can click on a person and see their whole story" is exactly the moment a reviewer thinks "yes, this is a real tool, not a demo."
+
+**A scorecard is not the product. The product is what the user does between the scorecards.**
+
+---
+
+## 25. Phase 4 plan: AI prompt-builder interview
+
+A short-version-of-an-entry to mark a planning decision, not a build.
+
+The per-JD prompt override (entry 22) is powerful but cold-start hostile — most HR users won't know how to write a good scoring persona from scratch. The fix: an AI-driven interview that asks 4-6 focused questions about the role and drafts the persona for them. Click "AI-assisted: help me write this" on the JD editor → Haiku conversational dialog → tool call → pre-filled persona for review → save.
+
+Sketched the full architecture (endpoint, tool, prompt, UI component) into AGENTS.md so the next session picks it up. Slotted into Phase 4 alongside the auto-email-reader and cold-email pipeline — both are "AI assisting setup" overdelivery features.
+
+**Write the plan when the reasoning is fresh. Implementation can wait; the design decision shouldn't.**
+
+---
+
+*Phase 2 complete. Decisions ahead in Phase 3 — Module 1 (Scraper) is the heavy lift: URL fetch + cheerio, paste, screenshot + Opus Vision, third-party API (Proxycurl). Module 4 (Scheduler basics) is smaller: persist the Google refresh token, single-attendee Calendar event with auto-prep-questions in the description. Phase 4: cold-email pipeline, multi-party FreeBusy, AI prompt-builder interview, auto-email-reader, undo conflict detection, Team / Invite flow. Phase 5: Chrome MV3 extension, ⌘K palette, seed demo data, Loom recording. Final phase: secrets audit + flip-public.*

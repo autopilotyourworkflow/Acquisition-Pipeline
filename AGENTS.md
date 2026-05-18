@@ -53,8 +53,8 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | Phase | Days | Status |
 |---|---|---|
 | 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
-| 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ `withAudit` HOF + Claude client (retry / cache / telemetry / tool-use forcing) + `scoring.v1` prompt + Tracker (Kanban + Table + JD CRUD) + Screener (SSE stream, ScoreCard, unpdf upload). Live smoke test: 8.60 weighted in 26s at $0.16 against seed JD. |
-| 3 — Scraper + Scheduler basics | Day 3 | not started |
+| 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ **COMPLETE.** Foundation (`withAudit` HOF + Claude client w/ retry/cache/telemetry/tool-use forcing + `scoring.v1` prompt). Tracker (Kanban + Table + JD CRUD, click-through, score badges, drag w/ UndoToast). Screener (SSE stream, ScoreCard, unpdf upload + dedup, model picker, team-mode 3+1, score history). Editable prompts (`/settings/prompts`), per-JD overrides, `/activity` audit log, any-age Undo, candidate detail page, bundled OAuth scopes. 20 cowork-log entries. Migrations 0001-0004 applied. |
+| 3 — Scraper + Scheduler basics | Day 3 | next up — see `docs/phase-3-prompt.md` for the session handoff |
 | 4 — Overdelivery (cold email, FreeBusy, undo/redo conflict, invites, **auto-email-reader**, **AI prompt-builder interview**) | Day 4 | not started |
 | 5 — Browser extension + polish + demo | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |
