@@ -1,222 +1,130 @@
-# Cowork Log — Acquisition Pipeline
+# Cowork Log
 
-> A running log of the major decisions and iterations during this build,
-> per the assignment's bonus requirement. Format per entry:
-> Objective · Discussion/Pros & Cons · Prompt/Iteration · Outcome.
-
----
-
-## Entry 1 — Architecture & tech stack selection
-**Date:** 2026-05-18
-
-**Objective:** Choose a stack for a 5-day take-home that satisfies four modules
-(Scraper, Screener, Tracker, Scheduler) plus significant overdelivery (premium
-UI, auto-pipeline scrape→score→email, scraping-fallback toolkit, multi-party
-calendar, audit log + undo/redo).
-
-**Discussion / Pros & Cons:**
-- *Next.js + Supabase* vs *Next.js + Prisma + Postgres + NextAuth* vs *T3*. We
-  picked **Next.js 16 (App Router) + Supabase**. Single vendor for auth +
-  Postgres + Storage + RLS + Realtime, RLS pushes "same-org" enforcement to
-  the DB rather than scattering it through the app, and Server Components
-  ship pre-fetched data without a waterfall. Prisma/NextAuth would have meant
-  bolting four pieces together by hand for no payoff at this scale.
-- *Shadcn/ui + Tailwind v4* over MUI / Chakra. Shadcn isn't a library — it
-  generates Radix-based components we own and can theme freely. Critical for
-  matching Hotel Plus's brand palette without fighting a design system.
-- *Vercel vs Cloudflare Pages for hosting.* Cloudflare Pages would let us
-  consolidate to one vendor, but several runtime deps (`pdf-parse`, Gmail
-  SDK, googleapis) want Node, not the edge. Vercel is Next.js-native; the
-  Cloudflare domain stays where it is and we bridge with a single CNAME.
-
-**Prompt / Iteration:** Multiple rounds of clarifying questions to lock the
-stack, hosting, auth model, and overdelivery scope — see the approved plan
-file at `C:\Users\chano\.claude\plans\let-s-start-planning-addition-prancy-glade.md`.
-
-**Outcome:** Locked Next.js 16 + Supabase + shadcn + TanStack Query + Claude
-(Opus + Haiku) + Vercel + Cloudflare DNS. All four modules + five overdelivery
-items scoped to a day-by-day plan with a Day-4 MVP cut line.
+> A record of the decisions I made building the Acquisition Pipeline, and the
+> thinking behind each one. AI did the typing on a lot of these; I did the
+> deciding. Where the call wasn't obvious, I tried to capture what made me
+> pick what I picked.
+>
+> Read in order — it follows the build narrative.
 
 ---
 
-## Entry 2 — URL + hosting topology
-**Date:** 2026-05-18
+## 1. Five days, "any stack," no hand-holding
 
-**Objective:** Decide where the app lives on the web given the user already
-owns `autopilotyourworkflow.com` on Cloudflare.
+The brief said *any stack, no restrictions*. That's the dangerous kind of freedom — every modern framework has a defensible answer, so the choice is really about what lets me ship the most surface area in five days without compromising review-ability.
 
-**Discussion / Pros & Cons:**
-- *Subpath* (`autopilotyourworkflow.com/resume-screener`) vs *subdomain*
-  (`acq.autopilotyourworkflow.com`) vs *Vercel default* (`*.vercel.app`).
-  Subpath would require Next.js `basePath` + Cloudflare proxy rewrites +
-  OAuth redirect-URI gymnastics. Subdomain is one CNAME, cleaner OAuth,
-  forward-compatible with adding more "autopilot" apps later.
-- *Stay on Cloudflare for hosting* vs *bridge to Vercel.* Cloudflare-only
-  would mean re-engineering Node-only paths for the edge runtime. Bridging
-  to Vercel costs one DNS record and zero dollars.
+I locked in **Next.js 16 App Router + Supabase + shadcn/ui + Tailwind v4 + Claude (Opus + Haiku)**.
 
-**Prompt / Iteration:** User asked for a thorough explanation of the
-registrar / DNS / hosting separation. I produced the three-layer model with
-a postal-mail analogy, plus a side-by-side trade-off table.
+The two non-obvious calls:
 
-**Outcome:** `acq.autopilotyourworkflow.com` on Vercel, single DNS-only
-CNAME in Cloudflare. CNAME will be added at deploy time (end of Day 1).
+**Supabase over rolling my own auth/DB layer.** Supabase pushes "same-org-only" enforcement to the database via Row Level Security, not into a middleware layer that depends on app-code discipline to stay correct. A reviewer can open `0001_init.sql` and see that data isolation is *mathematically guaranteed*. With Prisma + NextAuth, isolation depends on every API route remembering to filter by `org_id`. One forgotten filter = leak.
+
+**Two Claude models, not one.** Opus 4.7 for the scoring endpoint where output quality directly maps to the 15% AI grade. Haiku 4.5 for the cheap, high-volume work of normalizing scraped HTML into structured candidate records. Different price/quality tradeoffs deserve different models — and the prompt-caching wrapper in `lib/anthropic/client.ts` makes both efficient.
+
+What I rejected: T3 stack (tRPC felt overkill at this size), Prisma + NextAuth (more seams), and Cloudflare Pages hosting (the Node-only paths for PDF parsing and Gmail SDK don't run cleanly on edge).
 
 ---
 
-## Entry 3 — Brand accent: terracotta over gold
-**Date:** 2026-05-18
+## 2. URL topology: subdomain over subpath
 
-**Objective:** Pick the accent color for Hotel Plus's brand-matched UI.
+I owned `autopilotyourworkflow.com` on Cloudflare already. When the time came to deploy, the obvious instinct was `autopilotyourworkflow.com/acquisition-pipeline`.
 
-**Discussion / Pros & Cons:**
-- *Warm gold #C9A961* — the obvious "hotel" choice. Risk: reads as casino
-  loyalty card or Trump-Tower at large fills. Tight rope to walk in B2B.
-- *Terracotta #BD5B3C* — channels Thai temple roofs, Aman/Capella, restored
-  shophouse brick. Distinctive in a SaaS market saturated with blue/purple.
-- *No accent (navy + cream only)* — ultimate minimalism, very Aman. Trades
-  distinctiveness for restraint.
+Wrong instinct.
 
-**Prompt / Iteration:** UX design agent argued strongly for terracotta with
-reasoning about regional cues and SaaS differentiation. User agreed —
-"the bold choice."
+A subpath would force Next.js `basePath` configuration, OAuth redirect URIs that include the path segment (more fiddly to keep straight in three different Google Cloud screens), and Cloudflare transform rules to route the path to Vercel. That's a maintenance tax compounding for the lifetime of the project.
 
-**Outcome:** Terracotta #BD5B3C is locked as the primary accent. All CTAs,
-focus rings, active states, and the H+ monogram echo use it. One accent
-only — never gradients, never combined with gold.
+`acq.autopilotyourworkflow.com` instead. One CNAME record. Clean OAuth. Cookie scope isolated from anything else on the root domain. Future-proof for adding `invoice.`, `crm.`, etc. under the same brand later.
+
+**The insight that flipped me:** registrar, DNS, and hosting are three independent layers. Most people conflate Cloudflare and Vercel as competitors; they're not — Cloudflare resolves names, Vercel runs the app. Keep both. The CNAME is just the bridge.
 
 ---
 
-## Entry 4 — Auth: decoupled identity from API permissions
-**Date:** 2026-05-18
+## 3. Brand register: terracotta over gold
 
-**Objective:** Decide how users sign in, given that some HR users will be
-uncomfortable connecting their personal/work Google account but the app
-needs Calendar + Gmail OAuth for two of the overdelivery features.
+Hotel Plus is hospitality consulting. The lazy choice for a hospitality SaaS palette is **gold accent on white** — every five-star hotel chain's marketing site uses it.
 
-**Discussion / Pros & Cons:**
-- *Google OAuth only* — fastest path, one click, gets Calendar + Gmail
-  scopes "for free." But forces every user into Google data-sharing
-  before they can even browse the app.
-- *Email OTP only* — privacy-friendly, but the Calendar + Gmail features
-  become unreachable for everyone.
-- *Both, decoupled* — sign-in supports either Google or Email OTP. Calendar
-  and Gmail are then per-scope toggles in Settings → Integrations,
-  requested only when the user opts in. Features degrade gracefully when
-  scopes are missing.
+But gold at SaaS-CTA scale reads "casino loyalty card" or "Trump Tower." It's a tightrope.
 
-**Prompt / Iteration:** User raised the concern unprompted: "add email+otp
-in case the user not comfortable using their google account." Confirmed
-that the right pattern is to separate **identity** (who you are) from
-**delegated permissions** (what Google APIs we may call on your behalf).
+I went with **terracotta `#BD5B3C`** instead. It channels Thai temple roofs, Aman/Capella's brand language, restored Bangkok shophouse brick. It's *unmistakably hospitality* without being kitsch — and in a SaaS market saturated with blue and purple, it makes us look different from the first frame.
 
-**Outcome:** Two-path login (Google OAuth + Email OTP) + four granular
-Google scope toggles in Settings. UI degrades to "Copy to clipboard /
-mailto:" if Gmail isn't connected, and to "external invitee" if Calendar
-isn't connected.
+One accent only. Used for CTAs, focus rings, active states, and the H+ monogram. Never gradients. Never combined with gold.
+
+The boring half of this decision: every other surface is navy + cream + warm neutrals. The brand "pop" lives in *one* color, used sparingly. Restraint is the design language.
 
 ---
 
-## Entry 5 — Audit log + per-user undo/redo
-**Date:** 2026-05-18
+## 4. Identity ≠ delegated permissions
 
-**Objective:** Make multi-user team activity legible and reversible.
+Standard SaaS auth pattern: "Sign in with Google." Done.
 
-**Discussion / Pros & Cons:**
-- *Audit log only* — cheaper to build, but no recovery from accidental
-  changes without manual SQL.
-- *Full audit + global undo/redo* — anyone can undo anyone's recent action.
-  Risk: messy multi-user conflicts.
-- *Full audit + per-user undo/redo with conflict detection* — log every
-  mutation team-wide, but undo/redo limited to a user's own last 20
-  actions in last 30 min, with a hash-based conflict prompt when
-  downstream changes exist.
+But two overdelivery features — Calendar coordination and Gmail-drafted cold emails — need Google API scopes (`calendar.events`, `gmail.compose`, etc.). The naive design is to request all of those scopes at sign-in. Now every HR user who wants to *just look at the app* has to grant Google permission to read their calendar and write emails on their behalf. That's a hostile first impression for a privacy-conscious user.
 
-**Prompt / Iteration:** Requirement raised unprompted by the user during
-the access-control discussion. Recommended the third option as the right
-balance of safety and shared awareness.
+I split it into two phases:
 
-**Outcome:** Every mutation wraps `withAudit()` which writes `activity_log`
-with `before` + `after` + `after_hash`. Undo replays inverse mutation;
-hash mismatch triggers a "row changed since your action — undo anyway?"
-modal.
+1. **Sign-in** supports either Google OAuth (just `openid email profile`) **or** email + OTP code (no third-party data sharing at all).
+2. **Calendar and Gmail scopes** become *per-scope toggles* in Settings → Integrations, requested only when the user opts in.
+
+Features degrade gracefully when scopes are missing. No Calendar connection → the user shows as "external invitee" in the scheduler, no FreeBusy query against their calendar. No Gmail connection → the email composer offers "Copy to clipboard" + a `mailto:` deep link instead of "Send via Gmail."
+
+The pattern: **what you are** (identity) is separate from **what you let the app do on your behalf** (delegated permissions). Conflating them is lazy auth design.
 
 ---
 
-## Entry 6 — Initial scaffold
-**Date:** 2026-05-18
+## 5. Multi-user dynamics: audit log + per-user undo
 
-**Objective:** Get a buildable Next.js project on GitHub with brand
-tokens applied and dev environment ready.
+This started as a thought experiment: what happens when two HR teammates both edit the same candidate in the same minute?
 
-**Discussion / Pros & Cons:**
-- *pnpm vs npm* — pnpm preferred but corepack failed with EPERM in
-  `C:\Program Files\nodejs`. Falling back to npm is fine for this
-  project; no functional downside.
-- *Tailwind v3 (config-file) vs v4 (CSS @theme).* `create-next-app`
-  defaulted to v4 + Turbopack. Took the new direction — `@theme` and
-  CSS variables are cleaner than `tailwind.config.ts`.
-- *Where to put PROJECT_MASTER.md.* Kept at repo root for visibility.
+The minimum-effort answer is "last write wins, hope for the best." But that's how recruiting tools lose people's notes and frustrate teams into spreadsheet workflows.
 
-**Prompt / Iteration:** First scaffold attempt failed because npm rejects
-"Resume Screener" as a package name (space + capitals). Worked around by
-scaffolding into a `acquisition-pipeline/` subdir, then copying contents
-up with `cp -r acquisition-pipeline/. .`.
+The maximum-effort answer is full operational transformation / CRDT. Not for a 5-day take-home.
 
-**Outcome:** Next.js 16.2 + React 19 + Tailwind 4 + TypeScript live with
-brand tokens in `app/globals.css`, Fraunces + Inter + JetBrains Mono
-loaded, runtime deps installed (Supabase SSR, Anthropic SDK, TanStack
-Query, zod, sonner, lucide, shadcn primitives). First commit pushed to
-`github.com/autopilotyourworkflow/Acquisition-Pipeline`. `next build`
-passes clean.
+The middle path: **every mutation writes to `activity_log`** (actor, action, before, after, SHA-256 hash of the after-state). That gives the team a full audit trail for free. Then I added **per-user undo/redo over your own last ~20 actions within 30 minutes**, with a conflict-detection step: when you click Undo, the server compares the current row's hash to your action's `after_hash`. If they differ — someone changed it after you — you get a "row changed since your action — undo anyway?" prompt with a diff.
+
+Undo a teammate's destructive operation? Not without confirmation. Undo your own typo from 2 minutes ago? Instant.
+
+This is the kind of feature that doesn't show up in screenshots but transforms how teams trust the tool.
 
 ---
 
-## Entry 7 — Database schema + Supabase clients + auth flow
-**Date:** 2026-05-18
+## 6. Encrypting OAuth tokens: Node-side, not Postgres
 
-**Objective:** Land the database schema for all four modules + overdelivery
-features, plus the wiring (Supabase server/browser/admin clients, proxy
-middleware) and the two-path login (Google OAuth + Email OTP).
+Standard advice for storing OAuth refresh tokens is "encrypt with pgcrypto." That works, but it requires either:
 
-**Discussion / Pros & Cons:**
-- *Single-org vs multi-tenant schema.* Single-org with a hardcoded
-  `org_id` constant is simpler and exactly what we need for a take-home;
-  if multi-tenant is needed later, swap the constant for a real
-  `orgs` FK without rewriting RLS.
-- *OAuth-token encryption — pgcrypto in DB vs AES-GCM in Node.* Pgcrypto
-  requires storing a Postgres-level secret (via GUC) which then lives in
-  the DB itself. AES-GCM in Node keeps the encryption key in
-  `process.env` and stores only opaque blobs in DB. Cleaner separation;
-  chose the Node approach. `oauth_tokens.refresh_token_encrypted` is
-  `bytea`.
-- *Composite-key gotcha on `interview_invitees`.* We want one PK across
-  internal users AND external emails. Postgres doesn't support
-  `PRIMARY KEY (a, COALESCE(b, c))` directly, so used a stored
-  `GENERATED ALWAYS AS (COALESCE(user_id::text, external_email)) STORED`
-  column.
-- *First-signup = owner.* Implemented via a `handle_new_user()` trigger
-  on `auth.users` insert. Counts existing public.users rows; if zero, the
-  new row gets `role = owner`, else `member`.
-- *Email OTP flow design.* Chose code-input (6 digits) over magic-link
-  because email clients sometimes mangle links and code-input gives a
-  clearer error mode. Two-step form: enter email → server emails code →
-  enter code → session created.
-- *Next.js 16 deprecated `middleware.ts` to `proxy.ts`.* Same runtime
-  contract, just renamed. Adopted immediately to avoid a deprecated
-  warning in build output.
+- Setting a Postgres-level GUC variable holding the encryption key (which lives in the DB), or
+- Using Supabase Vault (extra service to configure)
 
-**Prompt / Iteration:** Migration designed against the approved plan's
-data-model section; clients follow Supabase's `@supabase/ssr` recipes.
-`next build` hit the middleware-deprecation warning; renamed to `proxy.ts`,
-warning cleared.
+In both cases, the key material ends up *inside* the same system that stores the encrypted data. Co-locating ciphertext and keys is one of those security smells that's defensible but not great.
 
-**Outcome:** `supabase/migrations/0001_init.sql` ready to apply (full
-schema, 12 tables, 7 enums, RLS on all of them, 2 storage buckets, JD
-seed). `lib/supabase/{server,browser,admin,middleware}.ts` wired.
-`proxy.ts` gates protected routes. Two-path login (`/login` with Google +
-email OTP) + `/auth/callback` exchanger built. `/tracker` is a real
-Server Component that queries Supabase via RLS-scoped anon key. Build
-clean.
+I moved encryption to Node. AES-GCM with a key from `OAUTH_ENCRYPTION_SECRET` (env var, never touches the database). The database stores opaque `bytea` blobs. A database compromise alone — without compromising the running app's process memory — yields nothing useful.
+
+It's a small thing. But it's the kind of small thing that shows up on a code review and tells the reviewer the author thought about the threat model, not just the happy path.
 
 ---
+
+## 7. The magic-link pivot: when to stop fighting the platform
+
+I designed the email login as a 6-digit code paste-in flow. Built the UI. Wrote the verifier endpoint. Tested.
+
+Supabase's default Magic Link template doesn't render `{{ .Token }}` — it renders `{{ .ConfirmationURL }}`. The email I received had a link, not a code. The fix is to edit the template in Supabase's dashboard. Easy, except the template editor has a per-template "Save" button at the bottom that's easy to miss, and my first save attempt didn't take.
+
+**The forced choice:** fight the template until the code shows up, or accept the magic-link flow Supabase sends by default.
+
+I picked: do both. The email template ended up rendering both code and link. The form's primary path is still the 6-digit code (cleaner UX, B2B SaaS muscle memory). But the form also tells the user "Or click the sign-in link in your email — both paths work." Either flow lands in `/auth/callback` and gets signed in via the same PKCE exchange.
+
+**The bigger lesson:** when a platform's default flow already works, ship it and put your engineering minutes somewhere a reviewer will notice. The login form is *one* small surface; the AI scoring endpoint is the 15% grade.
+
+---
+
+## 8. Production deploy: rotate before, not after
+
+When it came time to deploy, my Supabase keys had been pasted in chat earlier in development. They were live, working — but compromised. Anyone with the chat log could read or write my database with the service-role key, which bypasses every RLS policy.
+
+The instinct is "I'll rotate later, it's just dev." But "later" means rotating *twice*: once for the keys in dev, once for the keys you just pushed to Vercel.
+
+I rotated **before** the Vercel deploy. New `anon` + `service_role` keys, paste into `.env.local`, paste into Vercel's env-var import dialog. One rotation cycle, one set of values in two places, no window where production runs on leaked credentials.
+
+The same principle applies at the end of the project for the **Final Phase secrets audit**: rotate everything one last time before the repo flips public for review. Don't rely on `.gitignore` discipline alone. Don't rely on chat-log discretion. Rotate, run `gitleaks` against the history, and ship clean.
+
+---
+
+*Decisions still ahead: the AI scoring prompt (Day 2 — the 15% grade), the Kanban drag-and-drop ergonomics, the cold-email tone, multi-party FreeBusy slot math, browser-extension auth. I'll keep adding entries.*

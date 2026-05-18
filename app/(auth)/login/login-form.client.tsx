@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
-type Step = "method" | "sent";
+type Step = "method" | "code-sent";
 
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/tracker";
 
   const [step, setStep] = useState<Step>("method");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,10 +32,9 @@ export function LoginForm() {
       setError(error.message);
       setPending(false);
     }
-    // On success the browser is redirected; nothing else to manage.
   }
 
-  async function handleSendLink(e: React.FormEvent) {
+  async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
     setError(null);
@@ -49,33 +50,77 @@ export function LoginForm() {
       setError(error.message);
       return;
     }
-    setStep("sent");
+    setStep("code-sent");
   }
 
-  if (step === "sent") {
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setPending(true);
+    setError(null);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: "email",
+    });
+    setPending(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.push(next);
+    router.refresh();
+  }
+
+  if (step === "code-sent") {
     return (
-      <div className="space-y-4">
-        <div className="rounded-md border border-success/30 bg-success/5 p-5">
-          <p className="font-display text-lg text-navy">Check your email</p>
-          <p className="mt-1.5 text-sm text-charcoal">
-            We sent a sign-in link to{" "}
-            <span className="font-medium text-navy">{email}</span>.
-          </p>
-          <p className="mt-3 text-xs text-slate-deep">
-            Click the link in the email to finish signing in. It expires in 1 hour.
-          </p>
+      <form onSubmit={handleVerifyCode} className="space-y-4">
+        <div className="rounded-md border border-sand-200 bg-warm-white px-4 py-3 text-sm text-charcoal">
+          We sent a 6-digit code to{" "}
+          <span className="font-medium text-navy">{email}</span>.
         </div>
+        <div>
+          <label
+            htmlFor="code"
+            className="block text-xs font-medium uppercase tracking-wider text-slate-deep"
+          >
+            Verification code
+          </label>
+          <input
+            id="code"
+            type="text"
+            inputMode="numeric"
+            pattern="\d{6}"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="000000"
+            autoFocus
+            className="mt-1.5 h-11 w-full rounded-md border border-sand-200 bg-warm-white px-3 font-mono text-base tracking-[0.4em] text-navy placeholder:text-slate-mid focus:border-terracotta focus:outline-none"
+          />
+        </div>
+        {error && <FormError message={error} />}
+        <button
+          type="submit"
+          disabled={pending || code.length !== 6}
+          className="inline-flex h-11 w-full items-center justify-center rounded-md bg-terracotta px-6 text-sm font-medium text-cream shadow-xs transition-colors hover:bg-terracotta-700 disabled:opacity-50"
+        >
+          {pending ? "Verifying…" : "Continue"}
+        </button>
+        <p className="text-center text-[11px] text-slate-mid">
+          Or click the sign-in link in your email — both paths work.
+        </p>
         <button
           type="button"
           onClick={() => {
             setStep("method");
+            setCode("");
             setError(null);
           }}
           className="block w-full text-center text-xs text-slate-deep underline-offset-4 hover:underline"
         >
           Use a different email
         </button>
-      </div>
+      </form>
     );
   }
 
@@ -99,7 +144,7 @@ export function LoginForm() {
         <div className="flex-1 border-t border-sand-200" />
       </div>
 
-      <form onSubmit={handleSendLink} className="space-y-4">
+      <form onSubmit={handleSendCode} className="space-y-4">
         <div>
           <label
             htmlFor="email"
@@ -123,7 +168,7 @@ export function LoginForm() {
           disabled={pending || !email}
           className="inline-flex h-11 w-full items-center justify-center rounded-md bg-navy px-6 text-sm font-medium text-cream shadow-xs transition-colors hover:bg-navy-soft disabled:opacity-50"
         >
-          {pending ? "Sending…" : "Email me a sign-in link"}
+          {pending ? "Sending…" : "Email me a sign-in code"}
         </button>
       </form>
 

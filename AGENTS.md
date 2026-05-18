@@ -52,7 +52,7 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 
 | Phase | Days | Status |
 |---|---|---|
-| 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | code complete; pending: migration apply + login test + Vercel deploy |
+| 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
 | 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | not started |
 | 3 — Scraper + Scheduler basics | Day 3 | not started |
 | 4 — Overdelivery (cold email, FreeBusy, undo/redo, invites) | Day 4 | not started |
@@ -60,3 +60,12 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 6 — Final Phase: secrets audit + handoff | end | not started |
 
 Update this table at the end of each phase. Append a fresh entry to `cowork-log.md` after every major decision or successfully completed module.
+
+## Cowork-log voice
+The cowork log is a graded deliverable. Read the existing entries before adding a new one — match their voice. The voice is:
+- First-person, narrative, opinionated. The user is the protagonist making the call; AI is the collaborator.
+- Show *thinking*, not specs. The plan file has the specs. The log captures the reasoning that produced them.
+- No date stamps. Chronological order communicates the timeline.
+- Skip the Objective/Pros/Cons/Outcome template for routine entries. Use it only where the structure adds clarity.
+- Each entry: ~150–300 words. Bold the key takeaway. Lead with the framing question.
+- Goal: a reviewer skimming this should feel they understand how this team thinks, not just what was built.
