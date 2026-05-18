@@ -390,3 +390,64 @@ Sketched the full architecture (endpoint, tool, prompt, UI component) into AGENT
 ---
 
 *Phase 2 complete. Decisions ahead in Phase 3 — Module 1 (Scraper) is the heavy lift: URL fetch + cheerio, paste, screenshot + Opus Vision, third-party API (Proxycurl). Module 4 (Scheduler basics) is smaller: persist the Google refresh token, single-attendee Calendar event with auto-prep-questions in the description. Phase 4: cold-email pipeline, multi-party FreeBusy, AI prompt-builder interview, auto-email-reader, undo conflict detection, Team / Invite flow. Phase 5: Chrome MV3 extension, ⌘K palette, seed demo data, Loom recording. Final phase: secrets audit + flip-public.*
+
+---
+
+*Day 3 — 2026-05-19*
+
+## 26. OAuth token persistence: refresh token rotation and revocation
+
+How do we handle Google's refresh token after it's granted at sign-in? And what if the user revokes the app later?
+
+Built `lib/google/oauth.ts` with AES-256-GCM encryption (Node-side, key from `OAUTH_ENCRYPTION_SECRET` env var). The design:
+
+- After `exchangeCodeForSession`, grab `provider_token` + `provider_refresh_token` from the session.
+- Encrypt the refresh token (`iv || authTag || ciphertext`), store as `bytea` in `oauth_tokens.refresh_token_encrypted`.
+- `getGoogleAccessToken(userId)` returns current token if fresh (>60s left), else hits Google's token endpoint to refresh.
+- Refresh race condition: two concurrent requests both see `expires_at < now` and hit the endpoint. Both refreshes valid, last writer wins via atomic upsert — no locking needed.
+- Revocation: Google returns `invalid_grant` → delete the `oauth_tokens` row → return `{ ok: false, reason: 'revoked' }` → caller shows "Reconnect" CTA.
+
+The encryption at-the-Node level (not pgcrypto) means a database-only breach yields nothing useful — the key never touches Postgres. This is the same reasoning from cowork-log entry #6 (earlier entry on this project), applied to refresh tokens instead of session secrets.
+
+**OAuth tokens are a trust asset. Encryption is about threat models, not just defense-in-depth.**
+
+---
+
+## 27. Single normalize path for the scraper
+
+The scraper has 5 input tabs (URL, paste, PDF, screenshot, third-party API). Do they each get their own Claude call, or is there a single shape?
+
+Built `lib/scrape/normalize.ts:normalizeCandidate()` as the single funnel. Every tab:
+1. Extracts or fetches raw text (HTML → cheerio, URL → fetch, PDF → unpdf, screenshot → Opus vision, Proxycurl → JSON).
+2. POSTs to an SSE endpoint that calls `normalizeCandidate()`.
+3. Client gets back structured `ExtractCandidateInput` (full_name, email, phone, skills[], experience[], education[]).
+
+The single Claude call means:
+- One prompt, one set of guidelines, one rubric for what "extract" means (facts-only, no invention).
+- Each endpoint's test data is *consistent* — if URL extraction misses something, that bug shows up in all 5 endpoints because they call the same normalization.
+- The tool schema is `extract_candidate` (scaffolded in Phase 2) — no new tool definitions.
+
+Haiku by default ($0.009/call), Opus on demand if the user toggles it. Temperature 0 for determinism.
+
+**The normalize function is the contract. Once it's solid, all tabs are solid.**
+
+---
+
+## 28. HITL preview in the scraper — trust, but verify
+
+After extraction, show all fields as editable text inputs before saving. User can:
+- Fix typos (Claude extracted "Sennheiser" as "Senheiser").
+- Add missing context ("Director of People Ops → VP People" after reviewing the extracted title).
+- Ditch low-confidence extractions (email looks wrong → delete it).
+
+This is Human-In-The-Loop at its lightest. No approval workflow, no second-review gate — just a one-touch correction pass. The user reviews the extraction instantly, patches what matters, then saves.
+
+Without this, cold-start confidence in the scraper would be low (even if extraction is 95% accurate, that 5% error rate is visible on every import). With it, users trust the system — they're not blindly saving extracted records.
+
+Implementation: preview panel is a grid of text inputs bound to extracted fields. Save calls `createCandidate()` Server Action directly with the edited data.
+
+**Extraction confidence is a product feature. Make fixing errors frictionless and extraction becomes a tool, not a lottery.**
+
+---
+
+*Phase 3 foundation (OAuth + Scraper API) complete. Next: Scheduler (Step 2) + Settings/Integrations (Step 3).*
