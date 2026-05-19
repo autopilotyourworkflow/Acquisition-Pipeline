@@ -148,6 +148,122 @@ export async function createInterviewEvent(
  * for emphasis, `<br>` for line breaks. Mobile clients that strip tags
  * still render the text legibly, just without the bolding.
  */
+/**
+ * Cancel a previously-created Google Calendar event. Sends cancellation
+ * notifications to all attendees so they get the standard "Event canceled"
+ * email. No-op if the event doesn't exist on Google's side — we treat 404
+ * as success because the user's intent (it shouldn't be on the calendar)
+ * is satisfied either way.
+ */
+export async function cancelInterviewEvent(args: {
+  userId: string;
+  eventId: string;
+  calendarId?: string;
+}): Promise<void> {
+  const tokenResult = await getGoogleAccessToken(args.userId);
+  if (!tokenResult.ok) {
+    if (
+      tokenResult.reason === "not_connected" ||
+      tokenResult.reason === "revoked"
+    ) {
+      throw new GoogleNotConnectedError(
+        tokenResult.reason,
+        tokenResult.message,
+      );
+    }
+    throw new Error(
+      `Failed to obtain Google access token: ${tokenResult.message ?? tokenResult.reason}`,
+    );
+  }
+
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: tokenResult.accessToken });
+  const calendar = google.calendar({ version: "v3", auth });
+
+  try {
+    await calendar.events.delete({
+      calendarId: args.calendarId ?? "primary",
+      eventId: args.eventId,
+      sendUpdates: "all",
+    });
+  } catch (err: unknown) {
+    const status =
+      (err as { code?: number; status?: number })?.code ??
+      (err as { code?: number; status?: number })?.status;
+    if (status === 404 || status === 410) {
+      // Already gone — treat as success.
+      return;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Reschedule an existing interview event. Only changes start/end and the
+ * description (in case prep questions or notes shifted). Attendees stay
+ * the same and Google sends an "Event updated" notification to all of them.
+ */
+export async function rescheduleInterviewEvent(args: {
+  userId: string;
+  eventId: string;
+  calendarId?: string;
+  startsAt: string;
+  endsAt: string;
+  candidateName: string;
+  candidateEmail?: string | null;
+  candidatePhone?: string | null;
+  candidatePortfolioUrl?: string | null;
+  jdTitle?: string | null;
+  notes?: string;
+  cvUrl?: string | null;
+}): Promise<{ description: string; meetUrl: string | null }> {
+  const tokenResult = await getGoogleAccessToken(args.userId);
+  if (!tokenResult.ok) {
+    if (
+      tokenResult.reason === "not_connected" ||
+      tokenResult.reason === "revoked"
+    ) {
+      throw new GoogleNotConnectedError(
+        tokenResult.reason,
+        tokenResult.message,
+      );
+    }
+    throw new Error(
+      `Failed to obtain Google access token: ${tokenResult.message ?? tokenResult.reason}`,
+    );
+  }
+
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: tokenResult.accessToken });
+  const calendar = google.calendar({ version: "v3", auth });
+
+  const description = buildDescription({
+    candidateName: args.candidateName,
+    candidateEmail: args.candidateEmail,
+    candidatePhone: args.candidatePhone,
+    candidatePortfolioUrl: args.candidatePortfolioUrl,
+    jdTitle: args.jdTitle,
+    notes: args.notes,
+    cvUrl: args.cvUrl,
+  });
+
+  const response = await calendar.events.patch({
+    calendarId: args.calendarId ?? "primary",
+    eventId: args.eventId,
+    sendUpdates: "all",
+    requestBody: {
+      start: { dateTime: args.startsAt },
+      end: { dateTime: args.endsAt },
+      description,
+    },
+  });
+
+  return {
+    description,
+    meetUrl: response.data.hangoutLink ?? null,
+  };
+}
+
 function buildDescription({
   candidateName,
   candidateEmail,

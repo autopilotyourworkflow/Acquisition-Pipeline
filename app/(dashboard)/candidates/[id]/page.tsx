@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import { Button } from "@/components/ui/button";
+import { InterviewActions } from "@/components/interviews/InterviewActions.client";
 import { ScoreCard } from "@/components/screener/ScoreCard";
 import type { CandidateRow, JdRow, ScoreRow, AttachmentRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
@@ -555,6 +556,13 @@ function InterviewRow({ interview }: { interview: InterviewWithJd }) {
             Meet link
           </a>
         )}
+        <InterviewActions
+          interviewId={interview.id}
+          startsAt={interview.starts_at}
+          endsAt={interview.ends_at}
+          candidateName="this candidate"
+          isCanceled={interview.status === "canceled"}
+        />
       </div>
     </li>
   );

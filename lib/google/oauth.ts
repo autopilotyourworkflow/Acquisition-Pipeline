@@ -79,13 +79,22 @@ export async function upsertOAuthTokens(input: {
 }): Promise<void> {
   const admin = await createAdminClient();
   const encryptedRefreshToken = encryptRefreshToken(input.refreshToken);
+  // PostgREST's JSON body doesn't have a native binary type. If we pass a
+  // Buffer directly, supabase-js JSON-stringifies it to
+  // {"type":"Buffer","data":[1,2,...]} and Postgres stores those literal
+  // JSON bytes into the bytea column. On round-trip we'd then read back the
+  // JSON-string-as-bytes, not our original ciphertext, and decryption would
+  // fail with "Unable to authenticate data". Encode as a Postgres bytea
+  // hex string ("\xAABBCC…") instead — PostgREST recognizes this prefix and
+  // decodes it correctly into the bytea column.
+  const encryptedHex = `\\x${encryptedRefreshToken.toString("hex")}`;
   const expiresAt = new Date(Date.now() + input.expiresIn * 1000).toISOString();
 
   const { error } = await admin.from("oauth_tokens").upsert({
     user_id: input.userId,
     provider: input.provider,
     access_token: input.accessToken,
-    refresh_token_encrypted: encryptedRefreshToken,
+    refresh_token_encrypted: encryptedHex,
     expires_at: expiresAt,
     scopes: input.scopes,
   });

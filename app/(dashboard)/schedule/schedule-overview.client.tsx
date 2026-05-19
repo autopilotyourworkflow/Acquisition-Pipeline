@@ -10,7 +10,9 @@ import {
   createViewWeek,
 } from "@schedule-x/calendar";
 import "@schedule-x/theme-default/dist/index.css";
+import "./calendar-theme.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InterviewActions } from "@/components/interviews/InterviewActions.client";
 import { cn } from "@/lib/utils";
 
 export type OverviewInterview = {
@@ -289,6 +291,15 @@ function InterviewsList({
                     Meet
                   </a>
                 )}
+                <span onClick={(e) => e.stopPropagation()}>
+                  <InterviewActions
+                    interviewId={i.id}
+                    startsAt={i.startsAt}
+                    endsAt={i.endsAt}
+                    candidateName={i.candidateName}
+                    isCanceled={i.status === "canceled"}
+                  />
+                </span>
               </div>
             </button>
           </li>

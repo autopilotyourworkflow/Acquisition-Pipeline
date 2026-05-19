@@ -1,0 +1,60 @@
+/*
+ * Schedule-X theme overrides for the Acquisition Pipeline brand.
+ *
+ * Schedule-X exposes ~50 CSS custom properties on its calendar wrapper.
+ * We only override the ones that matter for visual hierarchy and brand
+ * match — colors keyed to our navy/cream/terracotta palette and a much
+ * taller day cell so the month grid feels usable, not cramped.
+ *
+ * Imported by app/(dashboard)/schedule/schedule-overview.client.tsx.
+ */
+
+.sx-react-calendar-wrapper {
+  /* Brand colors */
+  --sx-color-primary: #bd5b3c; /* terracotta */
+  --sx-color-on-primary: #faf7f2;
+  --sx-color-primary-container: #f5e6df;
+  --sx-color-on-primary-container: #17202e;
+
+  --sx-color-secondary: #17202e; /* navy */
+  --sx-color-on-secondary: #faf7f2;
+  --sx-color-secondary-container: #e6e4df;
+  --sx-color-on-secondary-container: #17202e;
+
+  --sx-color-surface: #ffffff;
+  --sx-color-surface-container: #faf7f2; /* cream */
+  --sx-color-surface-container-low: #fdfbf7;
+  --sx-color-surface-container-high: #f3f1ed;
+  --sx-color-background: #ffffff;
+  --sx-color-on-surface: #17202e;
+  --sx-color-on-background: #17202e;
+
+  --sx-color-outline: #e6e4df;
+  --sx-color-outline-variant: #f0eee9;
+
+  --sx-internal-color-border: #e6e4df;
+  --sx-internal-color-text: #17202e;
+
+  /* Make the calendar tall enough that month cells aren't cramped. The
+     wrapper controls overall height; day cells get min-height below. */
+  height: 760px;
+}
+
+/* Day cells: closer to square. Default ~75px; bumping to 130px makes the
+   grid scan like a real calendar, not a line of strips. */
+.sx-react-calendar-wrapper .sx__month-grid-day {
+  min-height: 130px;
+}
+
+/* Slightly tighter event chips so more fit before the "+N more" pill kicks in. */
+.sx-react-calendar-wrapper .sx__month-grid-event {
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+/* "Today" cell header: pop with terracotta instead of the default purple. */
+.sx-react-calendar-wrapper .sx__month-grid-day__header-date.sx__is-today {
+  background-color: #bd5b3c;
+  color: #faf7f2;
+}
