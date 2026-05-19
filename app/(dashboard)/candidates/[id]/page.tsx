@@ -130,6 +130,8 @@ export default async function CandidatePage({
         )}
       </section>
 
+      <ExtractedProfileSection rawProfile={c.raw_profile} />
+
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl text-navy">Attachments</h2>
@@ -270,6 +272,217 @@ export default async function CandidatePage({
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * Surface everything the scraper extracted into raw_profile + the original
+ * source content (pasted text / PDF filename / URL) so the user can see
+ * where this candidate came from. Renders nothing if there's no useful data.
+ */
+type ScraperSourceShape =
+  | { kind: "paste"; text?: string }
+  | { kind: "url"; url?: string }
+  | { kind: "pdf"; filename?: string; size?: number }
+  | { kind: "screenshot"; filename?: string }
+  | { kind: "thirdparty"; linkedinUrl?: string }
+  | null
+  | undefined;
+
+type ExperienceEntry = {
+  company?: string;
+  title?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  summary?: string | null;
+};
+
+type EducationEntry = {
+  institution?: string;
+  degree?: string | null;
+  field?: string | null;
+  end_year?: number | null;
+};
+
+function ExtractedProfileSection({
+  rawProfile,
+}: {
+  rawProfile: Record<string, unknown> | null;
+}) {
+  if (!rawProfile) return null;
+
+  const source = rawProfile.scraper_source as ScraperSourceShape;
+  const skills = Array.isArray(rawProfile.skills)
+    ? (rawProfile.skills as string[]).filter((s) => typeof s === "string" && s)
+    : [];
+  const experience = Array.isArray(rawProfile.experience)
+    ? (rawProfile.experience as ExperienceEntry[])
+    : [];
+  const education = Array.isArray(rawProfile.education)
+    ? (rawProfile.education as EducationEntry[])
+    : [];
+  const detectedLanguage =
+    typeof rawProfile.detected_language === "string"
+      ? (rawProfile.detected_language as string)
+      : null;
+
+  const hasAnything =
+    source ||
+    skills.length > 0 ||
+    experience.length > 0 ||
+    education.length > 0 ||
+    detectedLanguage;
+
+  if (!hasAnything) return null;
+
+  return (
+    <section className="space-y-4 rounded-lg border border-sand-200 bg-warm-white p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-xl text-navy">Extracted profile</h2>
+        {detectedLanguage && (
+          <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono text-[10px] text-charcoal">
+            lang: {detectedLanguage}
+          </span>
+        )}
+      </div>
+
+      {source && (
+        <details className="rounded-md border border-sand-200 bg-cream/40">
+          <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
+            Source content ({source.kind})
+          </summary>
+          <div className="border-t border-sand-200 px-4 py-3 text-xs">
+            {source.kind === "paste" && source.text && (
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap font-mono text-charcoal">
+                {source.text}
+              </pre>
+            )}
+            {source.kind === "url" && source.url && (
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-terracotta-700 underline-offset-4 hover:underline"
+              >
+                {source.url}
+              </a>
+            )}
+            {source.kind === "pdf" && (
+              <div className="space-y-1 text-charcoal">
+                <p>
+                  <span className="text-slate-deep">File:</span>{" "}
+                  <span className="font-mono">{source.filename ?? "—"}</span>
+                </p>
+                {typeof source.size === "number" && (
+                  <p>
+                    <span className="text-slate-deep">Size:</span>{" "}
+                    {(source.size / 1024).toFixed(1)} KB
+                  </p>
+                )}
+                <p className="text-slate-mid">
+                  PDF file storage is on the Phase-4 roadmap; for now the parsed
+                  text is captured under Experience &amp; Education below.
+                </p>
+              </div>
+            )}
+            {source.kind === "thirdparty" && source.linkedinUrl && (
+              <a
+                href={source.linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-terracotta-700 underline-offset-4 hover:underline"
+              >
+                {source.linkedinUrl}
+              </a>
+            )}
+            {source.kind === "screenshot" && source.filename && (
+              <p className="font-mono text-charcoal">{source.filename}</p>
+            )}
+          </div>
+        </details>
+      )}
+
+      {skills.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+            Skills
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {skills.map((s, i) => (
+              <span
+                key={`${s}-${i}`}
+                className="rounded-sm bg-sand-100 px-2 py-0.5 text-xs text-charcoal"
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {experience.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+            Experience
+          </p>
+          <ul className="space-y-2">
+            {experience.map((e, i) => (
+              <li
+                key={i}
+                className="rounded-md border border-sand-200 bg-cream/40 p-3 text-sm"
+              >
+                <p className="font-medium text-navy">
+                  {e.title ?? "—"}
+                  {e.company ? (
+                    <span className="text-slate-deep"> @ {e.company}</span>
+                  ) : null}
+                </p>
+                {(e.start_date || e.end_date) && (
+                  <p className="mt-0.5 font-mono text-[11px] text-slate-mid">
+                    {e.start_date ?? "?"} → {e.end_date ?? "present"}
+                  </p>
+                )}
+                {e.summary && (
+                  <p className="mt-1 whitespace-pre-wrap text-charcoal">
+                    {e.summary}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {education.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+            Education
+          </p>
+          <ul className="space-y-2">
+            {education.map((e, i) => (
+              <li
+                key={i}
+                className="rounded-md border border-sand-200 bg-cream/40 p-3 text-sm"
+              >
+                <p className="font-medium text-navy">
+                  {e.institution ?? "—"}
+                </p>
+                {(e.degree || e.field || e.end_year) && (
+                  <p className="mt-0.5 text-charcoal">
+                    {[e.degree, e.field].filter(Boolean).join(" · ")}
+                    {e.end_year ? (
+                      <span className="ml-1 font-mono text-[11px] text-slate-mid">
+                        {e.end_year}
+                      </span>
+                    ) : null}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
 
