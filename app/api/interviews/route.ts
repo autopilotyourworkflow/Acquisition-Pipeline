@@ -8,6 +8,7 @@ import {
 } from "@/lib/google/calendar";
 import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
+import { createShortLink } from "@/lib/short-links";
 
 // 30-day TTL on CV signed URLs. The interview lifecycle (schedule → meet →
 // follow-up) typically completes inside a month, so the link stays valid
@@ -108,7 +109,26 @@ export async function POST(req: NextRequest) {
         CV_SIGNED_URL_TTL_SECONDS,
       );
     if (signed?.signedUrl) {
-      cvUrl = signed.signedUrl;
+      // Wrap the long signed URL behind a short /l/<slug> link so the
+      // calendar invite description reads cleanly. The short link's
+      // expiry matches the underlying signed URL — once the signed URL
+      // dies, the short link returns 410.
+      try {
+        const short = await createShortLink({
+          url: signed.signedUrl,
+          ttlSeconds: CV_SIGNED_URL_TTL_SECONDS,
+          userId: user.id,
+        });
+        cvUrl = short.shortUrl;
+      } catch (shortErr) {
+        // Shortener failure isn't worth blocking the whole flow — fall
+        // back to the long URL.
+        console.error(
+          "[interviews] short-link mint failed, falling back to long URL:",
+          shortErr instanceof Error ? shortErr.message : shortErr,
+        );
+        cvUrl = signed.signedUrl;
+      }
     }
   }
 
