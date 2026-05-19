@@ -14,6 +14,21 @@ type ExtractState =
   | { status: "complete"; data: ExtractCandidateInput }
   | { status: "error"; message: string };
 
+/**
+ * Map server-side progress status keys to human-readable labels.
+ * Each scrape endpoint emits `scrape_progress { status: "..." }` events;
+ * we translate those keys here so the UI shows what's actually happening
+ * (raw keys like "parsing_pdf" leak implementation details).
+ */
+const STATUS_LABELS: Record<string, string> = {
+  fetching: "Fetching URL…",
+  parsing: "Parsing page content…",
+  parsing_pdf: "Reading PDF…",
+  normalizing: "Calling Claude (Haiku) — extracting candidate info…",
+  thirdparty_fetch: "Calling Proxycurl…",
+  vision: "Calling Claude (Opus vision) — reading screenshot…",
+};
+
 interface ScraperShellProps {
   initialJds: Array<{ id: string; title: string }>;
 }
@@ -25,7 +40,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleExtract = async (endpoint: string, body: Record<string, unknown> | FormData) => {
-    setExtractState({ status: "loading", stage: "Initializing..." });
+    setExtractState({ status: "loading", stage: "Connecting…" });
 
     try {
       const isFormData = body instanceof FormData;
@@ -45,64 +60,64 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
         return;
       }
 
-      const reader = response.body?.getReader();
+      const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
       if (!reader) throw new Error("No response stream");
 
-      const decoder = new TextDecoder();
       let data: ExtractCandidateInput | null = null;
       let buffer = "";
+      let errored = false;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        buffer += value;
+        let idx: number;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          const frame = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
+          let event = "message";
+          const dataLines: string[] = [];
+          for (const line of frame.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+          }
+          if (dataLines.length === 0) continue;
 
-          if (line.startsWith("data: ")) {
-            const jsonStr = line.slice(6);
-            try {
-              const msg = JSON.parse(jsonStr);
-              if (msg.event === "scrape_complete" && msg.data?.candidate) {
-                data = msg.data.candidate;
-              } else if (msg.event === "scrape_progress" && msg.data?.status) {
-                setExtractState({
-                  status: "loading",
-                  stage: msg.data.status,
-                });
-              } else if (msg.event === "scrape_error") {
-                setExtractState({
-                  status: "error",
-                  message: msg.data?.message || "Extraction failed",
-                });
-                return;
-              }
-            } catch {
-              // Ignore JSON parse errors
-            }
+          let payload: any;
+          try {
+            payload = JSON.parse(dataLines.join("\n"));
+          } catch {
+            continue;
+          }
+
+          if (event === "scrape_complete" && payload?.candidate) {
+            data = payload.candidate;
+          } else if (event === "scrape_progress" && payload?.status) {
+            const label = STATUS_LABELS[payload.status] || payload.status;
+            setExtractState({ status: "loading", stage: label });
+          } else if (event === "scrape_error") {
+            setExtractState({
+              status: "error",
+              message: payload?.message || "Extraction failed",
+            });
+            errored = true;
+            break;
           }
         }
+        if (errored) break;
       }
 
-      if (buffer.trim().startsWith("data: ")) {
-        try {
-          const msg = JSON.parse(buffer.slice(6));
-          if (msg.event === "scrape_complete" && msg.data?.candidate) {
-            data = msg.data.candidate;
-          }
-        } catch {
-          // Ignore
-        }
-      }
+      if (errored) return;
 
       if (data) {
         setExtractState({ status: "complete", data });
       } else {
-        setExtractState({ status: "error", message: "No candidate data extracted" });
+        setExtractState({
+          status: "error",
+          message: "Stream closed without a candidate result. Please try again or report the issue.",
+        });
       }
     } catch (err) {
       setExtractState({
@@ -200,14 +215,16 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
       )}
 
       {extractState.status === "loading" && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-600">
-          {extractState.stage}
+        <div className="flex items-center gap-3 rounded-lg border border-sand-200 bg-cream/40 p-4 text-sm text-charcoal">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-terracotta" />
+          <span>{extractState.stage}</span>
         </div>
       )}
 
       {extractState.status === "error" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {extractState.message}
+        <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm">
+          <p className="font-medium text-danger">Couldn&apos;t extract candidate</p>
+          <p className="mt-1 text-danger/90">{extractState.message}</p>
         </div>
       )}
     </div>

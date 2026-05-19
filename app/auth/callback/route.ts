@@ -23,24 +23,33 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
+    console.error("[auth/callback] exchangeCodeForSession error:", error.message);
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message)}`,
     );
   }
 
-  // Capture Google OAuth tokens if present
   if (data.session?.user?.id) {
     try {
-      // Cast to any to access potentially available provider fields
-      // These are populated by Supabase when OAuth scopes include offline access
       const session = data.session as any;
-      const providerToken = session.provider_token;
-      const providerRefreshToken = session.provider_refresh_token;
+      const providerToken: string | null | undefined = session.provider_token;
+      const providerRefreshToken: string | null | undefined = session.provider_refresh_token;
 
-      // Only persist if we have a refresh token (offline scope granted)
+      console.log("[auth/callback] user.id:", data.session.user.id);
+      console.log("[auth/callback] provider_token present:", !!providerToken);
+      console.log("[auth/callback] provider_refresh_token present:", !!providerRefreshToken);
+      console.log(
+        "[auth/callback] env: OAUTH_ENCRYPTION_SECRET set =",
+        !!process.env.OAUTH_ENCRYPTION_SECRET,
+        "len =",
+        process.env.OAUTH_ENCRYPTION_SECRET?.length,
+      );
+      console.log(
+        "[auth/callback] env: SUPABASE_SERVICE_ROLE_KEY set =",
+        !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      );
+
       if (providerToken && providerRefreshToken) {
-        // The scopes are the ones we requested in login-form.client.tsx
-        // Supabase passes them through, or we can hardcode them since they're fixed
         const GOOGLE_SCOPES = [
           "openid",
           "email",
@@ -56,13 +65,20 @@ export async function GET(request: NextRequest) {
           provider: "google",
           accessToken: providerToken,
           refreshToken: providerRefreshToken,
-          expiresIn: 3600, // Google access tokens valid for 1 hour
+          expiresIn: 3600,
           scopes: GOOGLE_SCOPES,
         });
+        console.log("[auth/callback] upsertOAuthTokens succeeded");
+      } else {
+        console.warn(
+          "[auth/callback] Skipping OAuth token upsert — Supabase did not return provider tokens.",
+        );
       }
     } catch (err) {
-      // Log the error but don't fail the entire signin flow
-      console.error("Failed to persist OAuth tokens:", err instanceof Error ? err.message : err);
+      console.error(
+        "[auth/callback] Failed to persist OAuth tokens:",
+        err instanceof Error ? err.stack || err.message : err,
+      );
     }
   }
 
