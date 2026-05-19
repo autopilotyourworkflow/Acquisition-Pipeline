@@ -11,9 +11,9 @@ const SECTIONS = [
   },
   {
     href: "/settings/integrations",
-    title: "Integrations (Day 3)",
-    desc: "Connect your Google account for Calendar FreeBusy and Gmail draft creation. Granular per-scope consent.",
-    ready: false,
+    title: "Integrations",
+    desc: "Per-scope status for Google Calendar + Gmail. See what's granted and reconnect to add scopes.",
+    ready: true,
   },
   {
     href: "/settings/team",

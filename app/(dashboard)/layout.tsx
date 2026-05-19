@@ -31,6 +31,7 @@ export default async function DashboardLayout({
             <NavLink href="/jds">JDs</NavLink>
             <NavLink href="/scraper">Scraper</NavLink>
             <NavLink href="/screener">Screener</NavLink>
+            <NavLink href="/schedule">Schedule</NavLink>
             <NavLink href="/activity">Activity</NavLink>
             <NavLink href="/settings">Settings</NavLink>
           </nav>
