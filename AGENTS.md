@@ -116,19 +116,25 @@ data: <JSON>
 Client parses with `fetch().body.pipeThrough(new TextDecoderStream())`.
 EventSource is GET-only — use ReadableStream for POST endpoints.
 
-## Current file inventory (Phase 2 complete state)
+## Current file inventory (Phase 3c complete state)
 
 **Routes (all dashboard routes inside `app/(dashboard)/`):**
 ```
 /                              app/page.tsx
 /login                         app/(auth)/login/
 /auth/callback                 app/auth/callback/route.ts
+/l/[slug]                      app/l/[slug]/route.ts     (public short-link redirect)
 /tracker                       app/(dashboard)/tracker/  (Kanban + Table + dialog)
 /jds  /jds/new  /jds/[id]      app/(dashboard)/jds/      (list + editor)
+/scraper                       app/(dashboard)/scraper/  (paste/URL/PDF/screenshot/thirdparty)
 /screener                      app/(dashboard)/screener/ (shell + history)
 /candidates/[id]               app/(dashboard)/candidates/[id]/
+/schedule                      app/(dashboard)/schedule/ (list + Schedule-X calendar)
+/schedule/new                  app/(dashboard)/schedule/new/  (booking form)
+/interviews/[id]/prep          app/(dashboard)/interviews/[id]/prep/ (staff-only briefing)
 /activity                      app/(dashboard)/activity/ (list + undo)
 /settings  /settings/prompts   app/(dashboard)/settings/
+/settings/integrations         app/(dashboard)/settings/integrations/ (per-scope status)
 ```
 Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/skeleton.tsx`).
 
@@ -137,11 +143,13 @@ Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/s
 /api/score/run                 POST, SSE — single + team mode
 /api/attachments/upload        multipart POST — unpdf + sha256 dedup
 /api/audit/undo                POST — any-age revert
-/api/scrape/url                POST — fetch + cheerio + Haiku normalize
+/api/scrape/url                POST — fetch + cheerio + Haiku normalize (+ Jina fallback)
 /api/scrape/paste              POST — Haiku normalize
-/api/scrape/pdf                POST { attachmentId } — read parsed_text + normalize
+/api/scrape/pdf                POST — upload-before-parse + Haiku normalize + orphan attachment
 /api/scrape/screenshot         POST — Opus vision + extract_candidate tool
 /api/scrape/thirdparty         POST — Proxycurl (BYO key) + Haiku flatten
+/api/interviews                POST — create interview (Google event + Hotel Plus invite + prep link)
+/api/interviews/[id]           DELETE = cancel, PATCH = reschedule
 ```
 
 **Libraries:**
@@ -154,35 +162,40 @@ lib/anthropic/prompts/manager.ts           team-mode manager prompt
 lib/anthropic/prompts/load.ts              DB-backed prompt loader
 lib/audit/wrap.ts                          withAudit HOF + crypto helpers
 lib/google/oauth.ts                        encrypt/decrypt + getGoogleAccessToken
+lib/google/calendar.ts                     create/cancel/reschedule + Hotel Plus invite template
 lib/scrape/normalize.ts                    single funnel: rawText → extract_candidate tool
+lib/short-links.ts                         /l/<slug> shortener for CV + prep URLs in invites
 lib/db/{constants,enums,types}.ts          shared
 lib/supabase/{server,browser,admin,middleware}.ts
 ```
 
-**Schema (migrations applied — all 5):**
+**Schema (migrations applied — all 6):**
 - `0001_init.sql` — full base schema, RLS, 12 tables, seed JD
 - `0002_phase2_fixes.sql` — `attachments.content_hash` + `scoring_prompts` table + seed v1
 - `0003_team_scoring.sql` — `scores.scoring_mode` + `scores.team_agents`
 - `0004_per_jd_prompt.sql` — `job_descriptions.scoring_persona_override`
 - `0005_user_settings.sql` — `user_settings` table (per-user, encrypted Proxycurl key)
+- `0006_short_links.sql` — `short_links` table (slug, url, expires_at; public SELECT RLS)
 
 **Components:**
 ```
-components/ui/                  shadcn primitives (button, dialog, input, etc.)
+components/ui/                  shadcn primitives (button, dialog, dropdown-menu, input, etc.)
                                 + skeleton.tsx + sonner.tsx (Toaster wrap)
 components/candidates/          StageBadge, SourceBadge
 components/screener/            ScoreCard, ScoreStream.client
+components/interviews/          InterviewActions.client (reschedule + cancel menu)
 ```
 
-**Routes (also exists — Phase 3 partial):**
-- `/scraper` — tabbed UI: URL / Paste / PDF / Screenshot / Third-party API. Single funnel via `lib/scrape/normalize.ts`, editable preview before save through `createCandidate` action.
-
 **Things that DON'T exist yet (build when phases get there):**
-- `lib/google/calendar.ts` — Google Calendar SDK wrapper (Phase 3c)
 - `lib/google/gmail.ts` — Gmail SDK wrapper (Phase 4)
-- `app/(dashboard)/schedule/` — single-attendee scheduler (Phase 3c)
-- `app/(dashboard)/settings/integrations/` — scope status page (Phase 3c)
-- `app/api/interviews/*` — interview creation (Phase 3c)
+- `lib/anthropic/prompts/persona-interview.ts` — JD prompt-builder interviewer (Phase 4a)
+- `lib/anthropic/tools/propose_scoring_persona.ts` — persona output tool (Phase 4a)
+- `app/api/jds/propose-prompt` — multi-turn SSE for JD wizard (Phase 4a)
+- `components/jds/PromptInterview.client.tsx` — JD wizard chat UI (Phase 4a)
+- `app/api/emails/draft` — Gmail draft create (Phase 4b)
+- `app/api/cron/gmail-poll` — auto-email-reader (Phase 4c)
+- `gmail_watch_configs` table — per-user inbox watch config (Phase 4c)
+- FreeBusy multi-attendee picker (Phase 4d)
 - `extension/` — Chrome MV3 (Phase 5)
 
 ## Files this project does NOT use

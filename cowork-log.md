@@ -533,3 +533,23 @@ This bug class is silent. The INSERT succeeds, the row exists, the column has da
 ---
 
 *Phase 3c complete. Scheduler + Integrations live, scraper hardened, scoring loop fixed, all on Vercel prod. Next: Phase 4 — overdelivery (cold email, auto-email-reader, AI prompt-builder interview, multi-party FreeBusy).*
+
+---
+
+## 33. Staff-only context, delivered via auth-gated link
+
+How do you put interviewer prep questions in a Google Calendar invite without the candidate seeing them?
+
+Short answer: you can't. Anything in `events.description` ships to every attendee — Google doesn't have per-attendee visibility on event descriptions. Considered a handful of angles: `extendedProperties.private` (organizer-only but not displayed for staff to read), Apps Script triggers to rewrite per recipient (overkill, fragile), separate organizer-only events that mirror the real one (doubles the records, breaks single-source-of-truth).
+
+Settled on a different shape: the description includes a LINK to the prep info, hosted on our own app at `/interviews/<id>/prep`. The page lives in the `(dashboard)` route group, which gates on auth. Candidates can see the URL in their invite, but the destination redirects to login. They don't have an org account, so they can't authenticate, so they can't see the content. Staff with an active session see it directly.
+
+The link in the description is shortened via `/l/<slug>` so the description stays readable — 12 base62 chars, ~71 bits of entropy on the slug. The page underneath is the real access control; the short slug is just hygiene.
+
+The same pattern generalizes. Phase 4's cold-email module can do the same: the email body links to a staff-only "review and send" page hosted in our app. The email is the public-facing artifact; the app is where the private context lives; an auth-gated link bridges the two.
+
+**Public artifacts can carry private context if the link's destination has its own auth.**
+
+---
+
+*Phase 3 fully closed. 33 cowork-log entries. Ready for Phase 4.*
