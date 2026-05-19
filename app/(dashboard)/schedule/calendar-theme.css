@@ -58,3 +58,55 @@
   background-color: #bd5b3c;
   color: #faf7f2;
 }
+
+/* All event chips: pointer cursor so users know they're clickable, same
+   affordance as buttons everywhere else in the app. */
+.sx-react-calendar-wrapper .sx__month-grid-event,
+.sx-react-calendar-wrapper .sx__time-grid-event,
+.sx-react-calendar-wrapper .sx__month-agenda-event,
+.sx-react-calendar-wrapper .sx__list-event,
+.sx-react-calendar-wrapper .sx__week-grid-event {
+  cursor: pointer;
+}
+
+/* Week + day views default to multi-line event chips that grow with the
+   event's duration. For our short interviews that just looks awkward —
+   force the content to one line and clamp overflow with ellipsis so the
+   visual matches the month view. */
+.sx-react-calendar-wrapper .sx__time-grid-event-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sx-react-calendar-wrapper .sx__time-grid-event-title {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Marquee on hover — for long event titles that get truncated, scroll the
+   text left-to-right when the user hovers so they can read the full thing.
+   Animating `text-indent` shifts the text horizontally without needing to
+   wrap it in an inner span. Short titles still hover-animate but the
+   visual change is negligible. */
+@keyframes sx-marquee-scroll {
+  0%,
+  8% {
+    text-indent: 0;
+  }
+  92%,
+  100% {
+    text-indent: -150%;
+  }
+}
+
+.sx-react-calendar-wrapper .sx__month-grid-event:hover,
+.sx-react-calendar-wrapper .sx__time-grid-event:hover .sx__time-grid-event-title,
+.sx-react-calendar-wrapper .sx__list-event:hover .sx__list-event-title {
+  animation: sx-marquee-scroll 7s linear infinite;
+}

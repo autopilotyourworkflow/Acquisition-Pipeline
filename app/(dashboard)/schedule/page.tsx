@@ -15,7 +15,7 @@ type InterviewWithJoins = {
   candidate_id: string;
   jd_id: string | null;
   stage: string;
-  status: "scheduled" | "completed" | "canceled" | "no_show";
+  status: "scheduled" | "rescheduled" | "completed" | "cancelled" | "no_show";
   starts_at: string;
   ends_at: string;
   meet_url: string | null;

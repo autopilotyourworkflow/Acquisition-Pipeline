@@ -22,7 +22,7 @@ const PatchBody = z.object({
 });
 
 /**
- * DELETE = cancel the interview. Soft-cancels in our DB (status='canceled')
+ * DELETE = cancel the interview. Soft-cancels in our DB (status='cancelled')
  * + sends a cancellation notification through Google to all attendees so
  * they get an "Event canceled" email.
  */
@@ -90,7 +90,7 @@ export async function DELETE(
       mutate: async () => {
         const { data, error } = await supabase
           .from("interviews")
-          .update({ status: "canceled" })
+          .update({ status: "cancelled" })
           .eq("id", id)
           .select()
           .single();
@@ -99,13 +99,12 @@ export async function DELETE(
       },
     });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error ? err.message : "Database update failed",
-      },
-      { status: 500 },
-    );
+    // Supabase throws PostgrestError as a plain object, not an Error subclass,
+    // so `err instanceof Error` is false. Read .message off both shapes.
+    const message =
+      (err as { message?: string })?.message ?? "Database update failed";
+    console.error("[interviews/:id] mutate failed:", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
@@ -263,13 +262,12 @@ export async function PATCH(
       },
     });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error ? err.message : "Database update failed",
-      },
-      { status: 500 },
-    );
+    // Supabase throws PostgrestError as a plain object, not an Error subclass,
+    // so `err instanceof Error` is false. Read .message off both shapes.
+    const message =
+      (err as { message?: string })?.message ?? "Database update failed";
+    console.error("[interviews/:id] mutate failed:", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   return NextResponse.json({

@@ -27,7 +27,7 @@ type InterviewWithJd = {
   candidate_id: string;
   jd_id: string | null;
   stage: string;
-  status: "scheduled" | "completed" | "canceled" | "no_show";
+  status: "scheduled" | "rescheduled" | "completed" | "cancelled" | "no_show";
   starts_at: string;
   ends_at: string;
   meet_url: string | null;
@@ -498,8 +498,9 @@ function InterviewRow({ interview }: { interview: InterviewWithJd }) {
     scheduled: isUpcoming
       ? "bg-success/10 text-success"
       : "bg-sand-100 text-charcoal",
+    rescheduled: "bg-info/10 text-info",
     completed: "bg-sand-100 text-charcoal",
-    canceled: "bg-warning/15 text-warning",
+    cancelled: "bg-warning/15 text-warning",
     no_show: "bg-danger/15 text-danger",
   };
 
@@ -561,7 +562,7 @@ function InterviewRow({ interview }: { interview: InterviewWithJd }) {
           startsAt={interview.starts_at}
           endsAt={interview.ends_at}
           candidateName="this candidate"
-          isCanceled={interview.status === "canceled"}
+          isCanceled={interview.status === "cancelled"}
         />
       </div>
     </li>
