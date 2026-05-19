@@ -21,6 +21,24 @@ export const dynamic = "force-dynamic";
 
 type ScoreWithJd = ScoreRow & { job_descriptions: { title: string; threshold: number } | null };
 
+type InterviewWithJd = {
+  id: string;
+  candidate_id: string;
+  jd_id: string | null;
+  stage: string;
+  status: "scheduled" | "completed" | "canceled" | "no_show";
+  starts_at: string;
+  ends_at: string;
+  meet_url: string | null;
+  google_event_id: string | null;
+  google_calendar_id: string | null;
+  description: string | null;
+  organizer_id: string;
+  created_at: string;
+  updated_at: string;
+  job_descriptions: { title: string } | null;
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -49,6 +67,7 @@ export default async function CandidatePage({
     { data: jd },
     { data: scores },
     { data: attachments },
+    { data: interviews },
   ] = await Promise.all([
     supabase.from("candidates").select("*").eq("id", id).single(),
     supabase.from("job_descriptions").select("*"),
@@ -64,6 +83,11 @@ export default async function CandidatePage({
       .select("*")
       .eq("candidate_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("interviews")
+      .select("*, job_descriptions(title)")
+      .eq("candidate_id", id)
+      .order("starts_at", { ascending: true }),
   ]);
 
   if (cErr || !candidate) return notFound();
@@ -72,6 +96,7 @@ export default async function CandidatePage({
   const allJds = (jd ?? []) as JdRow[];
   const allScores = (scores ?? []) as unknown as ScoreWithJd[];
   const allAttachments = (attachments ?? []) as AttachmentRow[];
+  const allInterviews = (interviews ?? []) as InterviewWithJd[];
 
   // Mint short-lived signed URLs so the user can preview/download each
   // attachment. Two flavors per attachment:
@@ -179,6 +204,8 @@ export default async function CandidatePage({
           </div>
         )}
       </section>
+
+      <InterviewsSection interviews={allInterviews} candidateId={c.id} />
 
       <ExtractedProfileSection rawProfile={c.raw_profile} />
 
@@ -406,6 +433,132 @@ type EducationEntry = {
   field?: string | null;
   end_year?: number | null;
 };
+
+/**
+ * Surfaces scheduled / past interviews for the candidate. Lives high on the
+ * detail page so HR sees the latest scheduling status without scrolling.
+ */
+function InterviewsSection({
+  interviews,
+  candidateId,
+}: {
+  interviews: InterviewWithJd[];
+  candidateId: string;
+}) {
+  if (interviews.length === 0) {
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl text-navy">Interviews</h2>
+          <Button asChild>
+            <Link href={`/schedule?candidate=${candidateId}`}>Schedule interview</Link>
+          </Button>
+        </div>
+        <p className="rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-6 text-center text-sm text-slate-mid">
+          No interviews scheduled yet.
+        </p>
+      </section>
+    );
+  }
+
+  const now = Date.now();
+  const upcoming = interviews.filter(
+    (i) => new Date(i.starts_at).getTime() > now && i.status === "scheduled",
+  );
+  const past = interviews.filter(
+    (i) => !upcoming.includes(i),
+  );
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-xl text-navy">Interviews</h2>
+        <Button asChild>
+          <Link href={`/schedule?candidate=${candidateId}`}>Schedule interview</Link>
+        </Button>
+      </div>
+      <ul className="space-y-2">
+        {[...upcoming, ...past].map((i) => (
+          <InterviewRow key={i.id} interview={i} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function InterviewRow({ interview }: { interview: InterviewWithJd }) {
+  const start = new Date(interview.starts_at);
+  const end = new Date(interview.ends_at);
+  const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+  const isUpcoming =
+    start.getTime() > Date.now() && interview.status === "scheduled";
+
+  const statusStyles: Record<InterviewWithJd["status"], string> = {
+    scheduled: isUpcoming
+      ? "bg-success/10 text-success"
+      : "bg-sand-100 text-charcoal",
+    completed: "bg-sand-100 text-charcoal",
+    canceled: "bg-warning/15 text-warning",
+    no_show: "bg-danger/15 text-danger",
+  };
+
+  const stageLabels: Record<string, string> = {
+    applied: "Applied",
+    screening: "Screening",
+    prescreen_call: "Pre-screen call",
+    first_interview: "First interview",
+    offer: "Offer",
+    hired: "Hired",
+    rejected: "Rejected",
+  };
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sand-200 bg-warm-white px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={cn(
+            "rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+            statusStyles[interview.status],
+          )}
+        >
+          {interview.status.replace("_", " ")}
+        </span>
+        <span className="font-medium text-navy">
+          {stageLabels[interview.stage] ?? interview.stage}
+        </span>
+        {interview.job_descriptions?.title && (
+          <span className="text-[11px] text-slate-deep">
+            for {interview.job_descriptions.title}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-mono text-[11px] text-slate-deep">
+          {start.toLocaleString("en-GB", {
+            timeZone: "Asia/Bangkok",
+            hour12: false,
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+        <span className="text-[11px] text-slate-mid">{durationMin} min</span>
+        {interview.meet_url && (
+          <a
+            href={interview.meet_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+          >
+            Meet link
+          </a>
+        )}
+      </div>
+    </li>
+  );
+}
 
 /**
  * Standalone dropdown for the original scraper input (pasted text, URL, etc.).

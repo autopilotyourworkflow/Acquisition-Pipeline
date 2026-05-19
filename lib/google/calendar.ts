@@ -168,13 +168,28 @@ function buildDescription({
   const lines: string[] = [];
 
   lines.push("<b>Hotel Plus – Interview Invitation</b>");
-  lines.push(`Position: ${jdTitle ?? "—"}`);
+  if (jdTitle && jdTitle.trim()) {
+    lines.push(`Position: ${jdTitle.trim()}`);
+  }
+
+  // Candidate block — only emit fields that actually have a value, so the
+  // invite doesn't read like "Phone: —" on every line we don't have data
+  // for.
   lines.push("");
   lines.push(`Candidate: ${candidateName}`);
-  lines.push(`Phone: ${candidatePhone?.trim() || "—"}`);
-  lines.push(`E-mail: ${candidateEmail?.trim() || "—"}`);
-  lines.push(`CV: ${cvUrl || "—"}`);
-  lines.push(`Portfolio: ${candidatePortfolioUrl?.trim() || "—"}`);
+  if (candidatePhone && candidatePhone.trim()) {
+    lines.push(`Phone: ${candidatePhone.trim()}`);
+  }
+  if (candidateEmail && candidateEmail.trim()) {
+    lines.push(`E-mail: ${candidateEmail.trim()}`);
+  }
+  if (cvUrl) {
+    lines.push(`CV: ${cvUrl}`);
+  }
+  if (candidatePortfolioUrl && candidatePortfolioUrl.trim()) {
+    lines.push(`Portfolio: ${candidatePortfolioUrl.trim()}`);
+  }
+
   lines.push("");
   lines.push("<b>Interviewer:</b>");
   lines.push("Hotel Plus Recruitment Team / Automation Team");
