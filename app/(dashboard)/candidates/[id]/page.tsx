@@ -74,19 +74,45 @@ export default async function CandidatePage({
   const allAttachments = (attachments ?? []) as AttachmentRow[];
 
   // Mint short-lived signed URLs so the user can preview/download each
-  // attachment. Admin client because storage policies on `cvs` bucket are
-  // managed at the bucket level — keeping this server-side keeps the bucket
-  // private (no permanent links leak).
+  // attachment. Two flavors per attachment:
+  //   - viewUrl: inline (no Content-Disposition) → browser PDF viewer
+  //   - downloadUrl: forces save with the original filename so even when the
+  //     inline viewer chokes on a malformed response, the user can still
+  //     get the file out.
+  // Admin client because storage policies on `cvs` bucket are managed at the
+  // bucket level — keeping this server-side keeps the bucket private (no
+  // permanent links leak).
   const attachmentLinks = await Promise.all(
     allAttachments.map(async (a) => {
       const admin = createAdminClient();
-      const { data: signed } = await admin.storage
-        .from(STORAGE_BUCKET)
-        .createSignedUrl(a.storage_path, SIGNED_URL_TTL_SECONDS);
-      return { id: a.id, url: signed?.signedUrl ?? null };
+      // Strip the hash/timestamp prefix from the stored filename for a
+      // friendlier download experience.
+      const tail = a.storage_path.split("/").pop() ?? "attachment.pdf";
+      const friendlyName = tail.replace(/^(?:[a-f0-9]{64}|\d{13})-/, "");
+      const [view, download] = await Promise.all([
+        admin.storage
+          .from(STORAGE_BUCKET)
+          .createSignedUrl(a.storage_path, SIGNED_URL_TTL_SECONDS),
+        admin.storage
+          .from(STORAGE_BUCKET)
+          .createSignedUrl(a.storage_path, SIGNED_URL_TTL_SECONDS, {
+            download: friendlyName,
+          }),
+      ]);
+      return {
+        id: a.id,
+        viewUrl: view.data?.signedUrl ?? null,
+        downloadUrl: download.data?.signedUrl ?? null,
+        friendlyName,
+      };
     }),
   );
-  const linkById = new Map(attachmentLinks.map((l) => [l.id, l.url]));
+  const linkById = new Map(
+    attachmentLinks.map((l) => [
+      l.id,
+      { viewUrl: l.viewUrl, downloadUrl: l.downloadUrl, friendlyName: l.friendlyName },
+    ]),
+  );
 
   // Group scores by JD so multiple runs against the same JD cluster together.
   const scoresByJd = new Map<string, ScoreWithJd[]>();
@@ -170,7 +196,8 @@ export default async function CandidatePage({
         ) : (
           <ul className="space-y-1">
             {allAttachments.map((a) => {
-              const url = linkById.get(a.id);
+              const links = linkById.get(a.id);
+              const friendlyName = links?.friendlyName ?? a.storage_path.split("/").pop();
               return (
                 <li
                   key={a.id}
@@ -180,9 +207,7 @@ export default async function CandidatePage({
                     <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono text-[10px] text-charcoal">
                       {a.kind}
                     </span>
-                    <span className="text-navy">
-                      {a.storage_path.split("/").pop()}
-                    </span>
+                    <span className="text-navy">{friendlyName}</span>
                     {a.parsed_text && (
                       <span className="text-[11px] text-slate-mid">
                         {a.parsed_text.length.toLocaleString()} chars cached
@@ -190,16 +215,25 @@ export default async function CandidatePage({
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    {url ? (
+                    {links?.viewUrl ? (
                       <a
-                        href={url}
+                        href={links.viewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
                       >
-                        View / Download
+                        View
                       </a>
-                    ) : (
+                    ) : null}
+                    {links?.downloadUrl ? (
+                      <a
+                        href={links.downloadUrl}
+                        className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+                      >
+                        Download
+                      </a>
+                    ) : null}
+                    {!links?.viewUrl && !links?.downloadUrl && (
                       <span className="text-[11px] text-slate-mid">
                         link unavailable
                       </span>
@@ -375,8 +409,13 @@ function ExtractedProfileSection({
       ? (rawProfile.detected_language as string)
       : null;
 
+  // For PDF sources, the file itself lives in the Attachments section below
+  // (with View / Download links), so the source-content dropdown here would
+  // just duplicate filename info. Hide it specifically for kind=pdf.
+  const showSource = source && source.kind !== "pdf";
+
   const hasAnything =
-    source ||
+    showSource ||
     skills.length > 0 ||
     experience.length > 0 ||
     education.length > 0 ||
@@ -395,7 +434,7 @@ function ExtractedProfileSection({
         )}
       </div>
 
-      {source && (
+      {showSource && source && (
         <details className="rounded-md border border-sand-200 bg-cream/40">
           <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
             Source content ({source.kind})
@@ -415,24 +454,6 @@ function ExtractedProfileSection({
               >
                 {source.url}
               </a>
-            )}
-            {source.kind === "pdf" && (
-              <div className="space-y-1 text-charcoal">
-                <p>
-                  <span className="text-slate-deep">File:</span>{" "}
-                  <span className="font-mono">{source.filename ?? "—"}</span>
-                </p>
-                {typeof source.size === "number" && (
-                  <p>
-                    <span className="text-slate-deep">Size:</span>{" "}
-                    {(source.size / 1024).toFixed(1)} KB
-                  </p>
-                )}
-                <p className="text-slate-mid">
-                  PDF file storage is on the Phase-4 roadmap; for now the parsed
-                  text is captured under Experience &amp; Education below.
-                </p>
-              </div>
             )}
             {source.kind === "thirdparty" && source.linkedinUrl && (
               <a
