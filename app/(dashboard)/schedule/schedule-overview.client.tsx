@@ -10,6 +10,7 @@ import {
   createViewMonthGrid,
   createViewWeek,
 } from "@schedule-x/calendar";
+import { createEventsServicePlugin } from "@schedule-x/events-service";
 import "@schedule-x/theme-default/dist/index.css";
 import "./calendar-theme.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -176,25 +177,45 @@ export function ScheduleOverview({
     [interviews],
   );
 
-  const calendar = useNextCalendarApp({
-    views: [
-      createViewMonthGrid(),
-      createViewWeek(),
-      createViewDay(),
-      createViewMonthAgenda(),
-    ],
-    defaultView: "month-grid",
-    events,
-    calendars: CALENDAR_CATEGORIES,
-    callbacks: {
-      onEventClick(event) {
-        const interview = interviews.find((i) => i.id === event.id);
-        if (interview) {
-          router.push(`/candidates/${interview.candidateId}`);
-        }
+  // Events service plugin lets us update the calendar's events imperatively
+  // after the calendar app is built. Without it, useNextCalendarApp captures
+  // events on first call and never refreshes — so after cancelling an
+  // interview, the chip would still show on the calendar until the user
+  // refreshed the page.
+  const eventsServicePlugin = useMemo(() => createEventsServicePlugin(), []);
+
+  const calendar = useNextCalendarApp(
+    {
+      views: [
+        createViewMonthGrid(),
+        createViewWeek(),
+        createViewDay(),
+        createViewMonthAgenda(),
+      ],
+      defaultView: "month-grid",
+      events,
+      calendars: CALENDAR_CATEGORIES,
+      callbacks: {
+        onEventClick(event) {
+          const interview = interviews.find((i) => i.id === event.id);
+          if (interview) {
+            router.push(`/candidates/${interview.candidateId}`);
+          }
+        },
       },
     },
-  });
+    [eventsServicePlugin],
+  );
+
+  // Keep the calendar's events in sync with the parent's interviews prop.
+  // router.refresh() updates `interviews`, which updates `events`, which we
+  // then push into the calendar's internal store via the plugin. Without
+  // this, cancelling or rescheduling didn't reflect on the calendar until
+  // the user hard-refreshed.
+  useEffect(() => {
+    if (!calendar) return;
+    eventsServicePlugin.set(events);
+  }, [calendar, events, eventsServicePlugin]);
 
   return (
     <Tabs
