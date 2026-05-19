@@ -273,7 +273,6 @@ export default async function CandidatePage({
           [...scoresByJd.entries()].map(([jdId, jdScores]) => {
             const jdTitle = jdScores[0]?.job_descriptions?.title ?? "Deleted JD";
             const threshold = jdScores[0]?.job_descriptions?.threshold ?? null;
-            const latest = jdScores[0];
             return (
               <div key={jdId} className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -289,63 +288,83 @@ export default async function CandidatePage({
                     {jdScores.length} run{jdScores.length === 1 ? "" : "s"}
                   </span>
                 </div>
-                <ScoreCard
-                  data={{
-                    scoreId: latest.id,
-                    skills_score: latest.skills_score,
-                    experience_score: latest.experience_score,
-                    culture_score: latest.culture_score,
-                    weighted_total: latest.weighted_total,
-                    reasoning: latest.reasoning,
-                    strengths: latest.strengths,
-                    gaps: latest.gaps,
-                    prep_questions: latest.prep_questions,
-                    hiring_report: latest.hiring_report ?? "",
-                    passes_threshold:
-                      threshold !== null ? latest.weighted_total >= threshold : null,
-                    cost_usd: latest.cost_usd ?? undefined,
-                  }}
-                />
-                {jdScores.length > 1 && (
-                  <details className="rounded-md border border-sand-200 bg-warm-white">
-                    <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
-                      Previous runs ({jdScores.length - 1} more)
-                    </summary>
-                    <ul className="divide-y divide-sand-100 border-t border-sand-100">
-                      {jdScores.slice(1).map((r) => (
-                        <li
-                          key={r.id}
-                          className="flex items-center justify-between px-4 py-2 text-sm"
+                <ul className="space-y-1.5">
+                  {jdScores.map((r, idx) => {
+                    const isLatest = idx === 0;
+                    const passesThreshold =
+                      threshold !== null ? r.weighted_total >= threshold : null;
+                    return (
+                      <li key={r.id}>
+                        <details
+                          className="group rounded-md border border-sand-200 bg-warm-white"
+                          open={isLatest}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-base font-medium text-navy">
-                              {r.weighted_total.toFixed(2)}
-                            </span>
-                            <span className="text-[11px] text-slate-deep">
-                              {new Date(r.created_at).toLocaleString("en-GB", {
-                                timeZone: "Asia/Bangkok",
-                                hour12: false,
-                              })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-mid">
-                            <span className="font-mono">{r.model}</span>
-                            <span
-                              className={cn(
-                                "rounded-sm px-1.5 py-0.5",
-                                r.scoring_mode === "team"
-                                  ? "bg-terracotta-50 text-terracotta-700"
-                                  : "bg-sand-100",
+                          <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-base font-medium text-navy">
+                                {r.weighted_total.toFixed(2)}
+                              </span>
+                              <span className="text-[11px] text-slate-deep">
+                                {new Date(r.created_at).toLocaleString("en-GB", {
+                                  timeZone: "Asia/Bangkok",
+                                  hour12: false,
+                                })}
+                              </span>
+                              {isLatest && (
+                                <span className="rounded-sm bg-terracotta-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-terracotta-700">
+                                  latest
+                                </span>
                               )}
-                            >
-                              {r.scoring_mode}
-                            </span>
+                              {passesThreshold !== null && (
+                                <span
+                                  className={cn(
+                                    "rounded-sm px-1.5 py-0.5 font-mono text-[10px]",
+                                    passesThreshold
+                                      ? "bg-success/10 text-success"
+                                      : "bg-warning/15 text-warning",
+                                  )}
+                                >
+                                  {passesThreshold ? "passes" : "below threshold"}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-mid">
+                              <span className="font-mono">{r.model}</span>
+                              <span
+                                className={cn(
+                                  "rounded-sm px-1.5 py-0.5",
+                                  r.scoring_mode === "team"
+                                    ? "bg-terracotta-50 text-terracotta-700"
+                                    : "bg-sand-100",
+                                )}
+                              >
+                                {r.scoring_mode}
+                              </span>
+                            </div>
+                          </summary>
+                          <div className="border-t border-sand-100 p-4">
+                            <ScoreCard
+                              data={{
+                                scoreId: r.id,
+                                skills_score: r.skills_score,
+                                experience_score: r.experience_score,
+                                culture_score: r.culture_score,
+                                weighted_total: r.weighted_total,
+                                reasoning: r.reasoning,
+                                strengths: r.strengths,
+                                gaps: r.gaps,
+                                prep_questions: r.prep_questions,
+                                hiring_report: r.hiring_report ?? "",
+                                passes_threshold: passesThreshold,
+                                cost_usd: r.cost_usd ?? undefined,
+                              }}
+                            />
                           </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
+                        </details>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             );
           })

@@ -54,8 +54,21 @@ export function ScoreStream({
       : [],
   );
   const startedRef = useRef<number>(Date.now());
+  // Stash onDone in a ref so the useEffect doesn't have to depend on it.
+  // Otherwise an unmemoized inline onDone in the parent recreates on every
+  // render and re-triggers the effect — which means re-firing the (paid)
+  // scoring fetch. Keep this ref in sync each render.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  // Guard against the effect being entered twice for the same logical run.
+  // Belt-and-suspenders on top of stable keys upstream — if anything ever
+  // breaks the key invariant again, this still prevents double-billing.
+  const startedThisInstanceRef = useRef(false);
 
   useEffect(() => {
+    if (startedThisInstanceRef.current) return;
+    startedThisInstanceRef.current = true;
+
     const controller = new AbortController();
     startedRef.current = Date.now();
     const tick = setInterval(() => {
@@ -94,7 +107,7 @@ export function ScoreStream({
         setError({ message: err instanceof Error ? err.message : "Stream failed" });
       } finally {
         clearInterval(tick);
-        onDone?.();
+        onDoneRef.current?.();
       }
     }
 
@@ -175,7 +188,11 @@ export function ScoreStream({
       controller.abort();
       clearInterval(tick);
     };
-  }, [candidateId, jdId, model, mode, threshold, onDone]);
+    // onDone is intentionally excluded — accessed via onDoneRef so a fresh
+    // function reference from the parent doesn't tear down a live stream
+    // and trigger another paid run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateId, jdId, model, mode, threshold]);
 
   if (error) {
     return (

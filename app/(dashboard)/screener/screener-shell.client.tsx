@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -113,6 +113,12 @@ export function ScreenerShell({
     jdId: string;
     model: ModelChoice;
     mode: ScoringMode;
+    // Per-run nonce so React keys are STABLE across re-renders. Previously
+    // we inlined Date.now() into the key, which meant every parent re-render
+    // (including the one triggered by router.refresh() after a score
+    // finished) generated a new key, remounted ScoreStream, and kicked off
+    // ANOTHER paid scoring run. Burnt real tokens on a loop.
+    nonce: number;
   } | null>(null);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [uploading, startUploadTransition] = useTransition();
@@ -187,9 +193,17 @@ export function ScreenerShell({
       toast.error("Pick a candidate and a JD");
       return;
     }
-    setRun({ candidateId, jdId, model, mode });
+    setRun({ candidateId, jdId, model, mode, nonce: Date.now() });
     setSelectedHistoryId(null);
   }
+
+  // Memoize so ScoreStream's useEffect doesn't see a "new" onDone on every
+  // parent re-render. Without this, the effect tears down and re-runs the
+  // entire fetch, which is yet another path to runaway paid scoring.
+  const onScoreStreamDone = useCallback(() => {
+    router.refresh();
+    setRun(null);
+  }, [router]);
 
   if (candidates.length === 0) {
     return (
@@ -361,13 +375,13 @@ export function ScreenerShell({
       {/* Live run takes precedence when active. */}
       {run ? (
         <ScoreStream
-          key={`${run.candidateId}:${run.jdId}:${run.model}:${run.mode}:${Date.now()}`}
+          key={`${run.candidateId}:${run.jdId}:${run.model}:${run.mode}:${run.nonce}`}
           candidateId={run.candidateId}
           jdId={run.jdId}
           model={run.model}
           mode={run.mode}
           threshold={jd?.threshold ?? 7}
-          onDone={() => router.refresh()}
+          onDone={onScoreStreamDone}
         />
       ) : displayedScore ? (
         <div className="space-y-3">
