@@ -26,8 +26,15 @@ Guidelines:
 - Extract only facts that are explicitly stated in the text
 - Do not invent or infer information not present in the source
 - For URLs, validate that they are proper URLs before including them
-- For skills, extract them as a list of specific, distinct skills
-- For experience, capture company, title, dates, and any description provided
+- For skills, extract them as a list of specific, distinct skills (JSON array
+  of strings — NEVER a comma-separated string)
+- For experience, capture company, title, dates. For each role, populate
+  \`bullets\` with the SPECIFIC accomplishments and responsibilities, ONE
+  PER ARRAY ELEMENT. Do not join them with periods or commas into a single
+  paragraph. The frontend renders these as a bullet list, so the array
+  structure is load-bearing. \`summary\` is optional and should be at most
+  one sentence of framing — leave it null if you'd just be restating the
+  bullets.
 - For education, capture institution, degree, field of study, and graduation year
 - Dates should be preserved as-is from the source (they'll be parsed on insert)
 - Detect the primary language of the profile text and set detected_language`,

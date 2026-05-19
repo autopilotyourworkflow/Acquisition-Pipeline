@@ -25,7 +25,16 @@ type ScraperSource =
 type ExtractState =
   | { status: "idle" }
   | { status: "loading"; stage: string }
-  | { status: "complete"; data: ExtractCandidateInput }
+  | {
+      status: "complete";
+      data: ExtractCandidateInput;
+      /**
+       * Set by the PDF route when it uploaded the binary + created an orphan
+       * attachment row. Passed through to createCandidate on save so we can
+       * claim that attachment for the new candidate.
+       */
+      attachmentId?: string | null;
+    }
   | { status: "saved"; name: string; candidateId: string }
   | { status: "error"; message: string };
 
@@ -38,7 +47,9 @@ type ExtractState =
 const STATUS_LABELS: Record<string, string> = {
   fetching: "Fetching URL…",
   parsing: "Parsing page content…",
+  fallback_jina: "Direct fetch was thin — trying Jina Reader fallback…",
   parsing_pdf: "Reading PDF…",
+  storing_pdf: "Saving PDF to storage…",
   normalizing: "Calling Claude (Haiku) — extracting candidate info…",
   thirdparty_fetch: "Calling Proxycurl…",
   vision: "Calling Claude (Opus vision) — reading screenshot…",
@@ -85,6 +96,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
       if (!reader) throw new Error("No response stream");
 
       let data: ExtractCandidateInput | null = null;
+      let attachmentId: string | null = null;
       let buffer = "";
       let errored = false;
 
@@ -115,6 +127,9 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
 
           if (event === "scrape_complete" && payload?.candidate) {
             data = payload.candidate;
+            if (typeof payload.attachmentId === "string") {
+              attachmentId = payload.attachmentId;
+            }
           } else if (event === "scrape_progress" && payload?.status) {
             const label = STATUS_LABELS[payload.status] || payload.status;
             setExtractState({ status: "loading", stage: label });
@@ -133,7 +148,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
       if (errored) return;
 
       if (data) {
-        setExtractState({ status: "complete", data });
+        setExtractState({ status: "complete", data, attachmentId });
       } else {
         setExtractState({
           status: "error",
@@ -168,6 +183,9 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
         scraper_source: originalSource ?? null,
       };
 
+      const attachmentId =
+        extractState.status === "complete" ? extractState.attachmentId ?? null : null;
+
       const result = await createCandidate({
         full_name: draft.full_name,
         email: draft.email,
@@ -179,6 +197,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
         source: sourceMap[activeTab],
         jd_id: selectedJdId,
         raw_profile: rawProfileWithSource,
+        attachmentId,
       });
 
       if (result.ok) {
@@ -319,21 +338,29 @@ function PasteTab({ onExtract }: { onExtract: ExtractFn }) {
 function UrlTab({ onExtract }: { onExtract: ExtractFn }) {
   const [url, setUrl] = useState("");
 
+  const handleSubmit = () => {
+    // Server route does this too, but trimming client-side gives nicer
+    // feedback (the URL bar reflects what was actually sent).
+    const cleaned = url.trim().replace(/^['"“”‘’]+|['"“”‘’]+$/g, "").trim();
+    onExtract("/api/scrape/url", { url: cleaned }, { kind: "url", url: cleaned });
+  };
+
   return (
     <>
       <input
-        type="url"
+        type="text"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="Enter LinkedIn profile or job URL..."
+        placeholder="Paste any profile, bio, or article URL…"
         className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
       />
-      <Button
-        onClick={() => onExtract("/api/scrape/url", { url }, { kind: "url", url })}
-        disabled={!url.trim()}
-      >
+      <Button onClick={handleSubmit} disabled={!url.trim()}>
         Fetch &amp; Extract
       </Button>
+      <p className="text-xs text-slate-mid">
+        Works on most public pages. If a site blocks direct access (LinkedIn,
+        paywalled sites), we fall back to Jina Reader automatically.
+      </p>
     </>
   );
 }

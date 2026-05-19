@@ -40,6 +40,12 @@ export async function createCandidate(input: {
   jd_id?: string | null;
   notes?: string | null;
   raw_profile?: Record<string, unknown> | null;
+  /**
+   * If the candidate was created from the Scraper's PDF tab, the route
+   * uploaded the binary and created an orphan attachment row up front. Pass
+   * its id here to claim it for the new candidate (UPDATEs candidate_id).
+   */
+  attachmentId?: string | null;
 }): Promise<ActionResult<{ id: string }>> {
   try {
     const { supabase, userId } = await getActor();
@@ -86,6 +92,20 @@ export async function createCandidate(input: {
       before: null,
       mutate: async () => finalRow,
     });
+
+    // If an orphan attachment came in from the Scraper, claim it now.
+    // Failure here shouldn't block candidate creation — the candidate row
+    // is what matters. Log + continue.
+    if (input.attachmentId) {
+      const { error: linkErr } = await supabase
+        .from("attachments")
+        .update({ candidate_id: inserted.id })
+        .eq("id", input.attachmentId)
+        .is("candidate_id", null);
+      if (linkErr) {
+        console.error("[createCandidate] attachment link failed:", linkErr.message);
+      }
+    }
 
     revalidatePath("/tracker");
     return { ok: true, data: { id: inserted.id } };

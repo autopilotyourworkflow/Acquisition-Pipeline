@@ -294,7 +294,11 @@ type ExperienceEntry = {
   title?: string;
   start_date?: string | null;
   end_date?: string | null;
+  // Legacy: prose paragraph captured before the schema was split.
   summary?: string | null;
+  // Current: distinct accomplishments, one per array element. Renders as a
+  // bullet list.
+  bullets?: string[];
 };
 
 type EducationEntry = {
@@ -426,29 +430,46 @@ function ExtractedProfileSection({
             Experience
           </p>
           <ul className="space-y-2">
-            {experience.map((e, i) => (
-              <li
-                key={i}
-                className="rounded-md border border-sand-200 bg-cream/40 p-3 text-sm"
-              >
-                <p className="font-medium text-navy">
-                  {e.title ?? "—"}
-                  {e.company ? (
-                    <span className="text-slate-deep"> @ {e.company}</span>
-                  ) : null}
-                </p>
-                {(e.start_date || e.end_date) && (
-                  <p className="mt-0.5 font-mono text-[11px] text-slate-mid">
-                    {e.start_date ?? "?"} → {e.end_date ?? "present"}
+            {experience.map((e, i) => {
+              const bullets = Array.isArray(e.bullets)
+                ? e.bullets.filter((b) => typeof b === "string" && b.trim())
+                : [];
+              const legacySummary =
+                bullets.length === 0 && e.summary ? e.summary : null;
+              return (
+                <li
+                  key={i}
+                  className="rounded-md border border-sand-200 bg-cream/40 p-3 text-sm"
+                >
+                  <p className="font-medium text-navy">
+                    {e.title ?? "—"}
+                    {e.company ? (
+                      <span className="text-slate-deep"> @ {e.company}</span>
+                    ) : null}
                   </p>
-                )}
-                {e.summary && (
-                  <p className="mt-1 whitespace-pre-wrap text-charcoal">
-                    {e.summary}
-                  </p>
-                )}
-              </li>
-            ))}
+                  {(e.start_date || e.end_date) && (
+                    <p className="mt-0.5 font-mono text-[11px] text-slate-mid">
+                      {e.start_date ?? "?"} → {e.end_date ?? "present"}
+                    </p>
+                  )}
+                  {e.summary && bullets.length > 0 && (
+                    <p className="mt-1 text-charcoal">{e.summary}</p>
+                  )}
+                  {bullets.length > 0 && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-charcoal marker:text-terracotta">
+                      {bullets.map((b, j) => (
+                        <li key={j}>{b}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {legacySummary && (
+                    <p className="mt-1 whitespace-pre-wrap text-charcoal">
+                      {legacySummary}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

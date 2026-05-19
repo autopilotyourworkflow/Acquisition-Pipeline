@@ -23,7 +23,13 @@ export const ExtractCandidateSchema = z.object({
         title: z.string(),
         start_date: z.string().nullable(),
         end_date: z.string().nullable(),
+        // Optional 1-sentence framing of the role. Bullets carry the
+        // detailed accomplishments — see `bullets`.
         summary: z.string().nullable(),
+        // Distinct accomplishments / responsibilities, one per item. This
+        // is what gets rendered as a bullet list on the candidate detail
+        // page, so the model should NEVER concatenate them into prose.
+        bullets: z.array(z.string()).default([]),
       }),
     )
     .default([]),
@@ -67,7 +73,11 @@ export const extractCandidateTool: ToolDefinition<ExtractCandidateInput> = {
     "Use this tool to return the normalized fields — do NOT respond in free text. " +
     "Set fields to null when the source does not contain that information; " +
     "do NOT invent values. Skills MUST be a JSON array of strings, never a " +
-    "comma-separated string. Detect the candidate's primary written language.",
+    "comma-separated string. For each experience entry, `bullets` MUST be " +
+    "an array where each element is ONE distinct accomplishment or " +
+    "responsibility — never concatenate multiple bullets into a single " +
+    "paragraph. Use `summary` for a one-sentence framing of the role only. " +
+    "Detect the candidate's primary written language.",
   input_schema: z.toJSONSchema(ExtractCandidateSchema) as Record<string, unknown>,
   validate: (raw) => ExtractCandidateSchema.parse(coerceRawInput(raw)),
 };

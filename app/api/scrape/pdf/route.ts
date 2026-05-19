@@ -1,6 +1,10 @@
+import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { extractText, getDocumentProxy } from "unpdf";
 import { normalizeCandidate } from "@/lib/scrape/normalize";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ORG_ID } from "@/lib/db/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +17,15 @@ function sseEvent(event: string, data: unknown): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require auth: we're going to write to storage + the attachments table.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -33,14 +46,17 @@ export async function POST(req: NextRequest) {
         try {
           emit("scrape_progress", { status: "parsing_pdf", fileName: file.name });
 
-          // Parse PDF
           const buf = new Uint8Array(await file.arrayBuffer());
-          let parsedText = "";
+          const contentHash = createHash("sha256").update(buf).digest("hex");
 
+          // Parse text up front — fail fast if the PDF is unreadable.
+          let parsedText = "";
           try {
             const pdf = await getDocumentProxy(buf);
             const result = await extractText(pdf, { mergePages: true });
-            parsedText = Array.isArray(result.text) ? result.text.join("\n\n") : result.text;
+            parsedText = Array.isArray(result.text)
+              ? result.text.join("\n\n")
+              : result.text;
           } catch (parseErr) {
             throw new Error(
               `Failed to parse PDF: ${parseErr instanceof Error ? parseErr.message : "unknown"}`,
@@ -51,9 +67,50 @@ export async function POST(req: NextRequest) {
             throw new Error("No text content found in PDF");
           }
 
-          emit("scrape_progress", { status: "normalizing", contentLength: parsedText.length });
+          // Save the binary + create an attachment row with candidate_id=null.
+          // The scraper-shell will link this attachment to the new candidate
+          // after createCandidate succeeds. Orphan attachments (user scraped
+          // but never saved) are accepted — cheap and easy to GC later.
+          emit("scrape_progress", { status: "storing_pdf" });
 
-          // Normalize the parsed text
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const storagePath = `org/${ORG_ID}/pending/${contentHash}-${safeName}`;
+          const admin = createAdminClient();
+          const { error: uploadErr } = await admin.storage
+            .from("cvs")
+            .upload(storagePath, buf, {
+              contentType: file.type || "application/pdf",
+              upsert: true, // re-uploading the same content is fine
+            });
+          if (uploadErr) {
+            throw new Error(`Storage upload failed: ${uploadErr.message}`);
+          }
+
+          const { data: attachment, error: insertErr } = await supabase
+            .from("attachments")
+            .insert({
+              org_id: ORG_ID,
+              candidate_id: null,
+              kind: "cv_pdf",
+              storage_path: storagePath,
+              mime_type: file.type || "application/pdf",
+              bytes: file.size,
+              parsed_text: parsedText,
+              content_hash: contentHash,
+            })
+            .select("id")
+            .single();
+          if (insertErr || !attachment) {
+            throw new Error(
+              `Attachment insert failed: ${insertErr?.message ?? "unknown"}`,
+            );
+          }
+
+          emit("scrape_progress", {
+            status: "normalizing",
+            contentLength: parsedText.length,
+          });
+
           const candidate = await normalizeCandidate({
             text: parsedText,
             model: "haiku",
@@ -61,6 +118,8 @@ export async function POST(req: NextRequest) {
 
           emit("scrape_complete", {
             candidate,
+            attachmentId: attachment.id,
+            fileName: file.name,
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
