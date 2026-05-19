@@ -403,6 +403,68 @@ function CalendarWithContextMenu({
   const [reschedule, setReschedule] = useState<OverviewInterview | null>(null);
   const [cancelling, setCancelling] = useState<OverviewInterview | null>(null);
   const [busy, setBusy] = useState(false);
+  // Active Schedule-X view ("month-grid" | "week" | "day" | "month-agenda" |
+  // "list"). Drives the data-view attr on the wrapper, which lets CSS
+  // target view-specific styling (week-only layout reorder, week-only
+  // time-fade-on-hover, etc.).
+  const [currentView, setCurrentView] = useState<string>("month-grid");
+
+  useEffect(() => {
+    if (!calendarApp) return;
+    // Schedule-X v2 doesn't expose `calendarState` publicly on the
+    // CalendarApp type — it's only on the internal `$app` (private in TS,
+    // public at runtime). Cast through `unknown` to reach the view signal.
+    // The shape is stable across the v2 line.
+    const internal = calendarApp as unknown as {
+      $app?: {
+        calendarState?: {
+          view?: {
+            value: string;
+            subscribe: (cb: (v: string) => void) => () => void;
+          };
+        };
+      };
+    };
+    const viewSignal = internal.$app?.calendarState?.view;
+    if (!viewSignal) return;
+    setCurrentView(viewSignal.value);
+    return viewSignal.subscribe((v) => setCurrentView(v));
+  }, [calendarApp]);
+
+  // Mark event elements whose title actually overflows their chip so CSS can
+  // marquee-scroll ONLY those on hover. Short titles that already fit stay
+  // visually static. Uses a MutationObserver because Schedule-X re-renders
+  // event DOM on view change / event update without a React lifecycle hook
+  // we can attach to.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const applyTruncation = () => {
+      const inlineTitles = wrapper.querySelectorAll<HTMLElement>(
+        ".sx__time-grid-event-title, .sx__list-event-title",
+      );
+      inlineTitles.forEach((el) => {
+        el.classList.toggle("is-truncated", el.scrollWidth > el.clientWidth);
+      });
+      const monthChips = wrapper.querySelectorAll<HTMLElement>(
+        ".sx__month-grid-event",
+      );
+      monthChips.forEach((el) => {
+        el.classList.toggle("is-truncated", el.scrollWidth > el.clientWidth);
+      });
+    };
+
+    applyTruncation();
+    const observer = new MutationObserver(applyTruncation);
+    observer.observe(wrapper, { childList: true, subtree: true });
+    window.addEventListener("resize", applyTruncation);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", applyTruncation);
+    };
+  }, [interviews, currentView]);
 
   // Reschedule dialog state — pre-filled from the selected interview each
   // time the dialog opens.
@@ -525,6 +587,7 @@ function CalendarWithContextMenu({
     <>
       <div
         ref={wrapperRef}
+        data-view={currentView}
         className="overflow-hidden rounded-lg border border-sand-200 bg-warm-white"
       >
         <ScheduleXCalendar calendarApp={calendarApp} />

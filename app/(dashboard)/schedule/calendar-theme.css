@@ -115,43 +115,85 @@
   overflow: hidden;
 }
 
-/* Marquee-with-fade reveal: when you hover an event, the time element fades
-   to opacity 0 (so it doesn't compete with the scrolling title for
-   horizontal space), and then the title text starts to scroll horizontally
-   so the user can read the full thing.
-   - The animation has a generous 0% → 8% pause at rest so short titles
-     don't appear to "twitch" on a quick hover.
-   - text-indent: -200% scrolls the text 2x its own width. That's enough to
-     reveal most overflowed titles without making short ones look broken. */
+/* Month-grid chips need explicit nowrap+overflow so we can detect
+   truncation via scrollWidth > clientWidth (the JS in the React component
+   reads those values to toggle .is-truncated). */
+.sx-react-calendar-wrapper .sx__month-grid-event {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Marquee keyframes — no initial pause, starts scrolling on hover instantly.
+   text-indent: -200% scrolls 2x the chip's width, enough to reveal most
+   overflowed titles. */
 @keyframes sx-event-marquee {
-  0%,
-  8% {
+  0% {
     text-indent: 0;
   }
-  92%,
   100% {
     text-indent: -200%;
   }
 }
 
-.sx-react-calendar-wrapper .sx__month-grid-event:hover .sx__month-grid-event-time,
+/* WEEK VIEW: reorganize event chip layout.
+   - Hide the clock icon (the SVG that prefixes the time).
+   - Put time on the left (order: 1) and title on the right (order: 2),
+     overriding the default DOM order via flex's `order` property.
+   - Flex row layout with the title flexing to fill remaining space.
+   Day view (also uses .sx__time-grid-event) is intentionally NOT touched
+   here — those chips are wide enough that the default layout looks fine.
+*/
+[data-view="week"] .sx__event-icon {
+  display: none;
+}
+[data-view="week"] .sx__time-grid-event-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+[data-view="week"] .sx__time-grid-event-time {
+  order: 1;
+  flex-shrink: 0;
+}
+[data-view="week"] .sx__time-grid-event-title {
+  order: 2;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Marquee on truncated content only. is-truncated is toggled per element
+   by the MutationObserver in CalendarWithContextMenu — short titles stay
+   visually static even on hover. */
+.sx-react-calendar-wrapper .sx__month-grid-event.is-truncated:hover {
+  animation: sx-event-marquee 7s linear infinite;
+}
+[data-view="week"]
+  .sx__time-grid-event:hover
+  .sx__time-grid-event-title.is-truncated {
+  animation: sx-event-marquee 7s linear infinite;
+}
+
+/* Time-fade on hover.
+   - Month view: only when the chip is truncated (otherwise the time was
+     fitting next to the title fine; no reason to hide it).
+   - Week view: always on hover, because the layout reorder puts time in
+     front of the title — fading it gives the title the whole chip width
+     to scroll into.
+   - Day view: NEVER — day chips are wide and showing both time and title
+     side by side is fine. Ben specifically asked us not to hide time in
+     day view. */
 .sx-react-calendar-wrapper
+  .sx__month-grid-event.is-truncated:hover
+  .sx__month-grid-event-time {
+  opacity: 0;
+  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-view="week"]
   .sx__time-grid-event:hover
   .sx__time-grid-event-time {
   opacity: 0;
-  transition: opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Month-grid: title text lives directly in the chip's text node (no
-   wrapper), so we animate text-indent on the chip itself. The now-invisible
-   time span shifts along with the title but isn't visible. */
-.sx-react-calendar-wrapper .sx__month-grid-event:hover {
-  animation: sx-event-marquee 7s linear 300ms infinite;
-}
-
-/* Time-grid + list: title is its own element. Animate it directly so the
-   chip background and time slot don't move. */
-.sx-react-calendar-wrapper .sx__time-grid-event:hover .sx__time-grid-event-title,
-.sx-react-calendar-wrapper .sx__list-event:hover .sx__list-event-title {
-  animation: sx-event-marquee 7s linear 300ms infinite;
+  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
