@@ -14,25 +14,23 @@ export type CreateInterviewArgs = {
   userId: string;
   candidateName: string;
   candidateEmail?: string | null;
+  candidatePhone?: string | null;
+  /** Candidate's portfolio / LinkedIn URL — surfaced in the invite. */
+  candidatePortfolioUrl?: string | null;
+  /** Title of the JD this interview is for. Surfaced as "Position" in the invite. */
+  jdTitle?: string | null;
   /** ISO 8601 with offset, e.g. "2026-05-19T14:30:00+07:00". */
   startsAt: string;
   endsAt: string;
-  /**
-   * Pulled from the candidate's latest score. Surfaced in the event
-   * description so the interviewer has context inside their calendar
-   * client without leaving it.
-   */
-  prepQuestions?: string[];
   /** Optional additional invitees by email (panelists, hiring manager, etc.). */
   externalInvitees?: string[];
   /** Free-form additional notes typed by the organizer. */
   notes?: string;
-  /** Short label for the CV attachment, e.g. the original filename. */
-  cvLabel?: string | null;
   /**
    * Signed URL to the candidate's most recent CV. Embedded in the calendar
-   * event description so the interviewer can open it from inside the event.
-   * Generated server-side from Supabase Storage with a 24h TTL.
+   * event description so the candidate (and any invitees) can open it. The
+   * URL has a long TTL (~30 days) so the link remains valid through the
+   * normal interview lifecycle.
    */
   cvUrl?: string | null;
 };
@@ -88,9 +86,11 @@ export async function createInterviewEvent(
 
   const description = buildDescription({
     candidateName: args.candidateName,
-    prepQuestions: args.prepQuestions ?? [],
+    candidateEmail: args.candidateEmail,
+    candidatePhone: args.candidatePhone,
+    candidatePortfolioUrl: args.candidatePortfolioUrl,
+    jdTitle: args.jdTitle,
     notes: args.notes,
-    cvLabel: args.cvLabel,
     cvUrl: args.cvUrl,
   });
 
@@ -138,46 +138,56 @@ export async function createInterviewEvent(
   };
 }
 
+/**
+ * Hotel Plus interview-invitation template — the candidate sees this text in
+ * their Google Calendar invite, so it's written for them. Internal-only
+ * info like prep questions does NOT go here (those live on the candidate
+ * detail page for the interviewer to review pre-meeting).
+ *
+ * Google Calendar's API treats `description` as HTML in the web UI — `<b>`
+ * for emphasis, `<br>` for line breaks. Mobile clients that strip tags
+ * still render the text legibly, just without the bolding.
+ */
 function buildDescription({
   candidateName,
-  prepQuestions,
+  candidateEmail,
+  candidatePhone,
+  candidatePortfolioUrl,
+  jdTitle,
   notes,
-  cvLabel,
   cvUrl,
 }: {
   candidateName: string;
-  prepQuestions: string[];
+  candidateEmail?: string | null;
+  candidatePhone?: string | null;
+  candidatePortfolioUrl?: string | null;
+  jdTitle?: string | null;
   notes?: string;
-  cvLabel?: string | null;
   cvUrl?: string | null;
 }): string {
-  const parts: string[] = [];
-  parts.push(`Interview with ${candidateName}.`);
+  const lines: string[] = [];
 
-  if (prepQuestions.length > 0) {
-    parts.push("");
-    parts.push("— Prep questions —");
-    for (const q of prepQuestions) {
-      parts.push(`• ${q}`);
-    }
-  }
-
-  if (cvUrl) {
-    parts.push("");
-    parts.push("— CV —");
-    if (cvLabel) parts.push(cvLabel);
-    parts.push(cvUrl);
-    parts.push("(link valid for 24h)");
-  }
+  lines.push("<b>Hotel Plus – Interview Invitation</b>");
+  lines.push(`Position: ${jdTitle ?? "—"}`);
+  lines.push("");
+  lines.push(`Candidate: ${candidateName}`);
+  lines.push(`Phone: ${candidatePhone?.trim() || "—"}`);
+  lines.push(`E-mail: ${candidateEmail?.trim() || "—"}`);
+  lines.push(`CV: ${cvUrl || "—"}`);
+  lines.push(`Portfolio: ${candidatePortfolioUrl?.trim() || "—"}`);
+  lines.push("");
+  lines.push("<b>Interviewer:</b>");
+  lines.push("Hotel Plus Recruitment Team / Automation Team");
+  lines.push("");
+  lines.push(
+    "Should you require any additional information or wish to reschedule the interview date or time, please feel free to contact me at 082-226-1181",
+  );
 
   if (notes && notes.trim()) {
-    parts.push("");
-    parts.push("— Notes —");
-    parts.push(notes.trim());
+    lines.push("");
+    lines.push("—");
+    lines.push(notes.trim());
   }
 
-  parts.push("");
-  parts.push("—");
-  parts.push("Acquisition Pipeline");
-  return parts.join("\n");
+  return lines.join("\n");
 }

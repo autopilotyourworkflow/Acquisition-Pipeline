@@ -288,8 +288,14 @@ export function ScheduleShell({
       {candidate && candidate.prep_questions.length > 0 && (
         <details className="rounded-md border border-sand-200 bg-warm-white">
           <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
-            Prep questions that will be attached ({candidate.prep_questions.length})
+            Prep questions ({candidate.prep_questions.length}) — interviewer-only,
+            not sent to candidate
           </summary>
+          <div className="border-t border-sand-100 px-4 py-3 text-[11px] text-slate-mid">
+            Review these before the meeting. They live on the candidate detail
+            page and are NOT included in the calendar invite the candidate
+            receives.
+          </div>
           <ul className="list-disc space-y-1 border-t border-sand-100 px-8 py-3 text-sm text-charcoal marker:text-terracotta">
             {candidate.prep_questions.map((q, i) => (
               <li key={i}>{q}</li>

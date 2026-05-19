@@ -9,7 +9,12 @@ import {
 import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
 
-const CV_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24; // 24 hours
+// 30-day TTL on CV signed URLs. The interview lifecycle (schedule → meet →
+// follow-up) typically completes inside a month, so the link stays valid
+// through the full flow without needing to refresh. Trade-off: a leaked
+// invite gives 30 days of CV access — acceptable given the recipient is
+// already an invited attendee.
+const CV_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +63,7 @@ export async function POST(req: NextRequest) {
   // that go into the calendar event description).
   const { data: candidate, error: cErr } = await supabase
     .from("candidates")
-    .select("id, full_name, email")
+    .select("id, full_name, email, phone, linkedin_url, source_url, jd_id")
     .eq("id", body.candidateId)
     .single();
   if (cErr || !candidate) {
@@ -68,20 +73,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: latestScore } = await supabase
-    .from("scores")
-    .select("prep_questions")
-    .eq("candidate_id", body.candidateId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const prepQuestions =
-    (latestScore?.prep_questions as string[] | undefined) ?? [];
+  // Look up the JD title for the "Position" line in the invite. Prefer the
+  // JD explicitly passed on the request; fall back to the candidate's
+  // assigned JD.
+  const jdIdForTitle = body.jdId ?? candidate.jd_id ?? null;
+  let jdTitle: string | null = null;
+  if (jdIdForTitle) {
+    const { data: jdRow } = await supabase
+      .from("job_descriptions")
+      .select("title")
+      .eq("id", jdIdForTitle)
+      .maybeSingle();
+    jdTitle = (jdRow?.title as string | undefined) ?? null;
+  }
 
-  // Pull the most recent CV attachment (if any) and mint a 24h signed URL.
-  // We embed this in the calendar event description so interviewers can
-  // open the CV without leaving their calendar client.
-  let cvLabel: string | null = null;
+  // Pull the most recent CV attachment (if any) and mint a 30-day signed URL.
+  // We embed this in the calendar event description so interviewers + the
+  // candidate can open the CV without leaving their calendar client.
   let cvUrl: string | null = null;
   const { data: latestAttachment } = await supabase
     .from("attachments")
@@ -101,12 +109,13 @@ export async function POST(req: NextRequest) {
       );
     if (signed?.signedUrl) {
       cvUrl = signed.signedUrl;
-      const tail =
-        (latestAttachment.storage_path as string).split("/").pop() ?? "cv.pdf";
-      // Strip hash/timestamp prefixes to leave a clean filename label.
-      cvLabel = tail.replace(/^(?:[a-f0-9]{64}|\d{13})-/, "");
     }
   }
+
+  // "Portfolio" maps to whichever candidate URL is most likely portfolio-y.
+  // LinkedIn first (most common), then source_url as the next-best signal.
+  const candidatePortfolioUrl =
+    candidate.linkedin_url ?? candidate.source_url ?? null;
 
   // 1. Create the calendar event FIRST. If this fails, no DB row is created
   //    and the user can retry without seeing a half-saved interview. If it
@@ -119,12 +128,13 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       candidateName: candidate.full_name,
       candidateEmail: candidate.email,
+      candidatePhone: candidate.phone,
+      candidatePortfolioUrl,
+      jdTitle,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
-      prepQuestions,
       externalInvitees: body.externalInvitees,
       notes: body.description,
-      cvLabel,
       cvUrl,
     });
   } catch (err) {
