@@ -132,14 +132,33 @@ export async function getGoogleAccessToken(userId: string): Promise<TokenResult>
 
   // Token expired, refresh it
   try {
+    // Refresh requires our own copy of the Google OAuth client credentials.
+    // (Supabase has its own copy for the initial sign-in flow, but it
+    // doesn't expose them — refresh is our responsibility from here on.)
+    // Catch this BEFORE hitting Google so the error message tells the
+    // operator exactly what's missing instead of a cryptic
+    // "Could not determine client ID from request" from Google.
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return {
+        ok: false,
+        reason: "error",
+        message:
+          "Server is missing GOOGLE_CLIENT_ID and/or GOOGLE_CLIENT_SECRET. " +
+          "Set both in Vercel → Settings → Environment Variables (same " +
+          "credentials Supabase uses for its Google provider) and redeploy.",
+      };
+    }
+
     const decryptedRefreshToken = decryptRefreshToken(data.refresh_token_encrypted);
 
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID || "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        client_id: clientId,
+        client_secret: clientSecret,
         grant_type: "refresh_token",
         refresh_token: decryptedRefreshToken,
       }).toString(),

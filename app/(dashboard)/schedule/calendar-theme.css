@@ -166,36 +166,20 @@
   min-width: 0;
 }
 
-/* Marquee on truncated content only. is-truncated is toggled per element
-   by the MutationObserver in CalendarWithContextMenu — short titles stay
-   visually static even on hover. */
+/* Marquee on truncated content — MONTH VIEW ONLY.
+   Week view was removed at Ben's request: the nested flex math made the
+   scroll feel jittery and the layout reorder already gives the title a
+   clean static fallback (time | title with ellipsis). Day view doesn't
+   need it because chips have plenty of horizontal room. */
 .sx-react-calendar-wrapper .sx__month-grid-event.is-truncated:hover {
   animation: sx-event-marquee 5s linear infinite alternate;
 }
-[data-view="week"]
-  .sx__time-grid-event:hover
-  .sx__time-grid-event-title.is-truncated {
-  animation: sx-event-marquee 5s linear infinite alternate;
-}
 
-/* Time-fade on hover.
-   - Month view: only when the chip is truncated (otherwise the time was
-     fitting next to the title fine; no reason to hide it).
-   - Week view: always on hover, because the layout reorder puts time in
-     front of the title — fading it gives the title the whole chip width
-     to scroll into.
-   - Day view: NEVER — day chips are wide and showing both time and title
-     side by side is fine. Ben specifically asked us not to hide time in
-     day view. */
+/* Time-fade on hover — also MONTH VIEW ONLY now, and only when the chip is
+   truncated (no reason to hide the time if everything was fitting fine). */
 .sx-react-calendar-wrapper
   .sx__month-grid-event.is-truncated:hover
   .sx__month-grid-event-time {
-  opacity: 0;
-  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-[data-view="week"]
-  .sx__time-grid-event:hover
-  .sx__time-grid-event-time {
   opacity: 0;
   transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
