@@ -1,12 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import { Button } from "@/components/ui/button";
 import { ScoreCard } from "@/components/screener/ScoreCard";
 import type { CandidateRow, JdRow, ScoreRow, AttachmentRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
+
+/**
+ * Storage bucket holding PDFs (and screenshots, eventually). Private — view
+ * access is granted per-request via createSignedUrl with a short TTL so a
+ * leaked HTML page can't expose a permanent link.
+ */
+const STORAGE_BUCKET = "cvs";
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +72,21 @@ export default async function CandidatePage({
   const allJds = (jd ?? []) as JdRow[];
   const allScores = (scores ?? []) as unknown as ScoreWithJd[];
   const allAttachments = (attachments ?? []) as AttachmentRow[];
+
+  // Mint short-lived signed URLs so the user can preview/download each
+  // attachment. Admin client because storage policies on `cvs` bucket are
+  // managed at the bucket level — keeping this server-side keeps the bucket
+  // private (no permanent links leak).
+  const attachmentLinks = await Promise.all(
+    allAttachments.map(async (a) => {
+      const admin = createAdminClient();
+      const { data: signed } = await admin.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(a.storage_path, SIGNED_URL_TTL_SECONDS);
+      return { id: a.id, url: signed?.signedUrl ?? null };
+    }),
+  );
+  const linkById = new Map(attachmentLinks.map((l) => [l.id, l.url]));
 
   // Group scores by JD so multiple runs against the same JD cluster together.
   const scoresByJd = new Map<string, ScoreWithJd[]>();
@@ -145,30 +169,51 @@ export default async function CandidatePage({
           </p>
         ) : (
           <ul className="space-y-1">
-            {allAttachments.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-center justify-between rounded-md border border-sand-200 bg-warm-white px-4 py-2.5 text-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono text-[10px] text-charcoal">
-                    {a.kind}
-                  </span>
-                  <span className="text-navy">{a.storage_path.split("/").pop()}</span>
-                  {a.parsed_text && (
-                    <span className="text-[11px] text-slate-mid">
-                      {a.parsed_text.length.toLocaleString()} chars cached
+            {allAttachments.map((a) => {
+              const url = linkById.get(a.id);
+              return (
+                <li
+                  key={a.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sand-200 bg-warm-white px-4 py-2.5 text-sm"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono text-[10px] text-charcoal">
+                      {a.kind}
                     </span>
-                  )}
-                </div>
-                <span className="font-mono text-[11px] text-slate-deep">
-                  {new Date(a.created_at).toLocaleString("en-GB", {
-                    timeZone: "Asia/Bangkok",
-                    hour12: false,
-                  })}
-                </span>
-              </li>
-            ))}
+                    <span className="text-navy">
+                      {a.storage_path.split("/").pop()}
+                    </span>
+                    {a.parsed_text && (
+                      <span className="text-[11px] text-slate-mid">
+                        {a.parsed_text.length.toLocaleString()} chars cached
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+                      >
+                        View / Download
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-slate-mid">
+                        link unavailable
+                      </span>
+                    )}
+                    <span className="font-mono text-[11px] text-slate-deep">
+                      {new Date(a.created_at).toLocaleString("en-GB", {
+                        timeZone: "Asia/Bangkok",
+                        hour12: false,
+                      })}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -434,8 +479,14 @@ function ExtractedProfileSection({
               const bullets = Array.isArray(e.bullets)
                 ? e.bullets.filter((b) => typeof b === "string" && b.trim())
                 : [];
-              const legacySummary =
-                bullets.length === 0 && e.summary ? e.summary : null;
+              // When the model returned both `bullets` and a `summary`, the
+              // bullets carry the value and the summary tends to be a
+              // redundant intro line — rendering it as an unbulleted
+              // paragraph above the bullets looked like a missed bullet.
+              // Drop it when bullets exist; only fall back to summary as
+              // prose when there are no bullets at all (legacy rows).
+              const hasBullets = bullets.length > 0;
+              const fallbackSummary = !hasBullets && e.summary ? e.summary : null;
               return (
                 <li
                   key={i}
@@ -452,19 +503,16 @@ function ExtractedProfileSection({
                       {e.start_date ?? "?"} → {e.end_date ?? "present"}
                     </p>
                   )}
-                  {e.summary && bullets.length > 0 && (
-                    <p className="mt-1 text-charcoal">{e.summary}</p>
-                  )}
-                  {bullets.length > 0 && (
+                  {hasBullets && (
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-charcoal marker:text-terracotta">
                       {bullets.map((b, j) => (
                         <li key={j}>{b}</li>
                       ))}
                     </ul>
                   )}
-                  {legacySummary && (
+                  {fallbackSummary && (
                     <p className="mt-1 whitespace-pre-wrap text-charcoal">
-                      {legacySummary}
+                      {fallbackSummary}
                     </p>
                   )}
                 </li>
