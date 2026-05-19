@@ -30,15 +30,13 @@ const STAGE_CHOICES: { value: CandidateStage; label: string }[] = [
  * those as local time, so .toISOString() gives us a correctly-tz-anchored
  * ISO 8601 with offset that the Google Calendar API accepts directly.
  */
-function defaultStart(): string {
+function defaultWhen(): string {
   const d = new Date();
-  d.setMinutes(d.getMinutes() + 30 - (d.getMinutes() % 15));
-  d.setSeconds(0, 0);
-  return toLocalInput(d);
-}
-function defaultEnd(start: string): string {
-  const d = new Date(start);
+  // Snap to the next 15-minute mark, then push another 30 min out so the
+  // default isn't "right now" (which always feels rushed).
   d.setMinutes(d.getMinutes() + 30);
+  d.setMinutes(d.getMinutes() + ((15 - (d.getMinutes() % 15)) % 15));
+  d.setSeconds(0, 0);
   return toLocalInput(d);
 }
 function toLocalInput(d: Date): string {
@@ -47,6 +45,19 @@ function toLocalInput(d: Date): string {
     d.getHours(),
   )}:${pad(d.getMinutes())}`;
 }
+
+const DURATION_OPTIONS: { value: number; label: string }[] = [
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "1 hour" },
+  { value: 75, label: "1h 15m" },
+  { value: 90, label: "1h 30m" },
+  { value: 105, label: "1h 45m" },
+  { value: 120, label: "2 hours" },
+  { value: 150, label: "2h 30m" },
+  { value: 180, label: "3 hours" },
+];
 
 export function ScheduleShell({
   candidates,
@@ -64,8 +75,8 @@ export function ScheduleShell({
   );
 
   const [stage, setStage] = useState<CandidateStage>("first_interview");
-  const [startsAt, setStartsAt] = useState<string>(() => defaultStart());
-  const [endsAt, setEndsAt] = useState<string>(() => defaultEnd(defaultStart()));
+  const [whenAt, setWhenAt] = useState<string>(() => defaultWhen());
+  const [durationMin, setDurationMin] = useState<number>(30);
   const [externalInviteesText, setExternalInviteesText] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -93,16 +104,18 @@ export function ScheduleShell({
       toast.error("Pick a candidate");
       return;
     }
-    if (!startsAt || !endsAt) {
-      toast.error("Pick start and end times");
+    if (!whenAt) {
+      toast.error("Pick a date and time");
       return;
     }
-    const startISO = new Date(startsAt).toISOString();
-    const endISO = new Date(endsAt).toISOString();
-    if (new Date(endISO).getTime() <= new Date(startISO).getTime()) {
-      toast.error("End time must be after start time");
+    if (!Number.isFinite(durationMin) || durationMin <= 0) {
+      toast.error("Pick a duration");
       return;
     }
+    const startDate = new Date(whenAt);
+    const endDate = new Date(startDate.getTime() + durationMin * 60_000);
+    const startISO = startDate.toISOString();
+    const endISO = endDate.toISOString();
 
     setSubmitting(true);
     try {
@@ -200,40 +213,39 @@ export function ScheduleShell({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-slate-deep">Duration</Label>
+          <Label htmlFor="when" className="text-xs text-slate-deep">
+            Date &amp; time
+          </Label>
+          <input
+            id="when"
+            type="datetime-local"
+            step={900}
+            value={whenAt}
+            onChange={(e) => setWhenAt(e.target.value)}
+            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="duration" className="text-xs text-slate-deep">
+            Duration
+          </Label>
+          <select
+            id="duration"
+            value={durationMin}
+            onChange={(e) => setDurationMin(Number(e.target.value))}
+            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+          >
+            {DURATION_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
           <p className="text-[11px] text-slate-mid">
-            Pick start and end times below. Defaults to a 30-min slot starting
-            ~30 minutes from now.
+            Defaults to 30 min, starting from the next 15-min mark ~30 min
+            from now.
           </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="starts" className="text-xs text-slate-deep">
-            Starts
-          </Label>
-          <input
-            id="starts"
-            type="datetime-local"
-            value={startsAt}
-            onChange={(e) => {
-              setStartsAt(e.target.value);
-              setEndsAt(defaultEnd(e.target.value));
-            }}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="ends" className="text-xs text-slate-deep">
-            Ends
-          </Label>
-          <input
-            id="ends"
-            type="datetime-local"
-            value={endsAt}
-            onChange={(e) => setEndsAt(e.target.value)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
-          />
         </div>
 
         <div className="space-y-1.5 md:col-span-2">

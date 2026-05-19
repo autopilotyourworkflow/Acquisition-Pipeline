@@ -1,12 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createInterviewEvent,
   GoogleNotConnectedError,
 } from "@/lib/google/calendar";
 import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
+
+const CV_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +78,36 @@ export async function POST(req: NextRequest) {
   const prepQuestions =
     (latestScore?.prep_questions as string[] | undefined) ?? [];
 
+  // Pull the most recent CV attachment (if any) and mint a 24h signed URL.
+  // We embed this in the calendar event description so interviewers can
+  // open the CV without leaving their calendar client.
+  let cvLabel: string | null = null;
+  let cvUrl: string | null = null;
+  const { data: latestAttachment } = await supabase
+    .from("attachments")
+    .select("storage_path, kind")
+    .eq("candidate_id", body.candidateId)
+    .eq("kind", "cv_pdf")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestAttachment) {
+    const admin = createAdminClient();
+    const { data: signed } = await admin.storage
+      .from("cvs")
+      .createSignedUrl(
+        latestAttachment.storage_path as string,
+        CV_SIGNED_URL_TTL_SECONDS,
+      );
+    if (signed?.signedUrl) {
+      cvUrl = signed.signedUrl;
+      const tail =
+        (latestAttachment.storage_path as string).split("/").pop() ?? "cv.pdf";
+      // Strip hash/timestamp prefixes to leave a clean filename label.
+      cvLabel = tail.replace(/^(?:[a-f0-9]{64}|\d{13})-/, "");
+    }
+  }
+
   // 1. Create the calendar event FIRST. If this fails, no DB row is created
   //    and the user can retry without seeing a half-saved interview. If it
   //    succeeds but the DB insert later fails, we'd have an orphan calendar
@@ -91,6 +124,8 @@ export async function POST(req: NextRequest) {
       prepQuestions,
       externalInvitees: body.externalInvitees,
       notes: body.description,
+      cvLabel,
+      cvUrl,
     });
   } catch (err) {
     if (err instanceof GoogleNotConnectedError) {

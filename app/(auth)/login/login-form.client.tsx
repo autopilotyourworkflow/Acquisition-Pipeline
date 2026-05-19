@@ -111,8 +111,8 @@ export function LoginForm() {
             id="code"
             type="text"
             inputMode="numeric"
-            pattern="\d{6}"
-            maxLength={6}
+            pattern="\d{6,8}"
+            maxLength={8}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             placeholder="000000"
@@ -123,7 +123,7 @@ export function LoginForm() {
         {error && <FormError message={error} />}
         <button
           type="submit"
-          disabled={pending || code.length !== 6}
+          disabled={pending || code.length < 6 || code.length > 8}
           className="inline-flex h-11 w-full items-center justify-center rounded-md bg-terracotta px-6 text-sm font-medium text-cream shadow-xs transition-colors hover:bg-terracotta-700 disabled:opacity-50"
         >
           {pending ? "Verifying…" : "Continue"}

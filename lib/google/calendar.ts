@@ -27,6 +27,14 @@ export type CreateInterviewArgs = {
   externalInvitees?: string[];
   /** Free-form additional notes typed by the organizer. */
   notes?: string;
+  /** Short label for the CV attachment, e.g. the original filename. */
+  cvLabel?: string | null;
+  /**
+   * Signed URL to the candidate's most recent CV. Embedded in the calendar
+   * event description so the interviewer can open it from inside the event.
+   * Generated server-side from Supabase Storage with a 24h TTL.
+   */
+  cvUrl?: string | null;
 };
 
 export type CreateInterviewResult = {
@@ -82,6 +90,8 @@ export async function createInterviewEvent(
     candidateName: args.candidateName,
     prepQuestions: args.prepQuestions ?? [],
     notes: args.notes,
+    cvLabel: args.cvLabel,
+    cvUrl: args.cvUrl,
   });
 
   const attendees: { email: string }[] = [];
@@ -132,26 +142,42 @@ function buildDescription({
   candidateName,
   prepQuestions,
   notes,
+  cvLabel,
+  cvUrl,
 }: {
   candidateName: string;
   prepQuestions: string[];
   notes?: string;
+  cvLabel?: string | null;
+  cvUrl?: string | null;
 }): string {
   const parts: string[] = [];
   parts.push(`Interview with ${candidateName}.`);
-  parts.push("");
+
   if (prepQuestions.length > 0) {
-    parts.push("Prep questions (from the latest screening run):");
+    parts.push("");
+    parts.push("— Prep questions —");
     for (const q of prepQuestions) {
       parts.push(`• ${q}`);
     }
-    parts.push("");
   }
+
+  if (cvUrl) {
+    parts.push("");
+    parts.push("— CV —");
+    if (cvLabel) parts.push(cvLabel);
+    parts.push(cvUrl);
+    parts.push("(link valid for 24h)");
+  }
+
   if (notes && notes.trim()) {
-    parts.push("Notes:");
-    parts.push(notes.trim());
     parts.push("");
+    parts.push("— Notes —");
+    parts.push(notes.trim());
   }
-  parts.push("— Acquisition Pipeline");
+
+  parts.push("");
+  parts.push("—");
+  parts.push("Acquisition Pipeline");
   return parts.join("\n");
 }

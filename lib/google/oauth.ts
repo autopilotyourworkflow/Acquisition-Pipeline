@@ -24,16 +24,41 @@ export function encryptRefreshToken(token: string): Buffer {
   return Buffer.concat([iv, authTag, encrypted]);
 }
 
-export function decryptRefreshToken(encrypted: Buffer): string {
-  const key = getKey();
+/**
+ * Coerce whatever shape Postgres bytea came back as into a Node Buffer.
+ *
+ * supabase-js serializes a Buffer to bytea on INSERT, but on SELECT it
+ * returns a hex-prefixed string like "\x1f2e3d…" — NOT a Buffer. Calling
+ * .subarray() on a string was the source of the "e.subarray is not a
+ * function" error users hit at token-refresh time.
+ */
+function toBuffer(raw: unknown): Buffer {
+  if (Buffer.isBuffer(raw)) return raw;
+  if (raw instanceof Uint8Array) return Buffer.from(raw);
+  if (typeof raw === "string") {
+    // Postgres bytea text format starts with "\x" followed by hex.
+    if (raw.startsWith("\\x")) return Buffer.from(raw.slice(2), "hex");
+    // Some configs return raw hex without the prefix.
+    if (/^[0-9a-fA-F]+$/.test(raw)) return Buffer.from(raw, "hex");
+    // Last resort: assume base64.
+    return Buffer.from(raw, "base64");
+  }
+  throw new Error(
+    `Cannot coerce refresh_token_encrypted to Buffer (type=${typeof raw})`,
+  );
+}
 
-  if (encrypted.length < IV_LENGTH + AUTH_TAG_LENGTH) {
+export function decryptRefreshToken(encrypted: Buffer | Uint8Array | string): string {
+  const key = getKey();
+  const buf = toBuffer(encrypted);
+
+  if (buf.length < IV_LENGTH + AUTH_TAG_LENGTH) {
     throw new Error("Invalid encrypted token format");
   }
 
-  const iv = encrypted.subarray(0, IV_LENGTH);
-  const authTag = encrypted.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
-  const ciphertext = encrypted.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+  const iv = buf.subarray(0, IV_LENGTH);
+  const authTag = buf.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = buf.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
   const decipher = createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
