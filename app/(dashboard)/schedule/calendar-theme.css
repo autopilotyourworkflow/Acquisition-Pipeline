@@ -59,12 +59,13 @@
   color: #faf7f2;
 }
 
-/* All event chips: pointer cursor + a transition for the hover state.
-   The transition timing is cubic-bezier "ease-out", which feels natural for
-   small-scale UI motion — fast enough to feel responsive, slow enough that
-   the contraction back to rest doesn't snap. */
+/* All event chips: pointer cursor + transition for hover. Includes
+   .sx__date-grid-event for multi-day events that span across days at the
+   top of week/month views — those use a different DOM container so we have
+   to target the class separately. */
 .sx-react-calendar-wrapper .sx__month-grid-event,
 .sx-react-calendar-wrapper .sx__time-grid-event,
+.sx-react-calendar-wrapper .sx__date-grid-event,
 .sx-react-calendar-wrapper .sx__month-agenda-event,
 .sx-react-calendar-wrapper .sx__list-event,
 .sx-react-calendar-wrapper .sx__week-grid-event {
@@ -95,21 +96,62 @@
   text-overflow: ellipsis;
 }
 
-/* Hover: subtle scale + drop shadow + raise above neighbors. We deliberately
-   use `transform: scale()` instead of changing `width` or `position`:
-   - transform is GPU-composited, so it doesn't trigger layout reflow on the
-     containing cell. The cell stays exactly where it was.
-   - The chip can't "contract" because the default state is scale 1; hover is
-     scale > 1. Day view events that already show full text just nudge up
-     slightly — no shrinking.
-   - The transition runs both ways, so the expand and contract are both
-     animated, not snapped. */
+/* Hover: subtle scale + drop shadow + raise above neighbors.
+   - transform is GPU-composited and does NOT trigger layout reflow, so the
+     containing cell never moves.
+   - We do NOT override `position` on hover. Time-grid events are
+     position:absolute by default; overriding to relative made them snap to
+     their flow position, which caused the visible "cell expansion" in week
+     and day views. z-index works on already-positioned elements without
+     needing the override. */
 .sx-react-calendar-wrapper .sx__month-grid-event:hover,
 .sx-react-calendar-wrapper .sx__time-grid-event:hover,
+.sx-react-calendar-wrapper .sx__date-grid-event:hover,
 .sx-react-calendar-wrapper .sx__month-agenda-event:hover,
 .sx-react-calendar-wrapper .sx__list-event:hover {
   transform: scale(1.04);
   z-index: 10;
-  position: relative;
   box-shadow: 0 4px 14px rgba(23, 32, 46, 0.18);
+  overflow: hidden;
+}
+
+/* Marquee-with-fade reveal: when you hover an event, the time element fades
+   to opacity 0 (so it doesn't compete with the scrolling title for
+   horizontal space), and then the title text starts to scroll horizontally
+   so the user can read the full thing.
+   - The animation has a generous 0% → 8% pause at rest so short titles
+     don't appear to "twitch" on a quick hover.
+   - text-indent: -200% scrolls the text 2x its own width. That's enough to
+     reveal most overflowed titles without making short ones look broken. */
+@keyframes sx-event-marquee {
+  0%,
+  8% {
+    text-indent: 0;
+  }
+  92%,
+  100% {
+    text-indent: -200%;
+  }
+}
+
+.sx-react-calendar-wrapper .sx__month-grid-event:hover .sx__month-grid-event-time,
+.sx-react-calendar-wrapper
+  .sx__time-grid-event:hover
+  .sx__time-grid-event-time {
+  opacity: 0;
+  transition: opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Month-grid: title text lives directly in the chip's text node (no
+   wrapper), so we animate text-indent on the chip itself. The now-invisible
+   time span shifts along with the title but isn't visible. */
+.sx-react-calendar-wrapper .sx__month-grid-event:hover {
+  animation: sx-event-marquee 7s linear 300ms infinite;
+}
+
+/* Time-grid + list: title is its own element. Animate it directly so the
+   chip background and time slot don't move. */
+.sx-react-calendar-wrapper .sx__time-grid-event:hover .sx__time-grid-event-title,
+.sx-react-calendar-wrapper .sx__list-event:hover .sx__list-event-title {
+  animation: sx-event-marquee 7s linear 300ms infinite;
 }
