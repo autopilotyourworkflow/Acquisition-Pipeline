@@ -97,7 +97,7 @@ export function LoginForm() {
     return (
       <form onSubmit={handleVerifyCode} className="space-y-4">
         <div className="rounded-md border border-sand-200 bg-warm-white px-4 py-3 text-sm text-charcoal">
-          We sent a 6-digit code to{" "}
+          We sent a sign-in code to{" "}
           <span className="font-medium text-navy">{email}</span>.
         </div>
         <div>
