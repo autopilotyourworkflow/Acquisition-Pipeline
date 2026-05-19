@@ -29,6 +29,7 @@ export default async function DashboardLayout({
           <nav className="flex items-center gap-2 text-sm">
             <NavLink href="/tracker">Tracker</NavLink>
             <NavLink href="/jds">JDs</NavLink>
+            <NavLink href="/scraper">Scraper</NavLink>
             <NavLink href="/screener">Screener</NavLink>
             <NavLink href="/activity">Activity</NavLink>
             <NavLink href="/settings">Settings</NavLink>

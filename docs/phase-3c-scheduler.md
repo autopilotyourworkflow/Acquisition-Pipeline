@@ -61,3 +61,5 @@ I'm continuing the Hotel Plus take-home (`acq.autopilotyourworkflow.com`). Phase
 **Cowork-log:** ONE entry on the design call that matters: graceful degrade for email-OTP users (the integrations page is the source of truth; features hide themselves when scope is missing rather than 500'ing). Under today's `*Day 3 cont. — <date>*` marker.
 
 **First action:** confirm `googleapis` install, confirm your test-user account on the OAuth client. Then build straight through.
+
+**Last action (mandatory):** before declaring the session complete, emit the **Session-done report** described in `AGENTS.md → Session-done reporting`. List files created, files modified, smoke tests passed, smoke tests Ben needs to run, anything deliberately deferred, the cowork-log entry you added. Then STOP — do not commit until Ben signs off.

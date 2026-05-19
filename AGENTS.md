@@ -306,6 +306,64 @@ A user-requested overdelivery feature: when a user creates or edits a JD, offer 
 
 ---
 
+## Session-done reporting (mandatory on every session)
+
+Before declaring your session complete, you MUST emit a structured report. This is non-negotiable — without it, Ben can't checkpoint and verify quality.
+
+When you finish the last task in the session, output a final message in this exact shape:
+
+```
+## Session complete — <session name>
+
+**Files created:**
+- path/to/file.ts — one-line purpose
+...
+
+**Files modified:**
+- path/to/file.ts — what changed
+...
+
+**Migrations to run manually:**
+- supabase/migrations/000N_*.sql (or "none")
+
+**Env vars to set:**
+- VAR_NAME (or "none")
+
+**Smoke tests I ran and what passed:**
+- [ ] description of test 1 → result
+- [ ] description of test 2 → result
+
+**Smoke tests YOU need to run before signing off:**
+- [ ] description of test 1
+- [ ] description of test 2
+
+**Cowork-log entry added:** entry # — title (or "deferred" with reason)
+
+**What I deliberately did NOT do (and why):**
+- item — reason
+
+**Recommended next session:** docs/phase-XX.md (or "none — phase complete")
+```
+
+After printing this, STOP. Do not commit unless Ben explicitly says to. Do not start the next session. The point is to give him a verification surface — if anything looks wrong, he'll push back BEFORE the commit hits main.
+
+## Writing handoff prompts for OTHER sessions (if Ben asks you to draft one)
+
+When Ben says "write me the prompt for the next chat" or similar, you are *NOT* writing a free-form summary. You are writing a tight contract. Hard rules:
+
+- **Token cap: ~1000 tokens.** If your prompt is longer than ~150 lines of markdown, it's too verbose. Cut.
+- **Inline pre-decided contracts.** Never ask the next agent to "propose the architecture" — that triggers research mode, which is the #1 token sink. State the decision: "Use AES-256-GCM. Key from `OAUTH_ENCRYPTION_SECRET` env var. Encrypt before INSERT to `oauth_tokens.refresh_token_encrypted`." Lock it.
+- **Anti-patterns at the top.** Every handoff prompt must include a "Do NOT" block: don't load cowork-log cover-to-cover, don't audit directory structure, don't re-read library files whose API is in this file, don't spawn Explore agents for "what does this look like" questions.
+- **Explicit file list.** "Files to create: 1. X, 2. Y, 3. Z." Not "build whatever you need to make this work."
+- **Out-of-scope list.** "Do NOT build: A, B, C — those are Phase N." This stops well-meaning over-implementation.
+- **Smoke test list.** Exact assertions to verify before reporting done.
+- **First action.** "Confirm <thing> with Ben, then build straight through. No proposal phase — the contracts above are locked."
+- **No `Read these files first` lists.** AGENTS.md autoloads. MEMORY.md autoloads. The next chat already has both. Telling it to "re-read" forces duplicate loads and wastes 30k+ tokens.
+
+Save the new prompt under `docs/phase-XYZ.md`. The naming convention is `phase-<phase-number><letter>-<short-name>.md` (e.g. `phase-4a-cold-email.md`). After Ben confirms the prompt, also update `docs/phase-3-prompt.md` (the status index) to point at it.
+
+Look at `docs/phase-3a-oauth.md`, `docs/phase-3b-scraper.md`, and `docs/phase-3c-scheduler.md` as templates of what a tight prompt looks like — they're 600-900 tokens each and complete.
+
 ## Cowork-log voice (only relevant when WRITING a new entry)
 
 The cowork log is a graded *narrative* deliverable. **It is not architectural reference — do not load it for context.** Only open it when:
