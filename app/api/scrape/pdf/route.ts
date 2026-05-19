@@ -44,15 +44,43 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(sseEvent(event, data)));
 
         try {
+          // 1. Read the file once into an ArrayBuffer. We hash from this and
+          // pass a FRESH Uint8Array view to pdfjs for parsing (pdfjs has a
+          // history of retaining/transferring buffers — burning a copy is
+          // cheaper than corrupting the upload).
+          const arrayBuffer = await file.arrayBuffer();
+          const hashBuf = new Uint8Array(arrayBuffer);
+          const contentHash = createHash("sha256").update(hashBuf).digest("hex");
+
+          // 2. Upload FIRST, passing the File object directly so the Supabase
+          // SDK handles the stream cleanly. Use a unique timestamped path so
+          // we never depend on upsert behavior.
+          //    This must happen before pdfjs sees the bytes — if we parse
+          //    first and the library retains the buffer, the upload silently
+          //    sends garbage and Edge's viewer ends up with "We can't open
+          //    this file."
+          emit("scrape_progress", { status: "storing_pdf" });
+
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const storagePath = `org/${ORG_ID}/pending/${Date.now()}-${contentHash}-${safeName}`;
+          const admin = createAdminClient();
+          const { error: uploadErr } = await admin.storage
+            .from("cvs")
+            .upload(storagePath, file, {
+              contentType: file.type || "application/pdf",
+              upsert: false,
+            });
+          if (uploadErr) {
+            throw new Error(`Storage upload failed: ${uploadErr.message}`);
+          }
+
+          // 3. Now parse text from a fresh copy of the bytes — safe to do
+          // anything pdfjs wants with this since the upload is already done.
           emit("scrape_progress", { status: "parsing_pdf", fileName: file.name });
-
-          const buf = new Uint8Array(await file.arrayBuffer());
-          const contentHash = createHash("sha256").update(buf).digest("hex");
-
-          // Parse text up front — fail fast if the PDF is unreadable.
           let parsedText = "";
           try {
-            const pdf = await getDocumentProxy(buf);
+            const parseBuf = new Uint8Array(arrayBuffer.slice(0));
+            const pdf = await getDocumentProxy(parseBuf);
             const result = await extractText(pdf, { mergePages: true });
             parsedText = Array.isArray(result.text)
               ? result.text.join("\n\n")
@@ -67,25 +95,7 @@ export async function POST(req: NextRequest) {
             throw new Error("No text content found in PDF");
           }
 
-          // Save the binary + create an attachment row with candidate_id=null.
-          // The scraper-shell will link this attachment to the new candidate
-          // after createCandidate succeeds. Orphan attachments (user scraped
-          // but never saved) are accepted — cheap and easy to GC later.
-          emit("scrape_progress", { status: "storing_pdf" });
-
-          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const storagePath = `org/${ORG_ID}/pending/${contentHash}-${safeName}`;
-          const admin = createAdminClient();
-          const { error: uploadErr } = await admin.storage
-            .from("cvs")
-            .upload(storagePath, buf, {
-              contentType: file.type || "application/pdf",
-              upsert: true, // re-uploading the same content is fine
-            });
-          if (uploadErr) {
-            throw new Error(`Storage upload failed: ${uploadErr.message}`);
-          }
-
+          // 4. Create the attachment row (candidate_id=null — claimed on save).
           const { data: attachment, error: insertErr } = await supabase
             .from("attachments")
             .insert({

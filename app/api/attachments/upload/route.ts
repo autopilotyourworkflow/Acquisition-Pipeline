@@ -55,8 +55,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const buf = new Uint8Array(await file.arrayBuffer());
-  const contentHash = createHash("sha256").update(buf).digest("hex");
+  // Read the file once into an ArrayBuffer. Hash from this; pass a FRESH
+  // Uint8Array view to pdfjs for parsing (pdfjs retains/transfers buffers,
+  // which silently turns the subsequent upload into a 0-byte write).
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuf = new Uint8Array(arrayBuffer);
+  const contentHash = createHash("sha256").update(hashBuf).digest("hex");
 
   // Dedup: if this candidate already has an attachment with the same content
   // hash, reuse it — no upload, no parse, no cost.
@@ -78,9 +82,28 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Upload FIRST, passing the File object directly so the Supabase SDK
+  // handles the stream cleanly. Must happen before pdfjs sees the bytes.
+  const admin = createAdminClient();
+  const storagePath = `org/${ORG_ID}/candidate/${candidateId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const { error: uploadErr } = await admin.storage
+    .from("cvs")
+    .upload(storagePath, file, {
+      contentType: file.type || "application/pdf",
+      upsert: false,
+    });
+  if (uploadErr) {
+    return NextResponse.json(
+      { error: `Storage upload failed: ${uploadErr.message}` },
+      { status: 500 },
+    );
+  }
+
+  // Now safe to parse — upload is already done, pdfjs can do what it wants.
   let parsedText = "";
   try {
-    const pdf = await getDocumentProxy(buf);
+    const parseBuf = new Uint8Array(arrayBuffer.slice(0));
+    const pdf = await getDocumentProxy(parseBuf);
     const result = await extractText(pdf, { mergePages: true });
     parsedText = Array.isArray(result.text) ? result.text.join("\n\n") : result.text;
   } catch (err) {
@@ -89,21 +112,6 @@ export async function POST(req: NextRequest) {
         error: `Failed to parse PDF: ${err instanceof Error ? err.message : "unknown"}`,
       },
       { status: 422 },
-    );
-  }
-
-  const admin = createAdminClient();
-  const storagePath = `org/${ORG_ID}/candidate/${candidateId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-  const { error: uploadErr } = await admin.storage
-    .from("cvs")
-    .upload(storagePath, buf, {
-      contentType: file.type || "application/pdf",
-      upsert: false,
-    });
-  if (uploadErr) {
-    return NextResponse.json(
-      { error: `Storage upload failed: ${uploadErr.message}` },
-      { status: 500 },
     );
   }
 

@@ -184,16 +184,16 @@ export default async function CandidatePage({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl text-navy">Attachments</h2>
+          <h2 className="font-display text-xl text-navy">Source &amp; attachments</h2>
           <Link href="/screener" className="text-xs text-terracotta-700 underline-offset-4 hover:underline">
             Upload from Screener →
           </Link>
         </div>
-        {allAttachments.length === 0 ? (
+        {allAttachments.length === 0 && !c.raw_profile?.scraper_source ? (
           <p className="rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-6 text-center text-sm text-slate-mid">
-            No CV or screenshot uploaded yet.
+            No CV, screenshot, or scraper source on file.
           </p>
-        ) : (
+        ) : allAttachments.length === 0 ? null : (
           <ul className="space-y-1">
             {allAttachments.map((a) => {
               const links = linkById.get(a.id);
@@ -250,6 +250,7 @@ export default async function CandidatePage({
             })}
           </ul>
         )}
+        <ScraperSourceDropdown rawProfile={c.raw_profile} />
       </section>
 
       <section className="space-y-4">
@@ -387,6 +388,64 @@ type EducationEntry = {
   end_year?: number | null;
 };
 
+/**
+ * Standalone dropdown for the original scraper input (pasted text, URL, etc.).
+ * Lives at the bottom of the Source & Attachments section so all
+ * "where did this candidate come from?" info clusters together.
+ *
+ * Hidden for kind=pdf — the PDF file itself is already listed above as an
+ * attachment with View / Download links, so the dropdown would only repeat
+ * the filename.
+ */
+function ScraperSourceDropdown({
+  rawProfile,
+}: {
+  rawProfile: Record<string, unknown> | null;
+}) {
+  if (!rawProfile) return null;
+  const source = rawProfile.scraper_source as ScraperSourceShape;
+  if (!source) return null;
+  if (source.kind === "pdf") return null;
+
+  return (
+    <details className="rounded-md border border-sand-200 bg-cream/40">
+      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
+        Source content ({source.kind})
+      </summary>
+      <div className="border-t border-sand-200 px-4 py-3 text-xs">
+        {source.kind === "paste" && source.text && (
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap font-mono text-charcoal">
+            {source.text}
+          </pre>
+        )}
+        {source.kind === "url" && source.url && (
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-terracotta-700 underline-offset-4 hover:underline"
+          >
+            {source.url}
+          </a>
+        )}
+        {source.kind === "thirdparty" && source.linkedinUrl && (
+          <a
+            href={source.linkedinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-terracotta-700 underline-offset-4 hover:underline"
+          >
+            {source.linkedinUrl}
+          </a>
+        )}
+        {source.kind === "screenshot" && source.filename && (
+          <p className="font-mono text-charcoal">{source.filename}</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function ExtractedProfileSection({
   rawProfile,
 }: {
@@ -394,7 +453,6 @@ function ExtractedProfileSection({
 }) {
   if (!rawProfile) return null;
 
-  const source = rawProfile.scraper_source as ScraperSourceShape;
   const skills = Array.isArray(rawProfile.skills)
     ? (rawProfile.skills as string[]).filter((s) => typeof s === "string" && s)
     : [];
@@ -409,13 +467,7 @@ function ExtractedProfileSection({
       ? (rawProfile.detected_language as string)
       : null;
 
-  // For PDF sources, the file itself lives in the Attachments section below
-  // (with View / Download links), so the source-content dropdown here would
-  // just duplicate filename info. Hide it specifically for kind=pdf.
-  const showSource = source && source.kind !== "pdf";
-
   const hasAnything =
-    showSource ||
     skills.length > 0 ||
     experience.length > 0 ||
     education.length > 0 ||
@@ -433,44 +485,6 @@ function ExtractedProfileSection({
           </span>
         )}
       </div>
-
-      {showSource && source && (
-        <details className="rounded-md border border-sand-200 bg-cream/40">
-          <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
-            Source content ({source.kind})
-          </summary>
-          <div className="border-t border-sand-200 px-4 py-3 text-xs">
-            {source.kind === "paste" && source.text && (
-              <pre className="max-h-96 overflow-auto whitespace-pre-wrap font-mono text-charcoal">
-                {source.text}
-              </pre>
-            )}
-            {source.kind === "url" && source.url && (
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="break-all text-terracotta-700 underline-offset-4 hover:underline"
-              >
-                {source.url}
-              </a>
-            )}
-            {source.kind === "thirdparty" && source.linkedinUrl && (
-              <a
-                href={source.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="break-all text-terracotta-700 underline-offset-4 hover:underline"
-              >
-                {source.linkedinUrl}
-              </a>
-            )}
-            {source.kind === "screenshot" && source.filename && (
-              <p className="font-mono text-charcoal">{source.filename}</p>
-            )}
-          </div>
-        </details>
-      )}
 
       {skills.length > 0 && (
         <div>
