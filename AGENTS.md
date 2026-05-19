@@ -14,11 +14,187 @@ Notable Next.js 16 specifics:
 ## What this project is
 Recruiting Pipeline Tool — a take-home assignment for **Hotel Plus** (hotelplus.asia), a Thai hotel-management consulting firm hiring a Full Stack Developer. The app runs HR's full recruiting workflow in one place: scrape candidates, score with Claude, track in a Kanban, schedule interviews via Google Calendar, draft cold-outreach emails via Gmail. Deadline is 5 days from 2026-05-18.
 
-## Read these first, in this order
-1. `PROJECT_MASTER.md` — the original assignment brief with the grading rubric and module requirements
-2. `cowork-log.md` — every major decision made so far, with rationale (the bonus deliverable)
-3. The approved implementation plan at `C:\Users\chano\.claude\plans\let-s-start-planning-addition-prancy-glade.md`
-4. The personal memory at `C:\Users\chano\.claude\projects\e--BEAM-Work-Antigravity-Workspaces-Resume-Screener\memory\MEMORY.md`
+## How to use this file (READ ME FIRST — saves you hours)
+
+**This file is autoloaded into every session via `CLAUDE.md`. You already have it. Do NOT re-read it as "homework" — that's a wasted load.**
+
+Trust the contracts and inventory below. They are the source of truth. Anything not listed here either doesn't exist yet (build it) or is irrelevant to your task.
+
+**Do NOT do these things in a fresh session — they're context-blow-up patterns:**
+- ❌ Read `cowork-log.md` cover-to-cover. It's a *narrative deliverable*, not architectural reference. Only open it when (a) writing a new entry and you need to match voice, or (b) looking up a *specific* numbered entry referenced in your prompt.
+- ❌ Glob/audit directory structure to "see what exists." The file inventory below tells you. Glob only when looking for one specific file by pattern.
+- ❌ Read `lib/anthropic/client.ts` / `lib/audit/wrap.ts` / `lib/anthropic/prompts/*` for "understanding." The Public API contracts section below gives you the signatures. TypeScript will infer the rest at the call site.
+- ❌ Spawn Explore agents for "what does this codebase look like" questions. AGENTS.md answers them. Reserve Explore agents for genuinely open-ended search (e.g. "find every call site of X across the repo").
+- ❌ Read `PROJECT_MASTER.md` or the original plan at `C:\Users\chano\.claude\plans\let-s-start-planning-addition-prancy-glade.md` unless you have a specific question only those answer (rubric clarification, original Day-by-day reasoning). The status table below supersedes the plan.
+- ❌ Implement more than one module per chat session. Each Claude Code session has finite context — split a "phase" into per-module sessions.
+
+**Files that DO autoload (no action needed — they're in your system prompt):**
+- This file (`AGENTS.md`)
+- `MEMORY.md` (project memory index at `C:\Users\chano\.claude\projects\e--BEAM-Work-Antigravity-Workspaces-Resume-Screener\memory\MEMORY.md`)
+
+**Files to open on-demand only:**
+- A specific cowork-log entry by number — `Read cowork-log.md` with `offset` and `limit` to grab just that entry
+- A specific migration file when reasoning about schema — `Read supabase/migrations/000N_*.sql`
+- The component or route you're modifying — read THE file you're editing, not its neighbors
+
+## Public API contracts (use these — don't re-derive from source)
+
+**Audit wrapper** (every mutation goes through this — `lib/audit/wrap.ts`):
+```ts
+withAudit<T>({ actorId, orgId, action, table, targetId, before, mutate })
+  => Promise<{ after: T | null; logId: string; afterHash: string | null }>
+// `mutate: () => Promise<T | null>` is the actual DB write. Uses service-role
+// client internally for the audit insert only — mutation runs on whatever
+// client the closure captures.
+
+computeRowHash(row)   // sha256(canonicalJSON), excludes row_hash + updated_at
+canonicalJSON(value)  // RFC-8785-ish, sorted keys
+sha256Hex(input)      // node:crypto helper
+```
+
+**Claude client** (single SDK wrapper — `lib/anthropic/client.ts`):
+```ts
+callWithTool<T>({ model, system, messages, tool, maxTokens?, temperature? })
+  => Promise<{ value: T; telemetry: ClaudeTelemetry }>
+// `model: 'claude-opus-4-7' | 'claude-haiku-4-5'`
+// `system: CacheableTextBlock[]` (set `cache: true` on the JD body)
+// `tool: ToolDefinition<T>` from lib/anthropic/tools/*
+// Default temperature: 0 (deterministic). Override only when sampling diversity matters.
+
+streamWithTool<T>({ ...same args })
+  => { stream: AsyncIterable<RawMessageStreamEvent>; result: Promise<ToolCallResult<T>> }
+
+ClaudeTelemetry = { model, input_tokens, output_tokens,
+  cache_creation_input_tokens, cache_read_input_tokens,
+  cost_usd, retries, duration_ms }
+
+ClaudeValidationError  // thrown on zod validate failure — carries telemetry
+                       // so failed scores can still show "tokens spent: $X"
+```
+
+**Scoring prompts** (`lib/anthropic/prompts/`):
+```ts
+loadActiveScoringPrompt() => Promise<{ version, personaText }>
+  // org-wide active, from scoring_prompts table; falls back to file constant
+loadScoringPromptForJd(jd: { id, scoring_persona_override })
+  => Promise<{ version, personaText }>
+  // per-JD override first, then org active, then file fallback
+buildScoringMessagesWithPersona(personaText, { jdTitle, jdBody, jdMustHave,
+  jdNiceToHave, candidateName, candidateText })
+  // returns { system: [...persona, cacheable jdBlock], messages: [user] }
+```
+
+**Server Actions** (every one wraps `withAudit`):
+```ts
+// app/actions/candidates.ts
+createCandidate(input)         updateCandidateStage({ candidateId, stage })
+updateCandidate({ candidateId, patch })   deleteCandidate({ candidateId })
+// app/actions/jds.ts
+createJd(input)   updateJd({ jdId, patch })   deleteJd({ jdId })
+// app/actions/prompts.ts
+saveScoringPrompt({ personaText })   activateScoringPrompt({ promptId })
+// All return: { ok: true, data: T } | { ok: false, error: string }
+```
+
+**Supabase clients** (`lib/supabase/`):
+```ts
+createClient()       // server.ts — user-scoped, RLS-enforced, async
+createAdminClient()  // admin.ts — service-role, bypasses RLS. SERVER-ONLY.
+                     // Never import from a 'use client' file.
+```
+
+**DB shapes** (`lib/db/types.ts`): `CandidateRow`, `JdRow`, `ScoreRow`, `AttachmentRow`.
+**Enums** (`lib/db/enums.ts`): `CandidateStage`, `CandidateSource`, `STAGE_LABELS`, `SOURCE_LABELS`, etc.
+**Constant** (`lib/db/constants.ts`): `ORG_ID = '00000000-0000-0000-0000-000000000001'`.
+
+**SSE event types** (for streaming endpoints — convention used by `/api/score/run`):
+```
+event: <name>
+data: <JSON>
+
+```
+Client parses with `fetch().body.pipeThrough(new TextDecoderStream())`.
+EventSource is GET-only — use ReadableStream for POST endpoints.
+
+## Current file inventory (Phase 2 complete state)
+
+**Routes (all dashboard routes inside `app/(dashboard)/`):**
+```
+/                              app/page.tsx
+/login                         app/(auth)/login/
+/auth/callback                 app/auth/callback/route.ts
+/tracker                       app/(dashboard)/tracker/  (Kanban + Table + dialog)
+/jds  /jds/new  /jds/[id]      app/(dashboard)/jds/      (list + editor)
+/screener                      app/(dashboard)/screener/ (shell + history)
+/candidates/[id]               app/(dashboard)/candidates/[id]/
+/activity                      app/(dashboard)/activity/ (list + undo)
+/settings  /settings/prompts   app/(dashboard)/settings/
+```
+Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/skeleton.tsx`).
+
+**API:**
+```
+/api/score/run                 POST, SSE — single + team mode
+/api/attachments/upload        multipart POST — unpdf + sha256 dedup
+/api/audit/undo                POST — any-age revert
+/api/scrape/url                POST — fetch + cheerio + Haiku normalize
+/api/scrape/paste              POST — Haiku normalize
+/api/scrape/pdf                POST { attachmentId } — read parsed_text + normalize
+/api/scrape/screenshot         POST — Opus vision + extract_candidate tool
+/api/scrape/thirdparty         POST — Proxycurl (BYO key) + Haiku flatten
+```
+
+**Libraries:**
+```
+lib/anthropic/client.ts                    Claude SDK wrapper
+lib/anthropic/tools/submit_score.ts        scoring tool def + zod
+lib/anthropic/tools/extract_candidate.ts   scraper tool def + zod
+lib/anthropic/prompts/scoring.v1.ts        file fallback persona + buildScoringMessages
+lib/anthropic/prompts/manager.ts           team-mode manager prompt
+lib/anthropic/prompts/load.ts              DB-backed prompt loader
+lib/audit/wrap.ts                          withAudit HOF + crypto helpers
+lib/google/oauth.ts                        encrypt/decrypt + getGoogleAccessToken
+lib/scrape/normalize.ts                    single funnel: rawText → extract_candidate tool
+lib/db/{constants,enums,types}.ts          shared
+lib/supabase/{server,browser,admin,middleware}.ts
+```
+
+**Schema (migrations applied — all 5):**
+- `0001_init.sql` — full base schema, RLS, 12 tables, seed JD
+- `0002_phase2_fixes.sql` — `attachments.content_hash` + `scoring_prompts` table + seed v1
+- `0003_team_scoring.sql` — `scores.scoring_mode` + `scores.team_agents`
+- `0004_per_jd_prompt.sql` — `job_descriptions.scoring_persona_override`
+- `0005_user_settings.sql` — `user_settings` table (per-user, encrypted Proxycurl key)
+
+**Components:**
+```
+components/ui/                  shadcn primitives (button, dialog, input, etc.)
+                                + skeleton.tsx + sonner.tsx (Toaster wrap)
+components/candidates/          StageBadge, SourceBadge
+components/screener/            ScoreCard, ScoreStream.client
+```
+
+**Routes (also exists — Phase 3 partial):**
+- `/scraper` — tabbed UI: URL / Paste / PDF / Screenshot / Third-party API. Single funnel via `lib/scrape/normalize.ts`, editable preview before save through `createCandidate` action.
+
+**Things that DON'T exist yet (build when phases get there):**
+- `lib/google/calendar.ts` — Google Calendar SDK wrapper (Phase 3c)
+- `lib/google/gmail.ts` — Gmail SDK wrapper (Phase 4)
+- `app/(dashboard)/schedule/` — single-attendee scheduler (Phase 3c)
+- `app/(dashboard)/settings/integrations/` — scope status page (Phase 3c)
+- `app/api/interviews/*` — interview creation (Phase 3c)
+- `extension/` — Chrome MV3 (Phase 5)
+
+## Files this project does NOT use
+- `react-pdf` — not installed. Use `unpdf` for parsing.
+- `pdf-parse` — replaced by `unpdf`.
+- `framer-motion` — not installed. CSS transitions only.
+- `@dnd-kit/sortable` is installed but unused — Kanban uses just `@dnd-kit/core`.
+
+## Reference docs (open these on demand only)
+- `PROJECT_MASTER.md` — original assignment brief + grading rubric
+- The Day-1 plan at `C:\Users\chano\.claude\plans\let-s-start-planning-addition-prancy-glade.md`
+- The `cowork-log.md` — narrative decisions (open by specific entry # only)
 
 ## Tech stack (locked — do not revisit)
 - Next.js 16 (App Router, TypeScript) + Tailwind v4 + shadcn/ui primitives
@@ -54,7 +230,7 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 |---|---|---|
 | 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
 | 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ **COMPLETE.** Foundation (`withAudit` HOF + Claude client w/ retry/cache/telemetry/tool-use forcing + `scoring.v1` prompt). Tracker (Kanban + Table + JD CRUD, click-through, score badges, drag w/ UndoToast). Screener (SSE stream, ScoreCard, unpdf upload + dedup, model picker, team-mode 3+1, score history). Editable prompts (`/settings/prompts`), per-JD overrides, `/activity` audit log, any-age Undo, candidate detail page, bundled OAuth scopes. 20 cowork-log entries. Migrations 0001-0004 applied. |
-| 3 — Scraper + Scheduler basics | Day 3 | next up — see `docs/phase-3-prompt.md` for the session handoff |
+| 3 — Scraper + Scheduler basics | Day 3 | 🟡 **partial.** 3a (OAuth tokens) ✅, 3b (Scraper — all 5 tabs) ✅, 3c (Scheduler + Settings/Integrations) ❌ — see `docs/phase-3-prompt.md` for status and `docs/phase-3c-scheduler.md` for the remaining session prompt. |
 | 4 — Overdelivery (cold email, FreeBusy, undo/redo conflict, invites, **auto-email-reader**, **AI prompt-builder interview**) | Day 4 | not started |
 | 5 — Browser extension + polish + demo | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |
@@ -130,11 +306,16 @@ A user-requested overdelivery feature: when a user creates or edits a JD, offer 
 
 ---
 
-## Cowork-log voice
-The cowork log is a graded deliverable. Read the existing entries before adding a new one — match their voice. The voice is:
+## Cowork-log voice (only relevant when WRITING a new entry)
+
+The cowork log is a graded *narrative* deliverable. **It is not architectural reference — do not load it for context.** Only open it when:
+1. You're about to append a new entry and need to skim the last 2-3 entries to match voice, OR
+2. Your prompt explicitly references a specific entry number (e.g. "see entry #6 for the OAuth encryption rationale") — in which case `Read cowork-log.md` with `offset` and `limit` to grab just that entry.
+
+When you DO append, match the voice:
 - First-person, narrative, opinionated. The user is the protagonist making the call; AI is the collaborator.
 - Show *thinking*, not specs. The plan file has the specs. The log captures the reasoning that produced them.
-- One date marker per day (e.g. `*Day 2 — 2026-05-19*`) inserted once before that day's first entry. Don't repeat the date on every entry.
-- Skip the Objective/Pros/Cons/Outcome template for routine entries. Use it only where the structure adds clarity.
-- Each entry: ~150–300 words. Bold the key takeaway. Lead with the framing question.
+- One date marker per day (e.g. `*Day 2 — 2026-05-19*`) inserted once before that day's first entry. Don't repeat the date.
+- Each entry: ~150–300 words. Lead with the framing question. **Bold the key takeaway** at the end.
+- Skip the Objective/Pros/Cons/Outcome template — use prose unless the structure adds clarity.
 - Goal: a reviewer skimming this should feel they understand how this team thinks, not just what was built.
