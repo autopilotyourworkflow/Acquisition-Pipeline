@@ -16,6 +16,15 @@ import { createShortLink } from "@/lib/short-links";
 // invite gives 30 days of CV access — acceptable given the recipient is
 // already an invited attendee.
 const CV_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 30;
+// Same TTL for the prep-page short link. The destination is auth-gated;
+// short link expiry is just hygiene.
+const PREP_LINK_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+function appBaseUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL;
+  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/+$/, "");
+  return "http://localhost:3000";
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,6 +146,30 @@ export async function POST(req: NextRequest) {
   const candidatePortfolioUrl =
     candidate.linkedin_url ?? candidate.source_url ?? null;
 
+  // Pre-generate the interview UUID so we can mint the staff-only prep
+  // short link BEFORE creating the calendar event. That way the description
+  // already includes the prep URL on the first calendar API call — no
+  // second PATCH needed to backfill.
+  const interviewId = crypto.randomUUID();
+  let prepUrl: string | null = null;
+  try {
+    const prepDestination = `${appBaseUrl()}/interviews/${interviewId}/prep`;
+    const shortLink = await createShortLink({
+      url: prepDestination,
+      ttlSeconds: PREP_LINK_TTL_SECONDS,
+      userId: user.id,
+    });
+    prepUrl = shortLink.shortUrl;
+  } catch (shortErr) {
+    // Shortener failure shouldn't block scheduling — fall back to the long
+    // URL directly. The prep page still works either way.
+    console.error(
+      "[interviews] prep short-link mint failed, using direct URL:",
+      shortErr instanceof Error ? shortErr.message : shortErr,
+    );
+    prepUrl = `${appBaseUrl()}/interviews/${interviewId}/prep`;
+  }
+
   // 1. Create the calendar event FIRST. If this fails, no DB row is created
   //    and the user can retry without seeing a half-saved interview. If it
   //    succeeds but the DB insert later fails, we'd have an orphan calendar
@@ -156,6 +189,7 @@ export async function POST(req: NextRequest) {
       externalInvitees: body.externalInvitees,
       notes: body.description,
       cvUrl,
+      prepUrl,
     });
   } catch (err) {
     if (err instanceof GoogleNotConnectedError) {
@@ -175,6 +209,7 @@ export async function POST(req: NextRequest) {
   const { data: inserted, error: insErr } = await supabase
     .from("interviews")
     .insert({
+      id: interviewId,
       org_id: ORG_ID,
       candidate_id: body.candidateId,
       jd_id: body.jdId ?? null,

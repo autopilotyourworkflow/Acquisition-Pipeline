@@ -124,15 +124,17 @@
   text-overflow: ellipsis;
 }
 
-/* Marquee keyframes — no initial pause, starts scrolling on hover instantly.
-   text-indent: -200% scrolls 2x the chip's width, enough to reveal most
-   overflowed titles. */
+/* Marquee keyframes — uses an exact-pixel shift set per-element by JS
+   (--sx-mq-end). The fallback is -200% if the variable isn't set, but in
+   practice the truncation observer always sets it for any chip that needs
+   to scroll. animation-direction: alternate is applied below; that's what
+   gives the back-and-forth bounce instead of a snap-back. */
 @keyframes sx-event-marquee {
-  0% {
+  from {
     text-indent: 0;
   }
-  100% {
-    text-indent: -200%;
+  to {
+    text-indent: var(--sx-mq-end, -200%);
   }
 }
 
@@ -168,12 +170,12 @@
    by the MutationObserver in CalendarWithContextMenu — short titles stay
    visually static even on hover. */
 .sx-react-calendar-wrapper .sx__month-grid-event.is-truncated:hover {
-  animation: sx-event-marquee 7s linear infinite;
+  animation: sx-event-marquee 5s linear infinite alternate;
 }
 [data-view="week"]
   .sx__time-grid-event:hover
   .sx__time-grid-event-title.is-truncated {
-  animation: sx-event-marquee 7s linear infinite;
+  animation: sx-event-marquee 5s linear infinite alternate;
 }
 
 /* Time-fade on hover.

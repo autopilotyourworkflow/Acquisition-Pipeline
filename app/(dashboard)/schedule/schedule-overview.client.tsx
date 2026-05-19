@@ -441,18 +441,34 @@ function CalendarWithContextMenu({
     if (!wrapper) return;
 
     const applyTruncation = () => {
-      const inlineTitles = wrapper.querySelectorAll<HTMLElement>(
-        ".sx__time-grid-event-title, .sx__list-event-title",
-      );
-      inlineTitles.forEach((el) => {
-        el.classList.toggle("is-truncated", el.scrollWidth > el.clientWidth);
-      });
-      const monthChips = wrapper.querySelectorAll<HTMLElement>(
-        ".sx__month-grid-event",
-      );
-      monthChips.forEach((el) => {
-        el.classList.toggle("is-truncated", el.scrollWidth > el.clientWidth);
-      });
+      // Set both the is-truncated class AND a per-element CSS variable
+      // (--sx-mq-end) with the exact pixel shift needed to reveal the rest
+      // of the title. We learned the hard way that `text-indent: -200%`
+      // resolves against a flex item's containing block, which in the week
+      // view's nested flex layout can be tiny — the text "stuttered in
+      // place barely moving" because -200% computed to maybe -30px. Exact
+      // px values from JS sidestep the whole containing-block ambiguity.
+      const mark = (el: HTMLElement) => {
+        const overflow = el.scrollWidth - el.clientWidth;
+        if (overflow > 0) {
+          // +24px buffer so the last word is fully visible at the end of
+          // the scroll, not cut off mid-letter.
+          el.style.setProperty("--sx-mq-end", `${-(overflow + 24)}px`);
+          el.classList.add("is-truncated");
+        } else {
+          el.classList.remove("is-truncated");
+          el.style.removeProperty("--sx-mq-end");
+        }
+      };
+
+      wrapper
+        .querySelectorAll<HTMLElement>(
+          ".sx__time-grid-event-title, .sx__list-event-title",
+        )
+        .forEach(mark);
+      wrapper
+        .querySelectorAll<HTMLElement>(".sx__month-grid-event")
+        .forEach(mark);
     };
 
     applyTruncation();

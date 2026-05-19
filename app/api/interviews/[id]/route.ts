@@ -9,11 +9,19 @@ import {
 } from "@/lib/google/calendar";
 import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
+import { createShortLink } from "@/lib/short-links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CV_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 30;
+const PREP_LINK_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+function appBaseUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL;
+  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/+$/, "");
+  return "http://localhost:3000";
+}
 
 const PatchBody = z.object({
   startsAt: z.string().min(1),
@@ -204,6 +212,26 @@ export async function PATCH(
     (candidate.source_url as string | null) ??
     null;
 
+  // Mint a fresh short link for the staff-only prep page so the rescheduled
+  // event's description still has a working prep link (the original one
+  // would expire after 30 days; rescheduling restarts that clock).
+  let prepUrl: string | null = null;
+  try {
+    const prepDestination = `${appBaseUrl()}/interviews/${id}/prep`;
+    const shortLink = await createShortLink({
+      url: prepDestination,
+      ttlSeconds: PREP_LINK_TTL_SECONDS,
+      userId: user.id,
+    });
+    prepUrl = shortLink.shortUrl;
+  } catch (shortErr) {
+    console.error(
+      "[interviews/:id PATCH] prep short-link mint failed:",
+      shortErr instanceof Error ? shortErr.message : shortErr,
+    );
+    prepUrl = `${appBaseUrl()}/interviews/${id}/prep`;
+  }
+
   let rescheduleResult;
   try {
     rescheduleResult = await rescheduleInterviewEvent({
@@ -220,6 +248,7 @@ export async function PATCH(
       jdTitle,
       notes: body.notes,
       cvUrl,
+      prepUrl,
     });
   } catch (err) {
     if (err instanceof GoogleNotConnectedError) {

@@ -33,6 +33,12 @@ export type CreateInterviewArgs = {
    * normal interview lifecycle.
    */
   cvUrl?: string | null;
+  /**
+   * URL to the staff-only interview-prep page (with prep questions + score
+   * summary). Goes into the calendar description but the destination is
+   * org-auth-gated, so candidates can't actually open it.
+   */
+  prepUrl?: string | null;
 };
 
 export type CreateInterviewResult = {
@@ -92,6 +98,7 @@ export async function createInterviewEvent(
     jdTitle: args.jdTitle,
     notes: args.notes,
     cvUrl: args.cvUrl,
+    prepUrl: args.prepUrl,
   });
 
   const attendees: { email: string }[] = [];
@@ -216,6 +223,7 @@ export async function rescheduleInterviewEvent(args: {
   jdTitle?: string | null;
   notes?: string;
   cvUrl?: string | null;
+  prepUrl?: string | null;
 }): Promise<{ description: string; meetUrl: string | null }> {
   const tokenResult = await getGoogleAccessToken(args.userId);
   if (!tokenResult.ok) {
@@ -245,6 +253,7 @@ export async function rescheduleInterviewEvent(args: {
     jdTitle: args.jdTitle,
     notes: args.notes,
     cvUrl: args.cvUrl,
+    prepUrl: args.prepUrl,
   });
 
   const response = await calendar.events.patch({
@@ -272,6 +281,7 @@ function buildDescription({
   jdTitle,
   notes,
   cvUrl,
+  prepUrl,
 }: {
   candidateName: string;
   candidateEmail?: string | null;
@@ -280,6 +290,7 @@ function buildDescription({
   jdTitle?: string | null;
   notes?: string;
   cvUrl?: string | null;
+  prepUrl?: string | null;
 }): string {
   const lines: string[] = [];
 
@@ -318,6 +329,15 @@ function buildDescription({
     lines.push("");
     lines.push("—");
     lines.push(notes.trim());
+  }
+
+  // Staff-only prep link. The URL is auth-gated at the destination, so the
+  // candidate can see the line but won't be able to open the contents.
+  // Label it explicitly as internal so the candidate doesn't try.
+  if (prepUrl) {
+    lines.push("");
+    lines.push("— Internal use only (staff) —");
+    lines.push(`Interview prep &amp; score brief: ${prepUrl}`);
   }
 
   return lines.join("\n");
