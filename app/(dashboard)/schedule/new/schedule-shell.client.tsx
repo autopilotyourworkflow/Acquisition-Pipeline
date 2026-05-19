@@ -61,13 +61,15 @@ const DURATION_OPTIONS: { value: number; label: string }[] = [
 
 export function ScheduleShell({
   candidates,
+  initialCandidateId,
 }: {
   candidates: ScheduleCandidate[];
+  initialCandidateId?: string | null;
 }) {
   const router = useRouter();
 
   const [candidateId, setCandidateId] = useState<string>(
-    candidates[0]?.id ?? "",
+    initialCandidateId ?? candidates[0]?.id ?? "",
   );
   const candidate = useMemo(
     () => candidates.find((c) => c.id === candidateId) ?? null,
@@ -151,10 +153,11 @@ export function ScheduleShell({
           ? `Meet link: ${json.meetUrl}`
           : "Calendar invite sent.",
       });
-      // Reset light state but keep the candidate selection for back-to-back
-      // bookings.
       setExternalInviteesText("");
       setNotes("");
+      // Navigate back to the overview so the new event shows up in the list /
+      // calendar without the user having to click around.
+      router.push("/schedule");
       router.refresh();
     } catch (err) {
       toast.error("Network error", {
@@ -279,8 +282,8 @@ export function ScheduleShell({
             className="w-full rounded-md border border-sand-200 bg-cream px-3 py-2 text-sm text-navy"
           />
           <p className="text-[11px] text-slate-mid">
-            Prep questions from the latest score are auto-attached to the
-            event description. These notes get appended.
+            Appended to the candidate-facing description after the standard
+            Hotel Plus invitation template.
           </p>
         </div>
       </div>

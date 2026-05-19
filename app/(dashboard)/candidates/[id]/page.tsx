@@ -451,7 +451,7 @@ function InterviewsSection({
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl text-navy">Interviews</h2>
           <Button asChild>
-            <Link href={`/schedule?candidate=${candidateId}`}>Schedule interview</Link>
+            <Link href={`/schedule/new?candidate=${candidateId}`}>Schedule interview</Link>
           </Button>
         </div>
         <p className="rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-6 text-center text-sm text-slate-mid">
