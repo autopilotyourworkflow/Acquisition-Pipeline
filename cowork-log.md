@@ -451,3 +451,85 @@ Implementation: preview panel is a grid of text inputs bound to extracted fields
 ---
 
 *Phase 3 foundation (OAuth + Scraper API) complete. Next: Scheduler (Step 2) + Settings/Integrations (Step 3).*
+
+---
+
+*Day 4 — 2026-05-20*
+
+## 29. Graceful degrade for email-OTP users
+
+The Scheduler module needs Google Calendar access — that's the whole point. But what about users who signed in via email OTP and never granted Google scopes? Three options on the table:
+
+1. Block them at the route level and force a re-auth.
+2. Let the call to Google fail and surface a generic 500.
+3. Show a clear empty state that explains what's missing and links to the fix.
+
+Went with #3. The `/schedule` and `/settings/integrations` pages both check `oauth_tokens` for the current user. No row → "Sign in with Google" CTA. Row exists but missing the `calendar.events` scope → "Reconnect to grant Calendar" message. Features never 500 — they hide themselves and tell the user exactly why.
+
+This decision plays out across the whole app. Phase 4's Gmail-based features will follow the same pattern: check `oauth_tokens.scopes[]`, render an empty state if a needed scope is missing. The `/settings/integrations` page becomes the single source of truth for "what can this user do?" — every feature defers to it for permission checks.
+
+A nice side effect: testing in different auth states isn't terrifying. Email-OTP users see a friendly empty state and a clear path to add the scope. No mysterious 500s, no "what does this error even mean?" support tickets in production.
+
+**Features should ask permission, not assume it. The integrations page is the registry; features are subscribers.**
+
+---
+
+## 30. The calendar invite is for the candidate, not the interviewer
+
+Initial Scheduler shipped with prep questions auto-attached to the Google Calendar event description. Looked great in testing — until I realized the candidate gets the invite too. They'd see *interviewer prep questions* in their own calendar.
+
+Hard rework. The description template is now for the candidate's eyes:
+
+```
+Hotel Plus – Interview Invitation
+Position: ...
+
+Candidate: ...
+Phone: ...
+E-mail: ...
+CV: <signed link>
+Portfolio: ...
+
+Interviewer:
+Hotel Plus Recruitment Team / Automation Team
+
+Should you require any additional information…
+```
+
+Prep questions still exist — they live on the candidate detail page, and the schedule form previews them with a banner that explicitly says "interviewer-only, not sent to candidate". That separation is structural, not stylistic: anything in `events.description` ships to all attendees, full stop.
+
+Also: empty fields drop their entire line instead of rendering "Phone: —". An invite with three out of six fields looks intentional; an invite with three filled + three em-dashes looks broken.
+
+**Audience awareness goes into the data model, not just the prompt. If a candidate sees it, write it for the candidate.**
+
+---
+
+## 31. Schedule-X v4 was a stack-pinning lesson
+
+Picked Schedule-X for the calendar view after weighing it against FullCalendar (smaller bundle, easier to brand-match with CSS variables, modern API). `npm install @schedule-x/...` without a version range pulled v4.6 — the latest. v4 had silently switched to the Temporal API: events take `Temporal.ZonedDateTime` objects instead of strings, `defaultView` was removed, `selectedDate` requires a `Temporal.PlainDate`. Our code, written for the v2 string-based API I'd pitched, threw at render time. Vercel's `/schedule` page returned 500 with no obvious cause.
+
+Pinned to `^2.36.0` explicitly and the page rendered immediately.
+
+Two takeaways. One: a library that releases a paradigm shift in a major version is doing the right thing semver-wise — the breaking change is signalled. But `npm install <pkg>` defaults to latest, which means the version drift is invisible at install time. Always pin majors when introducing a new dep, especially mid-project.
+
+Two: when a page returns 500 with no logs, the cause is usually a runtime-only crash inside a component, not an infra issue. The fix path is `npx tsc --noEmit` (catches type drift) then `git log --oneline package.json` (catches dep drift). I went straight for the second after realizing types weren't catching this — peer-dependency mismatches don't always trip tsc.
+
+**`^x.y.z` and `latest` aren't the same when the registry has a new major. Pin until you've read the changelog.**
+
+---
+
+## 32. PostgREST and binary columns don't speak Buffer
+
+The OAuth refresh token gets encrypted with AES-256-GCM (`iv || authTag || ciphertext`) and stored in `oauth_tokens.refresh_token_encrypted` as `bytea`. The first cut passed the resulting `Buffer` directly to supabase-js's `.upsert()`. The row inserted without error, signing in worked, scheduling worked — for about an hour.
+
+When the access token expired and the code tried to refresh via the encrypted refresh token, decryption failed with "Unable to authenticate data". The `octet_length` of what was stored was 496 — way too big for a ~100-byte plaintext + 28 bytes of IV+tag. Working backwards: 496 is exactly the byte count of the JSON literal `{"type":"Buffer","data":[1,2,...,140]}`. supabase-js had JSON-serialized the Buffer (because JSON has no Buffer type) and PostgREST had stored those literal JSON characters as bytea.
+
+Fix: explicitly encode as a Postgres bytea hex string (`\xAABBCC…`) before the upsert. PostgREST recognizes the prefix and decodes hex into the bytea column. The SELECT path was already correct (PostgREST encodes bytea as `\x…` on read), so the round-trip is now clean.
+
+This bug class is silent. The INSERT succeeds, the row exists, the column has data — but the data isn't what you wrote. Only the eventual decrypt blows up. Watch for it whenever a column type doesn't have a native JSON representation.
+
+**JSON-over-HTTP doesn't carry binary. Spell it out when the target column is bytea.**
+
+---
+
+*Phase 3c complete. Scheduler + Integrations live, scraper hardened, scoring loop fixed, all on Vercel prod. Next: Phase 4 — overdelivery (cold email, auto-email-reader, AI prompt-builder interview, multi-party FreeBusy).*
