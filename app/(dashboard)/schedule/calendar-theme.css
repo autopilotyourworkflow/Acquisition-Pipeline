@@ -59,14 +59,19 @@
   color: #faf7f2;
 }
 
-/* All event chips: pointer cursor so users know they're clickable, same
-   affordance as buttons everywhere else in the app. */
+/* All event chips: pointer cursor + a transition for the hover state.
+   The transition timing is cubic-bezier "ease-out", which feels natural for
+   small-scale UI motion — fast enough to feel responsive, slow enough that
+   the contraction back to rest doesn't snap. */
 .sx-react-calendar-wrapper .sx__month-grid-event,
 .sx-react-calendar-wrapper .sx__time-grid-event,
 .sx-react-calendar-wrapper .sx__month-agenda-event,
 .sx-react-calendar-wrapper .sx__list-event,
 .sx-react-calendar-wrapper .sx__week-grid-event {
   cursor: pointer;
+  transition:
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Week + day views default to multi-line event chips that grow with the
@@ -90,32 +95,21 @@
   text-overflow: ellipsis;
 }
 
-/* Hover: expand the chip to fit its full content instead of scrolling text.
-   Marquee was an attempt that didn't work well — the time and title elements
-   inside an event chip have their own layout and animated independently, so
-   they overlapped at different speeds. Hover-expand is what Google Calendar
-   does and it just works:
-   - z-index raises the chip above neighbors
-   - width: max-content lets it grow horizontally to fit
-   - max-width caps so super-long titles don't overflow the viewport
-   - If the title already fits, max-content = current width, so short events
-     don't move at all (item 4 of Ben's feedback). */
+/* Hover: subtle scale + drop shadow + raise above neighbors. We deliberately
+   use `transform: scale()` instead of changing `width` or `position`:
+   - transform is GPU-composited, so it doesn't trigger layout reflow on the
+     containing cell. The cell stays exactly where it was.
+   - The chip can't "contract" because the default state is scale 1; hover is
+     scale > 1. Day view events that already show full text just nudge up
+     slightly — no shrinking.
+   - The transition runs both ways, so the expand and contract are both
+     animated, not snapped. */
 .sx-react-calendar-wrapper .sx__month-grid-event:hover,
 .sx-react-calendar-wrapper .sx__time-grid-event:hover,
-.sx-react-calendar-wrapper .sx__month-agenda-event:hover {
-  position: relative;
+.sx-react-calendar-wrapper .sx__month-agenda-event:hover,
+.sx-react-calendar-wrapper .sx__list-event:hover {
+  transform: scale(1.04);
   z-index: 10;
-  overflow: visible;
-  width: max-content;
-  max-width: 320px;
-  box-shadow: 0 2px 10px rgba(23, 32, 46, 0.18);
-}
-
-/* When the chip expands, its inner truncation should also relax so the full
-   text becomes visible. */
-.sx-react-calendar-wrapper .sx__time-grid-event:hover .sx__time-grid-event-title,
-.sx-react-calendar-wrapper .sx__list-event:hover .sx__list-event-title {
-  overflow: visible;
-  text-overflow: unset;
-  max-width: none;
+  position: relative;
+  box-shadow: 0 4px 14px rgba(23, 32, 46, 0.18);
 }
