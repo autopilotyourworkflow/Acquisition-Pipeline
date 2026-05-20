@@ -273,6 +273,122 @@ export async function rescheduleInterviewEvent(args: {
   };
 }
 
+/**
+ * Read-only conflict check against the booker's primary calendar.
+ *
+ * Used by `/api/schedule/conflicts` to warn (not block) the user when the
+ * proposed interview window overlaps an existing busy block on their own
+ * calendar. Multi-attendee FreeBusy (panelists, hiring manager) is Phase 5
+ * — most external invitees won't share freebusy data with us anyway.
+ *
+ * Auth-degrade: if the user hasn't connected Google (email-OTP signin) or
+ * has revoked the scope, this returns `{ conflicts: [] }` silently rather
+ * than throwing. The form already surfaces a "connect Google" hint via the
+ * existing booking flow — duplicating it here would be noise.
+ */
+export async function checkBusy(args: {
+  userId: string;
+  startsAt: string;
+  endsAt: string;
+}): Promise<{
+  conflicts: Array<{ start: string; end: string; summary?: string }>;
+}> {
+  const tokenResult = await getGoogleAccessToken(args.userId);
+  if (!tokenResult.ok) {
+    return { conflicts: [] };
+  }
+
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: tokenResult.accessToken });
+  const calendar = google.calendar({ version: "v3", auth });
+
+  const proposedStartMs = new Date(args.startsAt).getTime();
+  const proposedEndMs = new Date(args.endsAt).getTime();
+  if (
+    !Number.isFinite(proposedStartMs) ||
+    !Number.isFinite(proposedEndMs) ||
+    proposedEndMs <= proposedStartMs
+  ) {
+    return { conflicts: [] };
+  }
+
+  // freebusy.query returns busy intervals only — no event titles. We do a
+  // second events.list call within the same window so the warning can show
+  // *what's* in the way ("Standup" vs. just "10:00–10:30"). One extra HTTP
+  // round-trip is fine at this cadence (debounced ~400ms, one per submit
+  // attempt).
+  let busy: Array<{ start?: string | null; end?: string | null }> = [];
+  try {
+    const fb = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: args.startsAt,
+        timeMax: args.endsAt,
+        items: [{ id: "primary" }],
+      },
+    });
+    busy = fb.data.calendars?.["primary"]?.busy ?? [];
+  } catch {
+    // If freebusy itself fails (rate-limited, transient), don't crash the
+    // form — silently degrade to "no warning".
+    return { conflicts: [] };
+  }
+
+  // Best-effort title resolution via events.list. Filter the events down
+  // to the busy intervals that actually overlap the proposed window.
+  let titledEvents: Array<{
+    start?: string | null;
+    end?: string | null;
+    summary?: string | null;
+  }> = [];
+  try {
+    const evs = await calendar.events.list({
+      calendarId: "primary",
+      timeMin: args.startsAt,
+      timeMax: args.endsAt,
+      singleEvents: true,
+      // We only need a handful of overlapping events — keep the response
+      // small. Default ordering is fine.
+      maxResults: 25,
+    });
+    titledEvents = (evs.data.items ?? []).map((e) => ({
+      start: e.start?.dateTime ?? e.start?.date ?? null,
+      end: e.end?.dateTime ?? e.end?.date ?? null,
+      summary: e.summary ?? null,
+    }));
+  } catch {
+    // Title lookup is best-effort; we still want to return the busy
+    // intervals from freebusy.
+    titledEvents = [];
+  }
+
+  const conflicts: Array<{ start: string; end: string; summary?: string }> = [];
+  for (const b of busy) {
+    if (!b.start || !b.end) continue;
+    const bStart = new Date(b.start).getTime();
+    const bEnd = new Date(b.end).getTime();
+    if (!Number.isFinite(bStart) || !Number.isFinite(bEnd)) continue;
+    // Standard half-open overlap: A overlaps B iff A.start < B.end AND
+    // A.end > B.start. Adjacent (end == start) is *not* a conflict.
+    if (bStart < proposedEndMs && bEnd > proposedStartMs) {
+      // Try to attach a title from titledEvents — match by start/end pair.
+      const matched = titledEvents.find(
+        (e) =>
+          e.start &&
+          e.end &&
+          new Date(e.start).getTime() === bStart &&
+          new Date(e.end).getTime() === bEnd,
+      );
+      conflicts.push({
+        start: b.start,
+        end: b.end,
+        summary: matched?.summary ?? undefined,
+      });
+    }
+  }
+
+  return { conflicts };
+}
+
 function buildDescription({
   candidateName,
   candidateEmail,

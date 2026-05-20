@@ -573,3 +573,19 @@ The questionnaire-vs-chat call for 4a was the smaller story. I had a draft from 
 **Schedule per-user cadence in the database; let the cron be the dumb heartbeat. And when you find yourself building a chat to ask five questions, build a form instead.**
 
 ---
+
+## 35. Warn, don't block — calendars aren't sources of truth about time
+
+Module 4's rubric calls out "แจ้งเตือนเมื่อมีการนัดซ้อนกัน" — alert when bookings overlap. The naive interpretation is a hard block: don't let the user submit while the proposed window collides with an existing event. The right interpretation is softer.
+
+The booker's calendar isn't a single source of truth for the booker's time. Focus blocks, buffer blocks, "tentative" events from other tools that sync into Google Calendar, lunch placeholders left over from the prior week — they all show up as `busy` in `freebusy.query`. A hard block would create friction every time HR tries to book during one of these, and the user would learn to either delete the buffers (defeating their purpose) or develop muscle memory to work around our form. Either way the rule has won an argument with the user instead of helping them.
+
+So we ship a warning instead. The check fires ~400ms after both time fields settle, hits FreeBusy on `primary`, and renders a terracotta-tinted card under the time pickers naming the conflict ("Standup — May 20 · 10:00–10:30"). Submit stays enabled. If HR really does need to double-book, they read the warning and move on. If they didn't notice the clash, they catch it before sending the invite.
+
+A second call to `events.list` over the same window resolves the busy intervals to titles — FreeBusy is title-blind by design (privacy), but if it's *your own* primary calendar the event titles are already yours. One extra HTTP round-trip at a debounced cadence is cheap insurance against a useless "10:00–10:30 is busy" message.
+
+The auth-degrade path matters too: if the user signed in via email OTP and never connected Google Calendar, the conflict-check just returns `{ conflicts: [] }`. No "connect Google" toast from the conflict checker — that hint is already handled by the booking-submit path. Duplicating it would be noise on a feature the user didn't ask for.
+
+**A warning informs the user. A block dictates to them. The right friction is the kind they can ignore when they have a reason to.**
+
+---
