@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,19 @@ export function BookmarkletPanel({
   const router = useRouter();
   const [token, setToken] = useState<string | null>(initialToken);
   const [pending, startTransition] = useTransition();
+  const linkRef = useRef<HTMLAnchorElement>(null);
+
+  // React (16.9+) sanitizes `javascript:` URLs out of JSX href props — they
+  // get replaced with an error stub. Set the href via the DOM after mount
+  // instead, which bypasses React's sanitizer entirely.
+  useEffect(() => {
+    if (linkRef.current && token) {
+      linkRef.current.setAttribute(
+        "href",
+        buildBookmarkletHref(token, apiBase),
+      );
+    }
+  }, [token, apiBase]);
 
   function regenerate() {
     startTransition(async () => {
@@ -97,18 +110,21 @@ export function BookmarkletPanel({
           <p className="text-xs font-medium text-navy">
             ↓ Drag this button to your bookmarks bar:
           </p>
-          {/* The <a> needs to keep its href on the rendered HTML so the
-              browser sees it as a draggable bookmark. eslint-disable
-              the no-script-url rule for this specific anchor. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          {/* href is set via useEffect/ref — React blocks javascript: URLs
+              in JSX href props since 16.9. Setting via DOM bypasses that
+              sanitizer and lets the browser see this as a valid draggable
+              bookmarklet. */}
           <a
-            href={buildBookmarkletHref(token, apiBase)}
+            ref={linkRef}
+            href="#"
             draggable
             onClick={(e) => {
               // Don't navigate when clicked on our own settings page —
               // dragging is the only intended interaction here.
               e.preventDefault();
-              toast.info("Drag this button to your bookmarks bar instead of clicking.");
+              toast.info(
+                "Drag this button to your bookmarks bar instead of clicking.",
+              );
             }}
             className="inline-block rounded-md bg-terracotta px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-terracotta/90 cursor-grab"
           >
@@ -152,23 +168,34 @@ export function BookmarkletPanel({
             bookmarks bar. (View → Show Bookmarks Bar if it&apos;s hidden.)
           </li>
           <li>
-            Go to a JobsDB applicant detail page (you must already be logged
-            into JobsDB in this browser).
+            Go to a candidate page in a logged-in browser tab. Works on{" "}
+            <strong>LinkedIn profiles</strong>,{" "}
+            <strong>JobsDB applicant pages</strong>, or any other site where
+            you can see the candidate&apos;s rendered details.
           </li>
           <li>
-            Click the bookmarklet. A toast appears on the JobsDB page
-            confirming the candidate was added.
+            Click the bookmarklet. A toast appears on that page confirming
+            the candidate was added.
           </li>
           <li>
-            Open the Tracker — the new candidate is there with{" "}
-            <span className="font-mono">source: jobsdb</span>. Run a score
-            from the Screener.
+            Open the Tracker — the new candidate is there with the source
+            tag matching where it came from (
+            <span className="font-mono">linkedin</span> /{" "}
+            <span className="font-mono">jobsdb</span> /{" "}
+            <span className="font-mono">extension</span>). Run a score from
+            the Screener.
           </li>
         </ol>
         <p className="mt-2 text-slate-mid">
-          If JobsDB&apos;s security policy blocks the request (rare), the
-          toast will say so. Fall back to the Scraper&apos;s paste tab in
-          that case.
+          <strong>For demos / first test:</strong> use any public LinkedIn
+          profile (yours, or anyone you&apos;re connected to). It works
+          identically to a JobsDB page and proves the round-trip without
+          needing employer-side JobsDB access.
+        </p>
+        <p className="mt-1 text-slate-mid">
+          If a site&apos;s security policy blocks the request (rare, but
+          possible on stricter sites), the toast on that page will tell you
+          — fall back to the Scraper&apos;s paste tab.
         </p>
       </details>
     </section>
