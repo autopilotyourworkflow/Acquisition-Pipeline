@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { Button } from "@/components/ui/button";
 import { ApiKeysPanel } from "./api-keys.client";
 
@@ -53,10 +53,7 @@ const ROWS: ScopeRow[] = [
  * to its lane: API connections (Google OAuth + paid-service keys).
  */
 export default async function IntegrationsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();

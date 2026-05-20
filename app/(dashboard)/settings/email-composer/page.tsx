@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { EmailDefaultsPanel } from "./email-defaults.client";
 
 /**
@@ -16,10 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Email composer · Settings · Acquisition" };
 
 export default async function EmailComposerPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();

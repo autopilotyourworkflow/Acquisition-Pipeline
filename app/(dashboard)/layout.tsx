@@ -1,6 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { SignOutButton } from "./sign-out-button.client";
 import { NavLink } from "./nav-link.client";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,10 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 export default async function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   // Middleware already redirects unauthenticated users, but belt-and-suspenders
   // for direct API hits that bypass middleware in edge cases.
@@ -19,12 +17,17 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-black bg-yellow">
+      <header className="sticky top-0 z-40 bg-yellow">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3">
           <Link href="/tracker" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-none bg-black font-display text-base font-black text-yellow">
-              H+
-            </div>
+            <Image
+              src="/logo.jpg"
+              alt="Hotel Plus"
+              width={40}
+              height={40}
+              priority
+              className="h-10 w-10 object-contain"
+            />
             <span className="font-display text-lg font-bold tracking-tight text-black">
               Acquisition
             </span>

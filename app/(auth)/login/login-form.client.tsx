@@ -96,14 +96,14 @@ export function LoginForm() {
   if (step === "code-sent") {
     return (
       <form onSubmit={handleVerifyCode} className="space-y-4">
-        <div className="rounded-md border border-sand-200 bg-warm-white px-4 py-3 text-sm text-charcoal">
+        <div className="rounded-sm border border-soft-gray bg-off-white px-4 py-3 text-sm text-gray">
           We sent a sign-in code to{" "}
-          <span className="font-medium text-navy">{email}</span>.
+          <span className="font-semibold text-black">{email}</span>.
         </div>
         <div>
           <label
             htmlFor="code"
-            className="block text-xs font-medium uppercase tracking-wider text-slate-deep"
+            className="block text-xs font-semibold uppercase tracking-wider text-black"
           >
             Verification code
           </label>
@@ -117,18 +117,18 @@ export function LoginForm() {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             placeholder="000000"
             autoFocus
-            className="mt-1.5 h-11 w-full rounded-md border border-sand-200 bg-warm-white px-3 font-mono text-base tracking-[0.4em] text-navy placeholder:text-slate-mid focus:border-terracotta focus:outline-none"
+            className="mt-1.5 h-11 w-full rounded-sm border border-soft-gray bg-white px-3 font-mono text-base tracking-[0.4em] text-black placeholder:text-gray-dim focus:border-black focus:outline-none"
           />
         </div>
         {error && <FormError message={error} />}
         <button
           type="submit"
           disabled={pending || code.length < 6 || code.length > 8}
-          className="inline-flex h-11 w-full items-center justify-center rounded bg-yellow px-6 text-sm font-semibold text-black shadow-xs transition-[filter] hover:brightness-95 disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center rounded-sm bg-yellow px-6 text-sm font-semibold text-black transition-[filter] hover:brightness-95 disabled:cursor-not-allowed disabled:bg-soft-gray disabled:text-gray"
         >
           {pending ? "Verifying…" : "Continue"}
         </button>
-        <p className="text-center text-[11px] text-slate-mid">
+        <p className="text-center text-[11px] text-gray">
           Or click the sign-in link in your email — both paths work.
         </p>
         <button
@@ -138,7 +138,7 @@ export function LoginForm() {
             setCode("");
             setError(null);
           }}
-          className="block w-full text-center text-xs text-slate-deep underline-offset-4 hover:underline"
+          className="block w-full text-center text-xs text-black underline-offset-4 hover:underline"
         >
           Use a different email
         </button>
@@ -152,25 +152,25 @@ export function LoginForm() {
         type="button"
         onClick={handleGoogle}
         disabled={pending}
-        className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-md border border-sand-200 bg-warm-white px-4 text-sm font-medium text-navy transition-colors hover:bg-sand-100 disabled:opacity-50"
+        className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-sm border border-soft-gray bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-off-white disabled:opacity-50"
       >
         <GoogleIcon />
         Continue with Google
       </button>
 
       <div className="relative flex items-center">
-        <div className="flex-1 border-t border-sand-200" />
-        <span className="px-3 text-[11px] font-medium uppercase tracking-widest text-slate-mid">
+        <div className="flex-1 border-t border-soft-gray" />
+        <span className="px-3 text-[10px] font-semibold uppercase tracking-widest text-gray">
           or
         </span>
-        <div className="flex-1 border-t border-sand-200" />
+        <div className="flex-1 border-t border-soft-gray" />
       </div>
 
       <form onSubmit={handleSendCode} className="space-y-4">
         <div>
           <label
             htmlFor="email"
-            className="block text-xs font-medium uppercase tracking-wider text-slate-deep"
+            className="block text-xs font-semibold uppercase tracking-wider text-black"
           >
             Work email
           </label>
@@ -181,20 +181,20 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
-            className="mt-1.5 h-11 w-full rounded-md border border-sand-200 bg-warm-white px-3 text-sm text-navy placeholder:text-slate-mid focus:border-terracotta focus:outline-none"
+            className="mt-1.5 h-11 w-full rounded-sm border border-soft-gray bg-white px-3 text-sm text-black placeholder:text-gray-dim focus:border-black focus:outline-none"
           />
         </div>
         {error && <FormError message={error} />}
         <button
           type="submit"
           disabled={pending || !email}
-          className="inline-flex h-11 w-full items-center justify-center rounded bg-yellow px-6 text-sm font-semibold text-black shadow-xs transition-[filter] hover:brightness-95 disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center rounded-sm bg-yellow px-6 text-sm font-semibold text-black transition-[filter] hover:brightness-95 disabled:cursor-not-allowed disabled:bg-soft-gray disabled:text-gray"
         >
           {pending ? "Sending…" : "Email me a sign-in code"}
         </button>
       </form>
 
-      <p className="text-center text-[11px] text-slate-mid">
+      <p className="text-center text-[11px] text-gray">
         New here? You&apos;ll need an invitation from an existing teammate.
       </p>
     </div>

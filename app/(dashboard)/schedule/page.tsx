@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { reconcileWithGoogle } from "@/lib/google/calendar";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,9 +28,7 @@ type InterviewWithJoins = {
 
 export default async function SchedulePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   // Sync DB ↔ Google before reading: if HR deleted an event directly in

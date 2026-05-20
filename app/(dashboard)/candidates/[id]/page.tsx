@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import { Button } from "@/components/ui/button";
@@ -74,9 +75,7 @@ export default async function CandidatePage({
 
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const admin = createAdminClient();
   const [

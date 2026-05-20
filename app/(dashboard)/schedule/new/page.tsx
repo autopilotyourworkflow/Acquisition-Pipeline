@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { Button } from "@/components/ui/button";
 import { ScheduleShell, type ScheduleCandidate } from "./schedule-shell.client";
 import type { CandidateRow } from "@/lib/db/types";
@@ -20,9 +21,7 @@ export default async function ScheduleNewPage({
   const preselectedCandidateId = params.candidate ?? null;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   // Check Google connection status. Admin client because oauth_tokens is

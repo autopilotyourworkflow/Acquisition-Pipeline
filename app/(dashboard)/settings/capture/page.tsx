@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { BookmarkletPanel } from "./bookmarklet-panel.client";
 
 /**
@@ -23,10 +23,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Capture · Settings · Acquisition" };
 
 export default async function CapturePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
