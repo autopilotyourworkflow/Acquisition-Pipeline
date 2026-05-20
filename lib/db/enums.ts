@@ -64,9 +64,15 @@ export type EmailDraftStatus = (typeof EMAIL_DRAFT_STATUSES)[number];
  * the candidate detail view. Kept here next to the enum so renames stay
  * synchronized.
  */
+/**
+ * Stage labels. Note: the `applied` enum value is rendered as
+ * "Applied / Contacted" because both inbound applications AND outbound
+ * candidates who've been cold-emailed converge at this stage. The source
+ * badge on each candidate disambiguates which path they took.
+ */
 export const STAGE_LABELS: Record<CandidateStage, string> = {
   sourced: "Sourced",
-  applied: "Applied",
+  applied: "Applied / Contacted",
   screening: "Screening",
   prescreen_call: "Prescreen Call",
   first_interview: "First Interview",

@@ -49,7 +49,7 @@ export default function Home() {
               Will be removed once we ship real screens. */}
           <div className="mt-16 flex flex-wrap items-center justify-center gap-2 text-xs">
             {[
-              { label: "Applied", className: "bg-sand-100 text-charcoal" },
+              { label: "Applied / Contacted", className: "bg-sand-100 text-charcoal" },
               { label: "Screening", className: "bg-warning/15 text-warning" },
               { label: "Pre-screen", className: "bg-info/15 text-info" },
               { label: "Interview", className: "bg-info/25 text-info" },

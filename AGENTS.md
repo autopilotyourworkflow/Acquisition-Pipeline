@@ -183,6 +183,7 @@ Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/s
 /api/interviews/[id]           DELETE = cancel, PATCH = reschedule
 /api/schedule/conflicts        POST — warn-only conflict check (events.list overlap)
 /api/schedule/sync             POST — Google → DB reconcile (deletes detected from Google)
+/api/emails/draft              POST, SSE — Opus 4.7 streams a cold-outreach draft
 ```
 
 **Libraries:**
@@ -190,12 +191,15 @@ Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/s
 lib/anthropic/client.ts                    Claude SDK wrapper
 lib/anthropic/tools/submit_score.ts        scoring tool def + zod
 lib/anthropic/tools/extract_candidate.ts   scraper tool def + zod
+lib/anthropic/tools/compose_cold_email.ts  cold-email tool def + zod
 lib/anthropic/prompts/scoring.v1.ts        file fallback persona + buildScoringMessages
 lib/anthropic/prompts/manager.ts           team-mode manager prompt
 lib/anthropic/prompts/load.ts              DB-backed prompt loader
+lib/anthropic/prompts/cold-email.ts        Opus 4.7 anti-spam-shaped persona + JD-cacheable message builder
 lib/audit/wrap.ts                          withAudit HOF + crypto helpers
 lib/google/oauth.ts                        encrypt/decrypt + getGoogleAccessToken
 lib/google/calendar.ts                     create/cancel/reschedule + Hotel Plus invite template + checkBusy + reconcileWithGoogle
+lib/google/gmail.ts                        sendEmail + hand-rolled MIME + markdownToEmailHtml
 lib/scrape/normalize.ts                    single funnel: rawText → extract_candidate tool
 lib/short-links.ts                         /l/<slug> shortener for CV + prep URLs in invites
 lib/interviews/cv-link.ts                  getCandidateCvInviteUrl — single CV-link path for create + reschedule
@@ -204,7 +208,7 @@ lib/supabase/{server,browser,admin,middleware}.ts
 hooks/use-conflict-check.ts                shared FreeBusy-driven conflict hook + formatConflictRange
 ```
 
-**Schema (migrations applied — all 10):**
+**Schema (migrations applied — all 11):**
 - `0001_init.sql` — full base schema, RLS, 12 tables, seed JD
 - `0002_phase2_fixes.sql` — `attachments.content_hash` + `scoring_prompts` table + seed v1
 - `0003_team_scoring.sql` — `scores.scoring_mode` + `scores.team_agents`
@@ -215,6 +219,7 @@ hooks/use-conflict-check.ts                shared FreeBusy-driven conflict hook 
 - `0008_bookmarklet.sql` — `user_settings.bookmarklet_token` (per-user capture credential)
 - `0009_apify.sql` — `user_settings.apify_api_token_encrypted` (swapped from Proxycurl for outbound LinkedIn)
 - `0010_sourced_stage.sql` — `candidate_stage` enum gets `sourced` value BEFORE `applied`
+- `0011_emails.sql` — `emails` table (org-scoped RLS) + `user_settings.email_signature` + `user_settings.email_from_name`
 
 **Components:**
 ```
@@ -224,6 +229,7 @@ components/candidates/          StageBadge, SourceBadge
 components/screener/            ScoreCard, ScoreStream.client
 components/interviews/          InterviewActions.client (reschedule + cancel menu, with conflict warning)
 components/schedule/            ConflictWarning (shared by booking + both reschedule dialogs)
+components/emails/              ColdEmailDialog.client + ColdEmailLauncher.client (visibility-gated CTA)
 ```
 
 **Things that DO exist now from Phase 3d (don't rebuild):**
@@ -240,10 +246,18 @@ components/schedule/            ConflictWarning (shared by booking + both resche
 - `app/(dashboard)/jds/[id]/source-dialog.client.tsx` — "Find candidates" dialog w/ Apify scraper-mode picker
 - `app/(dashboard)/jds/[id]/sourcing-history.tsx` — last-5-runs panel
 
+**Things that DO exist now from Phase 3e (don't rebuild):**
+- `lib/google/gmail.ts` — Gmail SDK wrapper (hand-rolled MIME + send; reusable by 4c)
+- `lib/anthropic/tools/compose_cold_email.ts` — `compose_cold_email` tool def + zod
+- `lib/anthropic/prompts/cold-email.ts` — Opus 4.7 anti-spam-shaped persona + JD-cacheable message builder
+- `app/actions/emails.ts` — `sendColdEmail` + `saveEmailSignature` (withAudit-wrapped)
+- `app/api/emails/draft/route.ts` — SSE-streaming draft endpoint
+- `components/emails/ColdEmailDialog.client.tsx` — streaming dialog (regex-based partial-JSON typewriter) + edit + send
+- `components/emails/ColdEmailLauncher.client.tsx` — server-friendly wrapper with precondition guards (email / JD / gmail.send scope)
+- `app/(dashboard)/settings/integrations/email-defaults.client.tsx` — signature + from-name editor
+- Migration 0011: `emails` table + `user_settings.email_signature` + `user_settings.email_from_name`
+
 **Things that DON'T exist yet (build when phases get there):**
-- `lib/google/gmail.ts` — Gmail SDK wrapper (Phase 3e; reused + extended by 4c)
-- `lib/anthropic/tools/compose_cold_email.ts` — cold-email tool (Phase 3e)
-- `app/actions/emails.ts` + `emails` table — cold-email drafts + sends (Phase 3e, migration 0011)
 - `lib/anthropic/prompts/persona-interview.ts` — JD prompt-builder interviewer (Phase 4a)
 - `lib/anthropic/tools/propose_scoring_persona.ts` — persona output tool (Phase 4a)
 - `app/api/jds/propose-prompt` — multi-turn SSE for JD wizard (Phase 4a)
@@ -301,7 +315,7 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 3 — Scraper + Scheduler basics | Day 3-4 | ✅ **COMPLETE.** 3a (OAuth tokens) ✅, 3b (Scraper — all 5 tabs) ✅, 3c (Scheduler + Integrations) ✅. `/schedule` shows list + Schedule-X v2 calendar (month/week/day/agenda) with brand theme; form moved to `/schedule/new`. Cancel + reschedule via dropdown (Google `events.delete` / `events.patch`, `sendUpdates='all'`). Hotel Plus invite template — candidate-facing; prep questions stay internal on the detail page. Link shortener `/l/<slug>` (migration 0006) for clean CV URLs in invites. `/settings/integrations` shows per-scope status (Calendar / Gmail Compose / Gmail Send). SMTP via Resend through Supabase. Hardening pass: scraper SSE parser, URL fetch normalization + Jina Reader fallback, editable preview + source retention, PDF upload-before-parse (was writing 0-byte files), scoring loop runaway-fire fixed (stable React key + ref pattern on onDone), bytea hex encoding for OAuth refresh tokens, attachment View/Download signed URLs (24h preview, 30-day download), experience bullets in scraped profiles. Migrations 0001-0006 applied. |
 | Pre-Phase 4 — Scheduling conflict detection + Google→DB sync | Day 4 | ✅ **COMPLETE.** Warn-only conflict detection on `/schedule/new` and both reschedule dialogs via `events.list` (dropped FreeBusy after it broke title matching — FreeBusy clips intervals to the query window). Shared `useConflictCheck` hook + `ConflictWarning` component, 150ms debounce + "Checking…" indicator. Reschedule-CV-URL regression fixed by centralizing the link path in `lib/interviews/cv-link.ts` — both POST and PATCH go through one helper now. Google → DB reconciliation on `/schedule` page load + "Refresh from Google" button (`reconcileWithGoogle` in `lib/google/calendar.ts` + `/api/schedule/sync`). One cowork-log entry (#36). |
 | 3d — Outbound sourcing + JobsDB inbound | Day 4-5 | ✅ **COMPLETE (pivoted mid-build).** JD-level "Find candidates" dialog with Apify-backed LinkedIn outbound (harvestapi/linkedin-profile-search actor; Short/Full/Full+email mode picker; cost preview; 5–50 cap). Scoring runs inline via new `lib/scoring/score-one.ts`. JobsDB *outbound* retired after we discovered it had no public candidate URLs — replaced by a **bookmarklet** that piggybacks on the user's logged-in browser session (LinkedIn / JobsDB / any site). New-tab capture page bypasses source-site CSP via URL hash. Outbound candidates land in a new **"Sourced" Kanban column** (migration 0010) — distinct funnel entry vs inbound "Applied". `/settings/integrations` now hosts Apify + Proxycurl key fields + draggable bookmarklet. Money guard: empty/placeholder candidates skipped before scoring spend. Migrations 0007 (sourcing_runs), 0008 (bookmarklet_token), 0009 (apify_token), 0010 (sourced stage). Cowork-log entries 38–39. |
-| 3e — Cold email (review-before-send) | Day 5 | not started. **Plugs into the Sourced column as the next-action surface.** Opus drafter + edit dialog + Gmail send via `gmail.send` scope. `lib/google/gmail.ts` new file. Migration 0011 (new `emails` table + signature/from-name in user_settings). Prompt: `docs/phase-3e-cold-email.md`. |
+| 3e — Cold email (review-before-send) | Day 5 | ✅ **COMPLETE.** "Draft cold email" CTA on candidate detail page (visible iff candidate has email + JD + user has `gmail.send` scope). Opus 4.7 SSE-streams the draft via new `lib/anthropic/tools/compose_cold_email.ts` + `lib/anthropic/prompts/cold-email.ts` (anti-spam framing: no clichés, hook-from-experience required). Editable subject + body in dialog with typewriter UI driven by regex extraction over partial JSON. Send via new `lib/google/gmail.ts` (hand-rolled MIME multipart/alternative + base64url, no `googleapis` dep). New `emails` table + RLS (migration 0011) logs every send/failure; activity log records via `withAudit`. Toast after send offers "Move to Applied / Contacted?" one-click stage transition. **Funnel decision:** single `applied` enum kept; label renamed to "Applied / Contacted" (`STAGE_LABELS.applied`). Source badge disambiguates inbound vs outbound. Signature + from-name editor added to `/settings/integrations` (plaintext text columns — not credentials). Cowork-log entry 40. Migration 0011 applied. |
 | 4 — AI assists for JD authoring + auto-email-reader (4a + 4c; 4b replaced by 3e) | Day 5 | not started (overdelivery — both optional). 4a = AI prompt-builder questionnaire (Haiku). 4c = auto-email-reader via cron-job.org + Vercel endpoint (Opus + Haiku, migration **0012**, new `CRON_SECRET` + `gmail.readonly` scope). 4d/4e/4f stay deferred to Phase 5. Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4c-auto-reader.md` (migration number in 4c prompt needs updating: 0009 → 0012 when picked up). |
 | 5 — Browser extension + polish + demo + deferred 4d/4e/4f | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { ApiKeysPanel } from "./api-keys.client";
 import { BookmarkletPanel } from "./bookmarklet-panel.client";
+import { EmailDefaultsPanel } from "./email-defaults.client";
 
 function getAppBaseUrl(): string {
   // Resolves to the deployed origin in prod (set in Vercel as
@@ -79,7 +80,7 @@ export default async function IntegrationsPage() {
     admin
       .from("user_settings")
       .select(
-        "proxycurl_api_key_encrypted, apify_api_token_encrypted, bookmarklet_token, updated_at",
+        "proxycurl_api_key_encrypted, apify_api_token_encrypted, bookmarklet_token, email_signature, email_from_name, updated_at",
       )
       .eq("user_id", user.id)
       .maybeSingle(),
@@ -186,6 +187,11 @@ export default async function IntegrationsPage() {
       )}
 
       <ApiKeysPanel status={apiKeyStatus} />
+
+      <EmailDefaultsPanel
+        initialSignature={(settingsRow?.email_signature as string | null) ?? null}
+        initialFromName={(settingsRow?.email_from_name as string | null) ?? null}
+      />
 
       <BookmarkletPanel
         hasToken={Boolean(settingsRow?.bookmarklet_token)}

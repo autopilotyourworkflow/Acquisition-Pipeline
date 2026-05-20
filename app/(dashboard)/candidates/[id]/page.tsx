@@ -7,8 +7,11 @@ import { SourceBadge } from "@/components/candidates/SourceBadge";
 import { Button } from "@/components/ui/button";
 import { InterviewActions } from "@/components/interviews/InterviewActions.client";
 import { ScoreCard } from "@/components/screener/ScoreCard";
+import { ColdEmailLauncher } from "@/components/emails/ColdEmailLauncher.client";
 import type { CandidateRow, JdRow, ScoreRow, AttachmentRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
+
+const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 
 /**
  * Storage bucket holding PDFs (and screenshots, eventually). Private — view
@@ -62,13 +65,18 @@ export default async function CandidatePage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
+  const admin = createAdminClient();
   const [
     { data: candidate, error: cErr },
     { data: jd },
     { data: scores },
     { data: attachments },
     { data: interviews },
+    { data: tokenRow },
   ] = await Promise.all([
     supabase.from("candidates").select("*").eq("id", id).single(),
     supabase.from("job_descriptions").select("*"),
@@ -89,7 +97,23 @@ export default async function CandidatePage({
       .select("*, job_descriptions(title)")
       .eq("candidate_id", id)
       .order("starts_at", { ascending: true }),
+    // oauth_tokens has owner-only RLS — admin client sidesteps that and lets
+    // the page render correctly regardless of how the JWT is plumbed through
+    // the server-component request context.
+    user
+      ? admin
+          .from("oauth_tokens")
+          .select("scopes")
+          .eq("user_id", user.id)
+          .eq("provider", "google")
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+
+  const grantedScopes = new Set<string>(
+    (tokenRow?.scopes as string[] | undefined) ?? [],
+  );
+  const hasGmailSend = grantedScopes.has(GMAIL_SEND_SCOPE);
 
   if (cErr || !candidate) return notFound();
 
@@ -177,9 +201,22 @@ export default async function CandidatePage({
       </div>
 
       <section className="rounded-lg border border-sand-200 bg-warm-white p-5">
-        <p className="mb-3 text-xs uppercase tracking-wide text-slate-deep">
-          Contact
-        </p>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-wide text-slate-deep">
+            Contact
+          </p>
+          <ColdEmailLauncher
+            candidate={{
+              id: c.id,
+              full_name: c.full_name,
+              email: c.email,
+              current_stage: c.stage,
+            }}
+            jdId={candidateJd?.id ?? null}
+            jdTitle={candidateJd?.title ?? null}
+            hasGmailSend={hasGmailSend}
+          />
+        </div>
         <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2">
           <ContactRow label="Email" value={c.email} />
           <ContactRow label="Phone" value={c.phone} />
@@ -505,7 +542,7 @@ function InterviewRow({ interview }: { interview: InterviewWithJd }) {
   };
 
   const stageLabels: Record<string, string> = {
-    applied: "Applied",
+    applied: "Applied / Contacted",
     screening: "Screening",
     prescreen_call: "Pre-screen call",
     first_interview: "First interview",

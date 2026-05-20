@@ -65,7 +65,7 @@ export type OverviewInterview = {
 };
 
 const STAGE_LABELS: Record<string, string> = {
-  applied: "Applied",
+  applied: "Applied / Contacted",
   screening: "Screening",
   prescreen_call: "Pre-screen call",
   first_interview: "First interview",

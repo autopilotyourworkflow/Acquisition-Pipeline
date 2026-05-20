@@ -665,3 +665,23 @@ The Sourced-stage call came at the end, after Ben pointed out that mixing outbou
 *Phase 3d complete. Day 5 of 5 begins. Next: Phase 3e (cold email — Module 4 of the rubric). 39 cowork-log entries.*
 
 ---
+
+## 40. One column for two funnels, and what it means for a cold-email button
+
+The clean version of cold email would have its own stage: `sourced → contacted → screened`. We reached for it instinctively when Ben asked whether the candidate should auto-move after send. *Applied* didn't fit — an outbound candidate who got cold-emailed hasn't applied. A new enum value would have been the rigorous answer.
+
+But "rigorous" was wrong here. A new stage means a new Kanban column on /tracker, a new label in three other files, an extra `ALTER TYPE` migration risk, and — most importantly — a funnel that visually separates two paths that *converge in practice*. The day after a cold-email reply lands and an inbound resume hits the same JD, both candidates are at the same point in HR's workflow: respond, screen, decide whether to interview. Splitting that column buys precision at the cost of clutter.
+
+The call: keep the single `applied` enum, rename the label to "Applied / Contacted", and let the existing source badge on each candidate card disambiguate inbound vs outbound. The send action moves outbound candidates into the same column inbound applicants occupy. The label tells HR "engaged, either way" without forcing them to track two parallel workflows that merge anyway.
+
+Two smaller calls fell out of the same session. The Opus 4.7 cold-email prompt is anti-spam-shaped — forbidding the clichés explicitly (*"I came across your profile…"*, vague flattery, fake urgency) rather than hoping the model knows not to. The signature stays plaintext in `user_settings` because it isn't a secret; the existing AES-256-GCM helper is reserved for credentials. And Gmail MIME got hand-rolled rather than pulled in via `googleapis` — one POST to one endpoint didn't justify the dep weight, and the existing project pattern (raw `fetch` against Google APIs) was already established by `calendar.ts`.
+
+The dialog's typewriter pulls partial subject + body out of the streaming tool-input JSON with a tiny field-extraction regex, not by trying to `JSON.parse` a half-formed object. Mid-stream JSON is never valid; trying to parse it just produces a thrown error every 50ms. Pattern-matching `"subject": "…` and `"body_markdown": "…` and incrementally unescaping the captured tail produces a readable typewriter for a few extra lines of code.
+
+**The right level of granularity in a funnel is the granularity that matches what the user does *next*, not what they did *before*. Inbound and outbound differ in their past; they're identical in their future.**
+
+---
+
+*Phase 3e complete. Module 4 of the rubric is in. 40 cowork-log entries. Next: 4a (JD prompt-builder) and 4c (auto-email-reader) as overdelivery, then final polish.*
+
+---
