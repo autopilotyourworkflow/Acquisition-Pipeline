@@ -50,19 +50,33 @@ export type ExtractCandidateInput = z.infer<typeof ExtractCandidateSchema>;
 
 /**
  * Defensive coercions for shape mismatches we've seen in the wild before
- * passing to zod. The JSON schema sent to Claude still requests an array for
- * `skills`, but Haiku occasionally emits a comma-separated string — rather
- * than fail the whole extraction over that, normalize it here.
+ * passing to zod. The JSON schema sent to Claude still requests arrays for
+ * the collection fields, but Haiku occasionally emits the wrong shape
+ * (comma-separated string, a free-text summary, null) — rather than fail
+ * the whole extraction over that, normalize here so the candidate still
+ * gets saved with whatever scalar fields the model did capture.
  */
 function coerceRawInput(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
   const obj = { ...(raw as Record<string, unknown>) };
+
+  // skills must be string[] — accept comma/semicolon/newline-separated string
   if (typeof obj.skills === "string") {
     obj.skills = (obj.skills as string)
       .split(/[,;\n]+/)
       .map((s) => s.trim())
       .filter(Boolean);
+  } else if (!Array.isArray(obj.skills)) {
+    obj.skills = [];
   }
+
+  // experience / education are array-of-objects. We can't reconstruct
+  // structure from a flat string, so degrade to [] rather than failing
+  // the whole extraction over the wrong wrapper type. Bullets / role
+  // details may be lost, but name / email / title still land.
+  if (!Array.isArray(obj.experience)) obj.experience = [];
+  if (!Array.isArray(obj.education)) obj.education = [];
+
   return obj;
 }
 

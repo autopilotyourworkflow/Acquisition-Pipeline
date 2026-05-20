@@ -21,7 +21,11 @@ import {
  */
 function buildBookmarkletHref(token: string, apiBase: string): string {
   const captureUrl = apiBase + "/bookmarklet-capture";
-  const src = `(()=>{const T=${JSON.stringify(token)};const C=${JSON.stringify(captureUrl)};const t=document.body.innerText;if(!t||t.length<100){alert('Page is empty — open a candidate detail page first.');return}try{const j=JSON.stringify({t:T,text:t,url:location.href});const b=new TextEncoder().encode(j);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);const e=btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=/g,'');window.open(C+'#d='+e,'_blank')}catch(e){alert('Bookmarklet error: '+e.message)}})()`;
+  // The lazy-load dance: walk the page top→bottom in 4 quick steps so
+  // any intersection-observer-driven lazy sections (LinkedIn experience,
+  // skills, recommendations) render before we read innerText. ~1.6s
+  // total. Then snap back to the top so the user isn't disoriented.
+  const src = `(async()=>{const T=${JSON.stringify(token)};const C=${JSON.stringify(captureUrl)};const sx=window.scrollX,sy=window.scrollY;const sleep=ms=>new Promise(r=>setTimeout(r,ms));for(let i=1;i<=4;i++){window.scrollTo({top:document.body.scrollHeight*i/4,behavior:'instant'});await sleep(380)}window.scrollTo({top:0,behavior:'instant'});await sleep(200);window.scrollTo(sx,sy);const t=document.body.innerText;if(!t||t.length<100){alert('Page looks empty — let it finish loading or open a candidate detail page first.');return}try{const j=JSON.stringify({t:T,text:t,url:location.href});const b=new TextEncoder().encode(j);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);const e=btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=/g,'');window.open(C+'#d='+e,'_blank')}catch(e){alert('Bookmarklet error: '+e.message)}})()`;
   return "javascript:" + encodeURIComponent(src);
 }
 
@@ -179,9 +183,17 @@ export function BookmarkletPanel({
             you can see the candidate&apos;s rendered details.
           </li>
           <li>
-            Click the bookmarklet. A new tab opens on Acquisition that
-            confirms the capture, lets you click through to the new
-            candidate, and can be closed when done.
+            <strong>Wait for the page to finish loading.</strong> LinkedIn
+            in particular lazy-loads experience / skills / recommendations
+            below the fold — give it 2–3 seconds so everything renders. The
+            bookmarklet auto-scrolls top-to-bottom before reading to help
+            trigger any laggy sections, but a fully-loaded page captures
+            cleaner.
+          </li>
+          <li>
+            Click the bookmarklet. After a brief auto-scroll a new tab
+            opens on Acquisition confirming the capture, with links to the
+            new candidate and the tracker.
           </li>
           <li>
             The candidate lands in the Tracker with the source tag
