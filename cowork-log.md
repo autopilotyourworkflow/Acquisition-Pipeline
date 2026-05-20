@@ -723,3 +723,25 @@ The most interesting fix was `useConflictCheck`. The original called `setConflic
 *40 cowork-log entries are now 42. Three QA bugs fixed (subject mojibake, signature flow, settings reorg) and the full lint backlog closed — zero errors, zero warnings.*
 
 ---
+
+## 43. Four QA bugs and a lesson about when lint advice is wrong
+
+Four issues from the next QA pass — dialog scroll, double sign-off, signature visual fidelity, and a regression where candidates couldn't be dragged to the Applied/Contacted column. The first three were straightforward fixes once isolated; the fourth was the interesting one because the cause turned out to be the lint cleanup from the previous session.
+
+The Applied/Contacted drag bug surfaced AFTER the lint pass. The previous cowork-log entry argued for replacing the "sync prop to state" useEffect with the React-blessed "setState during render with prev-comparison" pattern. On paper that's correct — it's literally the pattern React docs recommend for "adjusting state when a prop changes." In practice it was subtly racing with the optimistic Kanban drag: somewhere between `setCandidates(optimistic)` and `router.refresh()`, an intermediate render caused the prev-comparison to fire when it shouldn't have, resetting the optimistic state before the server had a chance to confirm. The result was a "drag that looks like nothing happened" — visually the candidate snapped back to its original column. The fix was to walk that change back: useEffect with `setCandidates(initialCandidates)` in the body, plus a targeted `eslint-disable-next-line react-hooks/set-state-in-effect` with a comment explaining the trade-off. The rule wants you to use derived state or the prev-comparison pattern; the prev-comparison pattern broke our optimistic-update timing; the lint warning's stated concern (cascading renders) is irrelevant for once-per-server-response state syncing. Disable was the right call. **Lint rules encode taste, not theorems — sometimes the right answer is to disable a rule and write the comment that says why.**
+
+The dialog scroll was a layout oversight. DialogContent grows with its children; the cold-email dialog has model pickers + language pickers + history panel + body editor + signature preview + rationale dropdown + action buttons, easily over 600px tall. Short viewports pushed the Send button below the fold. Fix: switch the Dialog from its default `grid` layout to `flex flex-col` with `max-h-[90vh]`, wrap the middle content in a `flex-1 overflow-y-auto` div, and pin the footer at the bottom with a `border-t`. Headers and footers stay visible; the middle scrolls. Took 10 minutes and applies to any future feature additions inside the dialog.
+
+The double sign-off came from a prompt → signature interaction. The Hotel Plus default signature starts with `Best regards,` — and the prompt was telling Opus to end the body with `Best regards,` (English) or `ขอบคุณครับ/ค่ะ` (Thai). Two closing salutations in one email. The clean fix wasn't to detect-and-strip — it was to make the prompt unambiguous: "End the body with your final substantive sentence — usually the CTA itself. Do NOT add any closing line at all. NEVER write 'Best regards' or 'ขอบคุณครับ/ค่ะ' or any signature block. A complete signature including the closing salutation is appended automatically." Tone-shifting prompts to "do this, don't do that, here's why" is more reliable than tone-shifting them to "do this generally." Models follow specific prohibitions better than aesthetic guidelines.
+
+The signature visual fidelity was the meaty one. The original plain-text signature was a flat list of lines — nothing like the reference: yellow H+ logo block on the left, navy "HOTEL PLUS" wordmark on the right, role title, subtle subtitle, orange divider, linked contact info, address. To do this without setting up image hosting (the take-home doesn't ship a CDN), the signature became HTML — table-based for Outlook compat, all styles inline because mail clients strip `<style>` tags, and the H+ "logo" recreated typographically as a yellow-background table cell with bold black "H+" letters at 44pt. Pixel-perfect to the company's real logo would require the actual PNG; this typographic approximation reads as "H+ in a yellow square" which is 90% of the visual identity.
+
+The send path now branches on `looksLikeHtml(signature)`: HTML signatures flow verbatim into the HTML body part, and a tag-stripped version goes into the plain-text part for clients that don't render HTML. Plain text signatures get wrapped in `<pre>` for the HTML part to preserve newlines. The settings page got an inline HTML preview so the user sees the rendered signature without sending a test email. Same column on disk (`email_signature`), no migration — just smarter rendering.
+
+**The best fix for an inconsistent feature is to make one path do everything the right way, not to layer detection logic on top of a partial implementation.**
+
+---
+
+*43 cowork-log entries. Phase 3e is now QA-stable across English + Thai, with a real-looking signature.*
+
+---

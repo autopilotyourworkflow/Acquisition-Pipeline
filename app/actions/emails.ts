@@ -5,7 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { withAudit, computeRowHash } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
-import { sendEmail, markdownToEmailHtml, GmailSendError } from "@/lib/google/gmail";
+import {
+  sendEmail,
+  markdownToEmailHtml,
+  signatureToHtmlFragment,
+  htmlSignatureToPlain,
+  looksLikeHtml,
+  GmailSendError,
+} from "@/lib/google/gmail";
 
 /**
  * Server Actions for the `emails` table — cold-outreach send + signature
@@ -97,11 +104,31 @@ export async function sendColdEmail(input: {
     const signature = settings?.email_signature?.trim() || null;
 
     // ALWAYS append the signature when one is configured. The prompt no
-    // longer instructs Opus to include it, so we don't need a substring
-    // guard against duplication. If signature is null, the body goes out
-    // as-is (the model's sign-off line is the only close).
-    const finalBodyText = signature ? `${body}\n\n${signature}` : body;
-    const finalBodyHtml = markdownToEmailHtml(finalBodyText);
+    // longer instructs Opus to include it (the prompt forbids any closing
+    // line entirely), so we don't need a substring guard against duplication.
+    //
+    // Signature handling: detect whether the saved signature is HTML or
+    // plain text. The HTML body part keeps HTML verbatim (so the H+ logo
+    // block + linked contact info render correctly), while the plain-text
+    // body part derives a clean text version via tag-stripping.
+    const signatureIsHtml = signature ? looksLikeHtml(signature) : false;
+    const signaturePlain = signature
+      ? signatureIsHtml
+        ? htmlSignatureToPlain(signature)
+        : signature
+      : "";
+    const finalBodyText = signaturePlain
+      ? `${body}\n\n${signaturePlain}`
+      : body;
+    const bodyHtml = markdownToEmailHtml(body);
+    const finalBodyHtml = signature
+      ? bodyHtml.replace(
+          "</body>",
+          `<div style="margin-top:24px;border-top:1px solid #eee;padding-top:16px;">${signatureToHtmlFragment(
+            signature,
+          )}</div></body>`,
+        )
+      : bodyHtml;
 
     // If the caller passed an emailId, verify it belongs to this user
     // before relying on it as the update target. Defends against a hostile

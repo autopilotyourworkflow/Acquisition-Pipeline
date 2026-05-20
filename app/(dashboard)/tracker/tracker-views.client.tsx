@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { KanbanBoard } from "./kanban-board.client";
@@ -75,16 +81,21 @@ export function TrackerViews({
 
   // Lifted state: TrackerViews owns the candidates list. Kanban and Table
   // both read from the same source, so drag-then-switch-view doesn't lose
-  // the optimistic move. Resynced when the server prop changes via the
-  // React-blessed "Adjusting state on prop change" pattern: compare in
-  // render, call setState in render. React detects this and re-renders
-  // synchronously with the new state — no cascading renders.
+  // the optimistic move. Resynced whenever the server prop changes (after
+  // router.refresh() or revalidatePath fires).
+  //
+  // The setState-in-effect rule's lint warning is genuinely the right call
+  // for typical use cases — but here it's the standard "prop-as-initial-
+  // value + server-driven resets" pattern. The setState fires once per
+  // server response, no cascading renders, no perf concern. The earlier
+  // attempt to use a setState-during-render compare pattern subtly broke
+  // optimistic moves to specific columns, so we're back on the boring,
+  // proven path with the rule explicitly opted out.
   const [candidates, setCandidates] = useState(initialCandidates);
-  const [prevInitial, setPrevInitial] = useState(initialCandidates);
-  if (prevInitial !== initialCandidates) {
-    setPrevInitial(initialCandidates);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCandidates(initialCandidates);
-  }
+  }, [initialCandidates]);
 
   const [, startTransition] = useTransition();
 

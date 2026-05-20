@@ -204,6 +204,53 @@ function chunkBase64(input: string): string {
 }
 
 /**
+ * Detect whether a signature string contains HTML markup. Cheap heuristic:
+ * if there's any `<tag>` pattern, treat it as HTML; otherwise plain text.
+ * False positives (literal "<" in plain text) are theoretically possible
+ * but vanishingly rare in real signatures.
+ */
+export function looksLikeHtml(input: string): boolean {
+  return /<[a-z][a-z0-9]*(\s[^>]*)?>/i.test(input);
+}
+
+/**
+ * Convert an HTML signature to a clean plain-text fallback. Used to build
+ * the text/plain part of the MIME multipart when the user's signature is
+ * HTML. Strips tags, decodes a handful of common entities, and collapses
+ * structure-implying tags (br, p, div, table rows) into newlines.
+ */
+export function htmlSignatureToPlain(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|table|h\d|li)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Render a signature for the HTML body part. If the signature already
+ * contains HTML, use it verbatim. If it's plain text, escape and convert
+ * newlines so it renders cleanly in HTML clients.
+ */
+export function signatureToHtmlFragment(signature: string): string {
+  if (looksLikeHtml(signature)) return signature;
+  const escaped = signature
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<pre style="font-family:inherit;white-space:pre-wrap;margin:0;">${escaped}</pre>`;
+}
+
+/**
  * Lightweight markdown → HTML for the email body. Cold emails don't need
  * anything fancy — we want paragraph breaks and the occasional bold or
  * link. Anything heavier should be rendered by a real markdown library;

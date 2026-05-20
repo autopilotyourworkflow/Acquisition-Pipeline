@@ -380,8 +380,9 @@ export function ColdEmailDialog(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-2xl">
+        {/* Sticky header */}
+        <DialogHeader className="shrink-0 border-b border-sand-200 px-6 pb-4 pt-6 text-left">
           <DialogTitle>Draft cold email</DialogTitle>
           <DialogDescription>
             To <span className="font-medium text-navy">{candidate.full_name}</span>{" "}
@@ -389,6 +390,10 @@ export function ColdEmailDialog(props: Props) {
             <span className="font-medium text-navy">{jdTitle}</span>
           </DialogDescription>
         </DialogHeader>
+
+        {/* Scrollable middle. flex-1 + overflow-y-auto keeps the body
+            scrollable while the header + footer stay pinned. */}
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
 
         {/* Model + Language pickers */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -529,8 +534,11 @@ export function ColdEmailDialog(props: Props) {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2">
+        </div>
+        {/* /scrollable middle */}
+
+        {/* Sticky footer */}
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-sand-200 bg-warm-white px-6 py-4 sm:flex-row sm:justify-end sm:gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -654,7 +662,9 @@ function EditablePane({
         </p>
       </div>
 
-      {/* Signature preview — read-only, appended at send time */}
+      {/* Signature preview — read-only, appended at send time. Renders as
+          HTML when the saved signature is HTML so the H+ logo block +
+          divider preview accurately. Plain text falls back to <pre>. */}
       {signature ? (
         <div className="rounded-md border border-sand-200 bg-cream/40">
           <div className="flex items-center justify-between border-b border-sand-200 px-3 py-2">
@@ -671,9 +681,16 @@ function EditablePane({
               Edit →
             </Link>
           </div>
-          <pre className="whitespace-pre-wrap px-3 py-2 font-sans text-xs leading-relaxed text-charcoal">
-            {signature}
-          </pre>
+          {/<[a-z][a-z0-9]*(\s[^>]*)?>/i.test(signature) ? (
+            <div className="bg-white px-3 py-3">
+              {/* User's own saved HTML, rendered back to them. Trusted. */}
+              <div dangerouslySetInnerHTML={{ __html: signature }} />
+            </div>
+          ) : (
+            <pre className="whitespace-pre-wrap px-3 py-2 font-sans text-xs leading-relaxed text-charcoal">
+              {signature}
+            </pre>
+          )}
         </div>
       ) : (
         <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-charcoal">
