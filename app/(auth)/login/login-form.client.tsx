@@ -124,7 +124,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={pending || code.length < 6 || code.length > 8}
-          className="inline-flex h-11 w-full items-center justify-center rounded-md bg-terracotta px-6 text-sm font-medium text-cream shadow-xs transition-colors hover:bg-terracotta-700 disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center rounded bg-yellow px-6 text-sm font-semibold text-black shadow-xs transition-[filter] hover:brightness-95 disabled:opacity-50"
         >
           {pending ? "Verifying…" : "Continue"}
         </button>
@@ -188,7 +188,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={pending || !email}
-          className="inline-flex h-11 w-full items-center justify-center rounded-md bg-navy px-6 text-sm font-medium text-cream shadow-xs transition-colors hover:bg-navy-soft disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center rounded bg-yellow px-6 text-sm font-semibold text-black shadow-xs transition-[filter] hover:brightness-95 disabled:opacity-50"
         >
           {pending ? "Sending…" : "Email me a sign-in code"}
         </button>

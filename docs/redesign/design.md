@@ -49,16 +49,17 @@ Stored as HSL strings so they slot directly into Tailwind v4's `@theme inline` b
 
 ### Stage badge palette
 
-Funnel-stage colors are intentionally chosen *within* the Hotel Plus palette to preserve scannability. Don't introduce off-brand colors here.
+The Postgres `candidate_stage` enum has 8 values (see [lib/db/enums.ts](../../lib/db/enums.ts)). Funnel-stage colors are chosen *within* the Hotel Plus palette as a saturation ramp across the active stages, with a clean visual narrative: cool entry → warming yellows → inverted black-on-yellow for offer → bold yellow for hired → desaturated for rejected.
 
-| Stage | Background | Text | Border | Note |
+| Stage | Background | Text | Border | Visual logic |
 |---|---|---|---|---|
-| `sourced` | `--off-white` | `--gray` | `--soft-gray` | Neutral entry (just discovered) |
-| `applied` (a.k.a. "Applied / Contacted") | `--yellow-pale` | `--black` | `--yellow` | Warm, in-flight |
-| `screening` | `--yellow-tint` | `--black` | `--yellow` | Progressing |
-| `interview` | `--yellow` | `--black` | `--black` | Active focus — full yellow chip |
-| `offer` | `--black` | `--yellow` | `--black` | Inverted — terminal positive |
-| `hired` | `--white` | `--black` | `--black` + `ring-2 ring-yellow` | Success — bordered with yellow ring |
+| `sourced` | `--off-white` | `--gray` | `--soft-gray` | Quiet entry — not engaged yet |
+| `applied` (a.k.a. "Applied / Contacted") | `--yellow-pale` | `--black` | `--soft-gray` | Warm, in-flight |
+| `screening` | `--yellow-tint` | `--black` | `--soft-gray` | Heating up |
+| `prescreen_call` | `--yellow-tint` | `--black` | `--yellow` | Active — prescreen scheduled (yellow border = action) |
+| `first_interview` | `--yellow` | `--black` | `--yellow` | Active — first interview (full yellow chip) |
+| `offer` | `--black` | `--yellow` | `--black` | Inverted — terminal pending |
+| `hired` | `--yellow` | `--black` (semibold) | `--black` | Terminal positive — yellow chip with bold black ring |
 | `rejected` | `--soft-gray` | `--gray` | `--soft-gray` | Deactivated |
 
 ### Source badge palette

@@ -20,16 +20,17 @@ type StageDef = {
   text: string;
   border: string;
   label: string;
-  ring?: string;
+  bold?: boolean;
 };
 
 const STAGES: StageDef[] = [
   { stage: "sourced", bg: "#F8F8F8", text: "#707070", border: "#EEEEEE", label: "Sourced" },
-  { stage: "applied", bg: "#FFF1B8", text: "#000000", border: "#FFD52B", label: "Applied / Contacted" },
-  { stage: "screening", bg: "#FFEA95", text: "#000000", border: "#FFD52B", label: "Screening" },
-  { stage: "interview", bg: "#FFD52B", text: "#000000", border: "#000000", label: "Interview" },
+  { stage: "applied", bg: "#FFF1B8", text: "#000000", border: "#EEEEEE", label: "Applied / Contacted" },
+  { stage: "screening", bg: "#FFEA95", text: "#000000", border: "#EEEEEE", label: "Screening" },
+  { stage: "prescreen_call", bg: "#FFEA95", text: "#000000", border: "#FFD52B", label: "Prescreen Call" },
+  { stage: "first_interview", bg: "#FFD52B", text: "#000000", border: "#FFD52B", label: "First Interview" },
   { stage: "offer", bg: "#000000", text: "#FFD52B", border: "#000000", label: "Offer" },
-  { stage: "hired", bg: "#FFFFFF", text: "#000000", border: "#000000", label: "Hired", ring: "#FFD52B" },
+  { stage: "hired", bg: "#FFD52B", text: "#000000", border: "#000000", label: "Hired", bold: true },
   { stage: "rejected", bg: "#EEEEEE", text: "#707070", border: "#EEEEEE", label: "Rejected" },
 ];
 
@@ -111,13 +112,13 @@ export default function DesignSystemPage() {
           {STAGES.map((s) => (
             <span
               key={s.stage}
-              className="inline-flex items-center px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+              className="inline-flex items-center px-3 py-1 text-xs uppercase tracking-wide"
               style={{
                 backgroundColor: s.bg,
                 color: s.text,
                 border: `1px solid ${s.border}`,
                 borderRadius: "2px",
-                ...(s.ring ? { boxShadow: `0 0 0 2px ${s.ring}` } : null),
+                fontWeight: s.bold ? 600 : 500,
               }}
             >
               {s.label}
@@ -125,9 +126,11 @@ export default function DesignSystemPage() {
           ))}
         </div>
         <p className="mt-4 max-w-prose text-sm text-[color:var(--ds-gray)]">
-          Sourced is intentionally subdued — it&apos;s entry, not yet engaged. Applied/Screening/Interview
-          escalate yellow saturation. Offer inverts to black-on-yellow (terminal positive). Hired is white
-          with a yellow ring (success without screaming). Rejected is fully gray (deactivated).
+          Sourced is intentionally subdued — entry, not yet engaged. Applied through First Interview
+          ramp yellow saturation across the active pipeline. Prescreen Call adds a yellow border to
+          signal &quot;action scheduled.&quot; Offer inverts to black-on-yellow (terminal pending). Hired
+          stays yellow but gets a bold black ring + heavier weight (terminal positive). Rejected is
+          fully gray (deactivated).
         </p>
       </Section>
 

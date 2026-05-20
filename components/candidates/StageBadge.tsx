@@ -1,18 +1,19 @@
 import { STAGE_LABELS, type CandidateStage } from "@/lib/db/enums";
 import { cn } from "@/lib/utils";
 
+// Funnel-stage palette inside the Hotel Plus register (yellow + black + grays).
+// Visual narrative: cool entry → yellow saturation ramps across the active stages
+// → inverted black-on-yellow for offer (terminal pending) → bold yellow for hired
+// → desaturated gray for rejected. Order encodes progress at a glance.
 const STAGE_CLASSES: Record<CandidateStage, string> = {
-  // Sourced reads as "passive / untouched" — cooler/quieter than Applied's
-  // warm sand. Navy/10 keeps it on-brand without competing with the action
-  // colors downstream (offer, hired, rejected).
-  sourced: "bg-navy/10 text-navy",
-  applied: "bg-sand-100 text-charcoal",
-  screening: "bg-info/10 text-info",
-  prescreen_call: "bg-info/15 text-info",
-  first_interview: "bg-warning/15 text-warning",
-  offer: "bg-terracotta-50 text-terracotta-700",
-  hired: "bg-success/15 text-success",
-  rejected: "bg-danger/10 text-danger",
+  sourced: "bg-off-white text-gray border border-soft-gray",
+  applied: "bg-yellow-pale text-black border border-soft-gray",
+  screening: "bg-yellow-tint text-black border border-soft-gray",
+  prescreen_call: "bg-yellow-tint text-black border border-yellow",
+  first_interview: "bg-yellow text-black border border-yellow",
+  offer: "bg-black text-yellow border border-black",
+  hired: "bg-yellow text-black border border-black font-semibold",
+  rejected: "bg-soft-gray text-gray border border-soft-gray",
 };
 
 export function StageBadge({

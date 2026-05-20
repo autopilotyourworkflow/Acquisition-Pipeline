@@ -9,8 +9,8 @@ import { formatConflictRange, type Conflict } from "@/hooks/use-conflict-check";
  * a low-key "Checking your calendar…" line — gives the user immediate
  * feedback during the ~300-500ms Google API round-trip.
  *
- * Visual: terracotta-tinted card. Brand-aligned with the warning surfaces
- * already used elsewhere (scoring failures, integration errors).
+ * Visual: yellow-pale tint with a black border. Brand-faithful — Hotel
+ * Plus uses yellow as its attention color, not red/orange.
  */
 export function ConflictWarning({
   conflicts,
@@ -25,7 +25,7 @@ export function ConflictWarning({
   if (conflicts.length === 0 && checking) {
     return (
       <p
-        className={`text-[11px] text-slate-mid ${className ?? ""}`}
+        className={`text-[11px] text-gray ${className ?? ""}`}
         role="status"
         aria-live="polite"
       >
@@ -35,14 +35,14 @@ export function ConflictWarning({
   }
   return (
     <div
-      className={`rounded-md border border-terracotta/40 bg-terracotta/10 px-4 py-3 ${className ?? ""}`}
+      className={`rounded border border-black bg-yellow-pale px-4 py-3 ${className ?? ""}`}
       role="status"
       aria-live="polite"
     >
-      <p className="text-sm font-medium text-terracotta">
+      <p className="text-sm font-semibold text-black">
         ⚠ Conflict on your calendar
       </p>
-      <ul className="mt-1.5 space-y-0.5 text-xs text-charcoal">
+      <ul className="mt-1.5 space-y-0.5 text-xs text-black">
         {conflicts.map((c, i) => (
           <li key={`${c.start}-${c.end}-${i}`}>
             {c.summary ? `${c.summary} — ` : ""}
@@ -50,7 +50,7 @@ export function ConflictWarning({
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[11px] text-slate-mid">
+      <p className="mt-2 text-[11px] text-gray">
         You can still book over this — Hotel Plus calendars often hold buffer
         blocks that are fine to overlap.
       </p>
