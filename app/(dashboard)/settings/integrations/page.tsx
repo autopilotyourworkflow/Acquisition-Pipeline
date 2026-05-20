@@ -4,19 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { ApiKeysPanel } from "./api-keys.client";
-import { BookmarkletPanel } from "./bookmarklet-panel.client";
-import { EmailDefaultsPanel } from "./email-defaults.client";
-
-function getAppBaseUrl(): string {
-  // Resolves to the deployed origin in prod (set in Vercel as
-  // NEXT_PUBLIC_APP_URL or VERCEL_URL). Falls back to the production
-  // domain so the bookmarklet always targets a real endpoint.
-  const env =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "https://acq.autopilotyourworkflow.com";
-  return env.replace(/\/$/, "");
-}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Integrations · Settings · Acquisition" };
@@ -48,18 +35,23 @@ const ROWS: ScopeRow[] = [
     key: "gmail_compose",
     title: "Gmail · Compose drafts",
     description:
-      "Draft cold-outreach emails into your Drafts folder so you can review before sending. Phase 4.",
+      "Draft cold-outreach emails into your Drafts folder so you can review before sending.",
     scopes: [SCOPES.gmailCompose],
   },
   {
     key: "gmail_send",
     title: "Gmail · Send",
     description:
-      "Send emails directly on your behalf. Only used when you click Send in-app. Phase 4.",
+      "Send emails directly on your behalf. Only used when you click Send in-app.",
     scopes: [SCOPES.gmailSend],
   },
 ];
 
+/**
+ * Third-party API integration status. Email composer settings + the
+ * capture bookmarklet moved to their own pages — this page now sticks
+ * to its lane: API connections (Google OAuth + paid-service keys).
+ */
 export default async function IntegrationsPage() {
   const supabase = await createClient();
   const {
@@ -67,8 +59,6 @@ export default async function IntegrationsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // oauth_tokens has owner-only RLS — read it via admin client so the page
-  // works regardless of how the JWT is plumbed through server context.
   const admin = createAdminClient();
   const [{ data: tokenRow }, { data: settingsRow }] = await Promise.all([
     admin
@@ -80,7 +70,7 @@ export default async function IntegrationsPage() {
     admin
       .from("user_settings")
       .select(
-        "proxycurl_api_key_encrypted, apify_api_token_encrypted, bookmarklet_token, email_signature, email_from_name, updated_at",
+        "proxycurl_api_key_encrypted, apify_api_token_encrypted, updated_at",
       )
       .eq("user_id", user.id)
       .maybeSingle(),
@@ -115,7 +105,8 @@ export default async function IntegrationsPage() {
           Integrations
         </h1>
         <p className="mt-1 text-sm text-charcoal">
-          Per-scope status for the Google APIs this app uses.
+          Connect this app to Google (Calendar, Gmail) and the paid services
+          that power outbound sourcing.
         </p>
       </div>
 
@@ -138,66 +129,60 @@ export default async function IntegrationsPage() {
         </div>
       )}
 
-      <ul className="space-y-2">
-        {ROWS.map((row) => {
-          const hasAll = row.scopes.every((s) => granted.has(s));
-          return (
-            <li
-              key={row.key}
-              className="flex flex-col gap-2 rounded-md border border-sand-200 bg-warm-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium text-navy">{row.title}</p>
-                <p className="mt-1 text-xs text-charcoal">{row.description}</p>
-              </div>
-              <div>
-                {hasAll ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-sm bg-success/10 px-2 py-1 text-xs font-medium text-success">
-                    <span aria-hidden>✓</span> Granted
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-sm bg-warning/15 px-2 py-1 text-xs font-medium text-warning">
-                    Not granted
-                  </span>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <section className="space-y-2">
+        <h2 className="font-display text-xl text-navy">Google APIs</h2>
+        <ul className="space-y-2">
+          {ROWS.map((row) => {
+            const hasAll = row.scopes.every((s) => granted.has(s));
+            return (
+              <li
+                key={row.key}
+                className="flex flex-col gap-2 rounded-md border border-sand-200 bg-warm-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium text-navy">{row.title}</p>
+                  <p className="mt-1 text-xs text-charcoal">{row.description}</p>
+                </div>
+                <div>
+                  {hasAll ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-sm bg-success/10 px-2 py-1 text-xs font-medium text-success">
+                      <span aria-hidden>✓</span> Granted
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-sm bg-warning/15 px-2 py-1 text-xs font-medium text-warning">
+                      Not granted
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
 
-      {tokenRow && (
-        <div className="rounded-md border border-sand-200 bg-cream/40 px-4 py-3 text-xs text-charcoal">
-          <p>
-            <span className="text-slate-deep">Token last refreshed:</span>{" "}
-            <span className="font-mono">
-              {new Date(
-                (tokenRow.updated_at as string) ?? (tokenRow.expires_at as string),
-              ).toLocaleString("en-GB", {
-                timeZone: "Asia/Bangkok",
-                hour12: false,
-              })}
-            </span>
-          </p>
-          <p className="mt-1 text-slate-mid">
-            Missing a scope? Sign out + sign back in with Google to re-trigger
-            the consent screen. We never store more than what you grant.
-          </p>
-        </div>
-      )}
+        {tokenRow && (
+          <div className="rounded-md border border-sand-200 bg-cream/40 px-4 py-3 text-xs text-charcoal">
+            <p>
+              <span className="text-slate-deep">Token last refreshed:</span>{" "}
+              <span className="font-mono">
+                {new Date(
+                  (tokenRow.updated_at as string) ??
+                    (tokenRow.expires_at as string),
+                ).toLocaleString("en-GB", {
+                  timeZone: "Asia/Bangkok",
+                  hour12: false,
+                })}
+              </span>
+            </p>
+            <p className="mt-1 text-slate-mid">
+              Missing a scope? Sign out + sign back in with Google to
+              re-trigger the consent screen. We never store more than what
+              you grant.
+            </p>
+          </div>
+        )}
+      </section>
 
       <ApiKeysPanel status={apiKeyStatus} />
-
-      <EmailDefaultsPanel
-        initialSignature={(settingsRow?.email_signature as string | null) ?? null}
-        initialFromName={(settingsRow?.email_from_name as string | null) ?? null}
-      />
-
-      <BookmarkletPanel
-        hasToken={Boolean(settingsRow?.bookmarklet_token)}
-        initialToken={null}
-        apiBase={getAppBaseUrl()}
-      />
     </div>
   );
 }

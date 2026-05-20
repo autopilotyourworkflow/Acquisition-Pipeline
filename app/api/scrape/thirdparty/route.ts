@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the API key from request or from user_settings
-    let proxycurlKey = apiKey;
+    const proxycurlKey = apiKey;
     if (!proxycurlKey) {
       const supabase = await createClient();
       const {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
             );
           }
 
-          const profileData = await proxycurlResponse.json();
+          const profileData = (await proxycurlResponse.json()) as ProxycurlData;
 
           emit("scrape_progress", { status: "normalizing" });
 
@@ -123,38 +123,67 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function formatProxycurlData(data: any): string {
+/**
+ * Proxycurl returns a richly-nested JSON object whose schema isn't strictly
+ * versioned; we treat it as a loose record and read the few fields we care
+ * about defensively. Strong typing here would be aspirational — the cost
+ * of getting it wrong is "one row in the email field stays blank."
+ */
+type ProxycurlData = Record<string, unknown>;
+
+function formatProxycurlData(data: ProxycurlData): string {
   const lines: string[] = [];
+  const str = (k: string): string | undefined =>
+    typeof data[k] === "string" ? (data[k] as string) : undefined;
+  const arr = (k: string): unknown[] | undefined =>
+    Array.isArray(data[k]) ? (data[k] as unknown[]) : undefined;
 
-  if (data.full_name) lines.push(`Full Name: ${data.full_name}`);
-  if (data.email) lines.push(`Email: ${data.email}`);
-  if (data.phone_number) lines.push(`Phone: ${data.phone_number}`);
-  if (data.headline) lines.push(`Current Title: ${data.headline}`);
-  if (data.location) lines.push(`Location: ${data.location}`);
-  if (data.profile_pic_url) lines.push(`Profile Picture: ${data.profile_pic_url}`);
+  if (str("full_name")) lines.push(`Full Name: ${str("full_name")}`);
+  if (str("email")) lines.push(`Email: ${str("email")}`);
+  if (str("phone_number")) lines.push(`Phone: ${str("phone_number")}`);
+  if (str("headline")) lines.push(`Current Title: ${str("headline")}`);
+  if (str("location")) lines.push(`Location: ${str("location")}`);
+  if (str("profile_pic_url"))
+    lines.push(`Profile Picture: ${str("profile_pic_url")}`);
 
-  if (data.skills && Array.isArray(data.skills)) {
-    lines.push(`\nSkills:\n${data.skills.map((s: any) => `- ${s.name}`).join("\n")}`);
+  const skills = arr("skills");
+  if (skills) {
+    lines.push(
+      `\nSkills:\n${skills
+        .map((s) =>
+          typeof s === "object" && s !== null && "name" in s
+            ? `- ${(s as { name: string }).name}`
+            : `- ${String(s)}`,
+        )
+        .join("\n")}`,
+    );
   }
 
-  if (data.experiences && Array.isArray(data.experiences)) {
+  const experiences = arr("experiences");
+  if (experiences) {
     lines.push(`\nWork Experience:`);
-    for (const exp of data.experiences) {
-      lines.push(`\nCompany: ${exp.company || "Unknown"}`);
+    for (const raw of experiences) {
+      const exp = raw as Record<string, unknown>;
+      lines.push(`\nCompany: ${(exp.company as string) || "Unknown"}`);
       if (exp.title) lines.push(`Title: ${exp.title}`);
-      if (exp.starts_at) lines.push(`Start: ${exp.starts_at.date}`);
-      if (exp.ends_at) lines.push(`End: ${exp.ends_at.date}`);
+      const sa = exp.starts_at as { date?: string } | undefined;
+      const ea = exp.ends_at as { date?: string } | undefined;
+      if (sa?.date) lines.push(`Start: ${sa.date}`);
+      if (ea?.date) lines.push(`End: ${ea.date}`);
       if (exp.description) lines.push(`Description: ${exp.description}`);
     }
   }
 
-  if (data.education && Array.isArray(data.education)) {
+  const education = arr("education");
+  if (education) {
     lines.push(`\nEducation:`);
-    for (const edu of data.education) {
-      lines.push(`\nInstitution: ${edu.school || "Unknown"}`);
+    for (const raw of education) {
+      const edu = raw as Record<string, unknown>;
+      lines.push(`\nInstitution: ${(edu.school as string) || "Unknown"}`);
       if (edu.degree_name) lines.push(`Degree: ${edu.degree_name}`);
       if (edu.field_of_study) lines.push(`Field: ${edu.field_of_study}`);
-      if (edu.ends_at) lines.push(`Graduation: ${edu.ends_at.date}`);
+      const ea = edu.ends_at as { date?: string } | undefined;
+      if (ea?.date) lines.push(`Graduation: ${ea.date}`);
     }
   }
 

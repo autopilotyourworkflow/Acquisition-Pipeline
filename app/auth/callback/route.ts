@@ -31,9 +31,15 @@ export async function GET(request: NextRequest) {
 
   if (data.session?.user?.id) {
     try {
-      const session = data.session as any;
-      const providerToken: string | null | undefined = session.provider_token;
-      const providerRefreshToken: string | null | undefined = session.provider_refresh_token;
+      // supabase-js's Session type doesn't expose `provider_token` /
+      // `provider_refresh_token` (they're populated on the OAuth callback
+      // only). Cast to the narrower shape we actually need.
+      const session = data.session as typeof data.session & {
+        provider_token?: string | null;
+        provider_refresh_token?: string | null;
+      };
+      const providerToken = session.provider_token;
+      const providerRefreshToken = session.provider_refresh_token;
 
       console.log("[auth/callback] user.id:", data.session.user.id);
       console.log("[auth/callback] provider_token present:", !!providerToken);

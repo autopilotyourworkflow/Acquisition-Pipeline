@@ -89,7 +89,7 @@ Format your response as plain text with clear sections.`,
           // Extract the text from the vision response
           const visionText = visionResponse.content
             .filter((block) => block.type === "text")
-            .map((block) => (block as any).text)
+            .map((block) => (block as { type: "text"; text: string }).text)
             .join("\n");
 
           emit("scrape_progress", { status: "normalizing" });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -226,7 +227,7 @@ export function ScreenerShell({
           Scoring is candidate-against-JD. Create your first JD to define the role.
         </p>
         <Button asChild className="mt-4">
-          <a href="/jds/new">Create a JD</a>
+          <Link href="/jds/new">Create a JD</Link>
         </Button>
       </div>
     );

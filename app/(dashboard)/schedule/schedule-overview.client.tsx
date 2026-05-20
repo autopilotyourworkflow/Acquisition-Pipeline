@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ScheduleXCalendar, useNextCalendarApp } from "@schedule-x/react";
@@ -317,8 +324,12 @@ function InterviewsList({
   interviews: OverviewInterview[];
 }) {
   const router = useRouter();
-  // Sort: upcoming first (ascending), then past (descending).
-  const now = Date.now();
+  // Sort: upcoming first (ascending), then past (descending). `now` is
+  // captured once at mount via lazy useState init so React's purity rule
+  // isn't tripped by Date.now() calls in render; the partition stays
+  // stable for the lifetime of this component (acceptable — a fresh
+  // page navigation re-mounts it).
+  const [now] = useState(() => Date.now());
   const sorted = useMemo(() => {
     const upcoming: OverviewInterview[] = [];
     const past: OverviewInterview[] = [];
@@ -455,30 +466,43 @@ function CalendarWithContextMenu({
   // Active Schedule-X view ("month-grid" | "week" | "day" | "month-agenda" |
   // "list"). Drives the data-view attr on the wrapper, which lets CSS
   // target view-specific styling (week-only layout reorder, week-only
-  // time-fade-on-hover, etc.).
-  const [currentView, setCurrentView] = useState<string>("month-grid");
-
-  useEffect(() => {
-    if (!calendarApp) return;
-    // Schedule-X v2 doesn't expose `calendarState` publicly on the
-    // CalendarApp type — it's only on the internal `$app` (private in TS,
-    // public at runtime). Cast through `unknown` to reach the view signal.
-    // The shape is stable across the v2 line.
-    const internal = calendarApp as unknown as {
-      $app?: {
-        calendarState?: {
-          view?: {
-            value: string;
-            subscribe: (cb: (v: string) => void) => () => void;
-          };
+  // time-fade-on-hover, etc.). Wired via useSyncExternalStore because the
+  // view lives in Schedule-X's internal signal — using its subscribe API
+  // through React's blessed external-state hook avoids the setState-in-
+  // effect pattern.
+  type SxInternal = {
+    $app?: {
+      calendarState?: {
+        view?: {
+          value: string;
+          subscribe: (cb: (v: string) => void) => () => void;
         };
       };
     };
-    const viewSignal = internal.$app?.calendarState?.view;
-    if (!viewSignal) return;
-    setCurrentView(viewSignal.value);
-    return viewSignal.subscribe((v) => setCurrentView(v));
+  };
+  const subscribeSxView = useCallback(
+    (callback: () => void) => {
+      if (!calendarApp) return () => {};
+      const internal = calendarApp as unknown as SxInternal;
+      const viewSignal = internal.$app?.calendarState?.view;
+      if (!viewSignal) return () => {};
+      // Schedule-X's subscribe passes the new value; React only needs the
+      // change signal — it'll re-read via getSnapshot below.
+      return viewSignal.subscribe(() => callback());
+    },
+    [calendarApp],
+  );
+  const getSxView = useCallback((): string => {
+    if (!calendarApp) return "month-grid";
+    const internal = calendarApp as unknown as SxInternal;
+    return internal.$app?.calendarState?.view?.value ?? "month-grid";
   }, [calendarApp]);
+  const getSxViewServer = useCallback((): string => "month-grid", []);
+  const currentView = useSyncExternalStore(
+    subscribeSxView,
+    getSxView,
+    getSxViewServer,
+  );
 
   // Mark event elements whose title actually overflows their chip so CSS can
   // marquee-scroll ONLY those on hover. Short titles that already fit stay
@@ -532,19 +556,15 @@ function CalendarWithContextMenu({
   }, [interviews, currentView]);
 
   // Reschedule dialog state — pre-filled from the selected interview each
-  // time the dialog opens.
+  // time a new reschedule target is set. Uses the React-blessed "Adjusting
+  // state on prop change" pattern (compare in render, setState in render)
+  // rather than a useEffect that calls setState in its body.
   const [whenAt, setWhenAt] = useState("");
   const [durationMin, setDurationMin] = useState<number>(30);
-
-  // Conflict check only runs while the reschedule dialog is open.
-  const { conflicts: rescheduleConflicts, checking: rescheduleChecking } =
-    useConflictCheck({
-      whenAt,
-      durationMin,
-      enabled: !!reschedule,
-    });
-
-  useEffect(() => {
+  const [prevRescheduleId, setPrevRescheduleId] = useState<string | null>(null);
+  const rescheduleId = reschedule?.id ?? null;
+  if (prevRescheduleId !== rescheduleId) {
+    setPrevRescheduleId(rescheduleId);
     if (reschedule) {
       setWhenAt(isoToLocalInput(reschedule.startsAt));
       const dur = Math.max(
@@ -557,7 +577,15 @@ function CalendarWithContextMenu({
       );
       setDurationMin(dur);
     }
-  }, [reschedule]);
+  }
+
+  // Conflict check only runs while the reschedule dialog is open.
+  const { conflicts: rescheduleConflicts, checking: rescheduleChecking } =
+    useConflictCheck({
+      whenAt,
+      durationMin,
+      enabled: !!reschedule,
+    });
 
   useEffect(() => {
     const el = wrapperRef.current;

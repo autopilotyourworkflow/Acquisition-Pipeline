@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { KanbanBoard } from "./kanban-board.client";
@@ -19,6 +19,42 @@ type CandidateWithJd = CandidateRow & {
   latest_score: number | null;
 };
 
+/**
+ * Track the view preference in localStorage with SSR-safe hydration.
+ * `useSyncExternalStore` is the React 19 blessed way to integrate with
+ * external state — its `getServerSnapshot` argument keeps SSR + client
+ * first render in lockstep (both return 'table'), avoiding the hydration
+ * mismatch that a `useState(() => readLocalStorage())` would risk.
+ *
+ * The subscribe callback listens for both cross-tab `storage` events
+ * AND a custom `tracker-view-changed` event we dispatch ourselves on
+ * same-tab writes — same-tab `setItem` does NOT fire the native event.
+ */
+function subscribeView(callback: () => void): () => void {
+  window.addEventListener("storage", callback);
+  window.addEventListener("tracker-view-changed", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("tracker-view-changed", callback);
+  };
+}
+function readView(): ViewKey {
+  try {
+    const v = window.localStorage.getItem(LS_KEY);
+    return v === "kanban" ? "kanban" : "table";
+  } catch {
+    return "table";
+  }
+}
+function writeView(next: ViewKey): void {
+  try {
+    window.localStorage.setItem(LS_KEY, next);
+    window.dispatchEvent(new Event("tracker-view-changed"));
+  } catch {
+    // ignore
+  }
+}
+
 export function TrackerViews({
   candidates: initialCandidates,
   jds,
@@ -30,38 +66,27 @@ export function TrackerViews({
   // Default to table — denser information display for a recruiting team that
   // mostly scans names + stages. Kanban is one click away and persists in
   // localStorage once chosen.
-  const [view, setView] = useState<ViewKey>("table");
-  const [hydrated, setHydrated] = useState(false);
+  const view = useSyncExternalStore(
+    subscribeView,
+    readView,
+    () => "table" as ViewKey,
+  );
+  const setView = useCallback((next: ViewKey) => writeView(next), []);
 
   // Lifted state: TrackerViews owns the candidates list. Kanban and Table
   // both read from the same source, so drag-then-switch-view doesn't lose
-  // the optimistic move. Resynced whenever the server prop changes (after
-  // a router.refresh() or revalidatePath fires).
+  // the optimistic move. Resynced when the server prop changes via the
+  // React-blessed "Adjusting state on prop change" pattern: compare in
+  // render, call setState in render. React detects this and re-renders
+  // synchronously with the new state — no cascading renders.
   const [candidates, setCandidates] = useState(initialCandidates);
-  useEffect(() => {
+  const [prevInitial, setPrevInitial] = useState(initialCandidates);
+  if (prevInitial !== initialCandidates) {
+    setPrevInitial(initialCandidates);
     setCandidates(initialCandidates);
-  }, [initialCandidates]);
+  }
 
   const [, startTransition] = useTransition();
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(LS_KEY);
-      if (stored === "table" || stored === "kanban") setView(stored);
-    } catch {
-      // ignore
-    }
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(LS_KEY, view);
-    } catch {
-      // ignore
-    }
-  }, [view, hydrated]);
 
   const moveCandidateStage = useCallback(
     (candidateId: string, nextStage: CandidateStage) => {
@@ -135,7 +160,6 @@ export function TrackerViews({
       ) : view === "kanban" ? (
         <KanbanBoard
           candidates={candidates}
-          jds={jds}
           onMove={moveCandidateStage}
         />
       ) : (

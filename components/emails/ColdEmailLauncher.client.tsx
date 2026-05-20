@@ -29,6 +29,8 @@ type Props = {
   jdTitle: string | null;
   hasGmailSend: boolean;
   pastEmails: PastEmail[];
+  /** User's saved signature — passed through to the dialog's preview. */
+  signature: string | null;
 };
 
 export function ColdEmailLauncher({
@@ -37,6 +39,7 @@ export function ColdEmailLauncher({
   jdTitle,
   hasGmailSend,
   pastEmails,
+  signature,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -100,6 +103,7 @@ export function ColdEmailLauncher({
           jdId={jdId}
           jdTitle={jdTitle}
           initialPastEmails={pastEmails}
+          signature={signature}
         />
       )}
     </>

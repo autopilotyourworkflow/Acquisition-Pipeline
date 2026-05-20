@@ -96,7 +96,6 @@ export async function POST(req: NextRequest) {
     { data: candidate, error: cErr },
     { data: jd, error: jErr },
     { data: latestScore },
-    { data: userSettings },
   ] = await Promise.all([
     supabase
       .from("candidates")
@@ -115,11 +114,6 @@ export async function POST(req: NextRequest) {
       .eq("jd_id", body.jdId)
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle(),
-    createAdminClient()
-      .from("user_settings")
-      .select("email_signature, email_from_name")
-      .eq("user_id", user.id)
       .maybeSingle(),
   ]);
 
@@ -158,8 +152,6 @@ export async function POST(req: NextRequest) {
     jd: jdRow,
     candidate: candidateRow,
     score: (latestScore as ScoreRow | null) ?? null,
-    fromName: userSettings?.email_from_name ?? null,
-    signature: userSettings?.email_signature ?? null,
     targetLanguage,
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -73,6 +74,13 @@ type Props = {
   jdId: string;
   jdTitle: string;
   initialPastEmails: PastEmail[];
+  /**
+   * The user's saved signature (from /settings/email-composer). Shown
+   * as a read-only preview block below the body editor so the user can
+   * see what will be appended at send time. Null when nothing's
+   * configured — dialog surfaces a setup prompt instead.
+   */
+  signature: string | null;
 };
 
 const MODEL_OPTIONS: { value: ModelChoice; label: string }[] = [
@@ -130,7 +138,7 @@ function extractPartialField(raw: string, field: string): string | null {
 }
 
 export function ColdEmailDialog(props: Props) {
-  const { open, onOpenChange, candidate, jdId, jdTitle, initialPastEmails } = props;
+  const { open, onOpenChange, candidate, jdId, jdTitle, initialPastEmails, signature } = props;
   const router = useRouter();
   const [pastEmails, setPastEmails] = useState<PastEmail[]>(initialPastEmails);
   const [mode, setMode] = useState<Mode>(
@@ -508,6 +516,7 @@ export function ColdEmailDialog(props: Props) {
             setBody={setBody}
             rationale={rationale}
             sending={sending}
+            signature={signature}
           />
         )}
 
@@ -605,6 +614,7 @@ function EditablePane({
   setBody,
   rationale,
   sending,
+  signature,
 }: {
   subject: string;
   setSubject: (s: string) => void;
@@ -612,6 +622,7 @@ function EditablePane({
   setBody: (s: string) => void;
   rationale: string;
   sending: boolean;
+  signature: string | null;
 }) {
   return (
     <div className="space-y-3">
@@ -633,16 +644,53 @@ function EditablePane({
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          rows={12}
+          rows={10}
           maxLength={4000}
           disabled={sending}
           className="font-sans text-sm leading-relaxed"
         />
         <p className="mt-1 text-[10px] text-slate-mid">
-          Edits stay client-side until you click Send. Your signature (if set
-          in Settings → Integrations) is appended automatically when sent.
+          Edits stay client-side until you click Send.
         </p>
       </div>
+
+      {/* Signature preview — read-only, appended at send time */}
+      {signature ? (
+        <div className="rounded-md border border-sand-200 bg-cream/40">
+          <div className="flex items-center justify-between border-b border-sand-200 px-3 py-2">
+            <p className="text-[11px] uppercase tracking-wide text-slate-deep">
+              Signature{" "}
+              <span className="text-slate-mid normal-case">
+                · appended automatically
+              </span>
+            </p>
+            <Link
+              href="/settings/email-composer"
+              className="text-[11px] text-terracotta-700 underline-offset-2 hover:underline"
+            >
+              Edit →
+            </Link>
+          </div>
+          <pre className="whitespace-pre-wrap px-3 py-2 font-sans text-xs leading-relaxed text-charcoal">
+            {signature}
+          </pre>
+        </div>
+      ) : (
+        <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-charcoal">
+          <p>
+            <strong>No signature configured.</strong> The email will go out
+            with just the body. Set one up at{" "}
+            <Link
+              href="/settings/email-composer"
+              className="text-terracotta-700 underline-offset-2 hover:underline"
+            >
+              Settings → Email composer
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+
       {rationale && (
         <details className="rounded-md border border-sand-200 bg-cream/40">
           <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-navy">

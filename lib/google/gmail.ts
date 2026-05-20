@@ -79,11 +79,55 @@ function sanitizeHeader(value: string): string {
 }
 
 /**
+ * RFC 2047 "encoded-word" encoder for header values that contain non-ASCII
+ * characters. RFC 2822 headers are defined as US-ASCII only; non-ASCII
+ * bytes in a Subject or From header are undefined behavior and mail
+ * clients typically display them as mojibake (the raw UTF-8 bytes get
+ * misinterpreted as Latin-1, then re-decoded as UTF-8 = double-encoding).
+ *
+ * Format: `=?UTF-8?B?<base64 of UTF-8 bytes>?=`. ASCII-only values pass
+ * through unchanged so the common case stays human-readable.
+ *
+ * Note: very long headers should technically be split into multiple
+ * encoded-word chunks per RFC 2047 (max 75 chars per chunk). Subject
+ * lines for our cold-email use case stay under 200 chars and Gmail
+ * accepts a single long chunk in practice, so we don't bother splitting.
+ */
+function encodeMimeHeaderValue(value: string): string {
+  const sanitized = sanitizeHeader(value);
+  // ASCII-only? Pass through.
+  if (/^[\x20-\x7E]*$/.test(sanitized)) return sanitized;
+  const base64 = Buffer.from(sanitized, "utf8").toString("base64");
+  return `=?UTF-8?B?${base64}?=`;
+}
+
+/**
  * Build a minimal multipart/alternative MIME message. The text part
  * comes first so any client that ignores the HTML still gets a readable
  * body — and the boundary is a random UUID-ish string so it can't
  * collide with anything inside either part.
  */
+/**
+ * Build the From header. Gmail's `me` placeholder rewrites to the authed
+ * user's primary address, so we keep the angle-bracket part as-is and only
+ * encode the display name. For ASCII display names, RFC 2822 quoted-string
+ * form. For non-ASCII (Thai, etc.), RFC 2047 encoded-word for the display
+ * name only — keeping `<me>` outside any encoded section so Gmail still
+ * recognizes the substitution token.
+ */
+function buildFromHeader(fromName: string | null | undefined): string {
+  if (!fromName) return "me";
+  const trimmed = sanitizeHeader(fromName);
+  if (trimmed.length === 0) return "me";
+  if (/^[\x20-\x7E]*$/.test(trimmed)) {
+    // ASCII: RFC 2822 quoted-string display name.
+    return `"${trimmed.replace(/"/g, '\\"')}" <me>`;
+  }
+  // Non-ASCII: RFC 2047 encoded-word display name.
+  const base64 = Buffer.from(trimmed, "utf8").toString("base64");
+  return `=?UTF-8?B?${base64}?= <me>`;
+}
+
 function buildMime(args: {
   to: string;
   subject: string;
@@ -91,24 +135,36 @@ function buildMime(args: {
   bodyText: string;
   bodyHtml?: string;
 }): string {
-  const subject = sanitizeHeader(args.subject);
+  // RFC 2047 encode any non-ASCII header values. Pass-through for ASCII so
+  // simple English headers stay human-readable in the wire.
+  const subject = encodeMimeHeaderValue(args.subject);
   const to = sanitizeHeader(args.to);
-  const from = sanitizeHeader(args.fromHeader);
+  // From was already assembled correctly by buildFromHeader above — pass
+  // through without re-encoding (would otherwise double-encode the display
+  // name or eat the `<me>` placeholder).
+  const from = args.fromHeader;
+
+  // Body parts get base64-encoded so non-ASCII UTF-8 (Thai, accents, etc.)
+  // survives intermediary mail relays cleanly. 7bit was wrong for any body
+  // with bytes > 0x7F; 8bit requires the relay to advertise 8BITMIME (most
+  // do, but base64 is the safest default and Gmail forwards it without
+  // touching). Lines are split to <=76 chars per the RFC.
+  const textBase64 = chunkBase64(Buffer.from(args.bodyText, "utf8").toString("base64"));
 
   if (!args.bodyHtml) {
-    // Plain text only — simpler MIME, no multipart wrapper.
     return [
       `To: ${to}`,
       `Subject: ${subject}`,
       `From: ${from}`,
       `MIME-Version: 1.0`,
       `Content-Type: text/plain; charset="UTF-8"`,
-      `Content-Transfer-Encoding: 7bit`,
+      `Content-Transfer-Encoding: base64`,
       ``,
-      args.bodyText,
+      textBase64,
     ].join("\r\n");
   }
 
+  const htmlBase64 = chunkBase64(Buffer.from(args.bodyHtml, "utf8").toString("base64"));
   const boundary = `=_HotelPlus_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 
   return [
@@ -120,18 +176,31 @@ function buildMime(args: {
     ``,
     `--${boundary}`,
     `Content-Type: text/plain; charset="UTF-8"`,
-    `Content-Transfer-Encoding: 7bit`,
+    `Content-Transfer-Encoding: base64`,
     ``,
-    args.bodyText,
+    textBase64,
     ``,
     `--${boundary}`,
     `Content-Type: text/html; charset="UTF-8"`,
-    `Content-Transfer-Encoding: 7bit`,
+    `Content-Transfer-Encoding: base64`,
     ``,
-    args.bodyHtml,
+    htmlBase64,
     ``,
     `--${boundary}--`,
   ].join("\r\n");
+}
+
+/**
+ * Split a base64 string into 76-char lines per RFC 2045 §6.8. Most mail
+ * clients tolerate unwrapped base64 but the spec wants it wrapped and
+ * some strict relays (Postfix with certain configs) reject otherwise.
+ */
+function chunkBase64(input: string): string {
+  const out: string[] = [];
+  for (let i = 0; i < input.length; i += 76) {
+    out.push(input.slice(i, i + 76));
+  }
+  return out.join("\r\n");
 }
 
 /**
@@ -193,15 +262,10 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   // The authed user's Gmail address goes in the From header. We don't fetch
-  // their /profile here — Gmail will use the authenticated identity
-  // regardless of what we put in the From header, so an absent display
-  // name is safe (Gmail substitutes the account's own).
-  const fromHeader = input.fromName
-    ? `${sanitizeHeader(input.fromName)} <me>`
-    : `me`;
-  // "me" is Gmail's well-known alias for the authenticated user — when used
-  // in the From header, Gmail rewrites it to the user's actual primary
-  // address. This keeps us from needing to fetch the user's email up front.
+  // their /profile here — Gmail rewrites the `me` placeholder to the user's
+  // actual primary address, so an absent display name is safe (Gmail
+  // substitutes the account's own).
+  const fromHeader = buildFromHeader(input.fromName);
 
   const mime = buildMime({
     to: input.to,

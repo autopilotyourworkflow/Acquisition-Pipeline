@@ -119,26 +119,29 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
           }
           if (dataLines.length === 0) continue;
 
-          let payload: any;
+          let payload: Record<string, unknown> | null = null;
           try {
-            payload = JSON.parse(dataLines.join("\n"));
+            payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
           } catch {
             continue;
           }
+          if (!payload) continue;
 
-          if (event === "scrape_complete" && payload?.candidate) {
-            data = payload.candidate;
+          if (event === "scrape_complete" && payload.candidate) {
+            data = payload.candidate as ExtractCandidateInput;
             if (typeof payload.attachmentId === "string") {
               attachmentId = payload.attachmentId;
             }
-          } else if (event === "scrape_progress" && payload?.status) {
-            const label = STATUS_LABELS[payload.status] || payload.status;
+          } else if (event === "scrape_progress" && payload.status) {
+            const status = String(payload.status);
+            const label = STATUS_LABELS[status] || status;
             setExtractState({ status: "loading", stage: label });
           } else if (event === "scrape_error") {
-            setExtractState({
-              status: "error",
-              message: payload?.message || "Extraction failed",
-            });
+            const message =
+              typeof payload.message === "string"
+                ? payload.message
+                : "Extraction failed";
+            setExtractState({ status: "error", message });
             errored = true;
             break;
           }
@@ -252,7 +255,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
         </TabsContent>
 
         <TabsContent value="screenshot" className="space-y-4">
-          <ScreenshotTab onExtract={handleExtract} />
+          <ScreenshotTab />
         </TabsContent>
 
         <TabsContent value="thirdparty" className="space-y-4">
@@ -399,7 +402,7 @@ function PdfTab({ onExtract }: { onExtract: ExtractFn }) {
   );
 }
 
-function ScreenshotTab({ onExtract: _onExtract }: { onExtract: ExtractFn }) {
+function ScreenshotTab() {
   return (
     <div className="rounded-lg border-2 border-dashed border-sand-200 p-8 text-center">
       <p className="text-sm text-slate-deep">Screenshot extraction coming soon</p>

@@ -299,7 +299,7 @@ export async function callWithTool<T>(args: {
   const client = getClient();
   const started = Date.now();
 
-  const { value: message, retries } = await withRetry((_attempt) =>
+  const { value: message, retries } = await withRetry(() =>
     client.messages.create(buildMessageParams(args)),
   );
 

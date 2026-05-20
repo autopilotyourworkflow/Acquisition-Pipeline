@@ -15,9 +15,10 @@ export type Conflict = { start: string; end: string; summary?: string };
  * POSTs them to `/api/schedule/conflicts`.
  *
  * Behaviour:
- *   - Debounces 400ms after the inputs settle.
- *   - Clears stale results immediately on any input change so a previous
- *     warning doesn't linger past the next keystroke.
+ *   - Debounces 150ms after the inputs settle.
+ *   - Stale-input protection: results are only returned when they match
+ *     the current query (queryKey check). Eliminates flicker when the
+ *     user changes inputs while a request is in flight.
  *   - AbortController cancels in-flight requests when inputs change again.
  *   - Soft-fails: any error → empty conflicts, no toast. The warning is
  *     informational; a network blip shouldn't surface to the user.
@@ -35,22 +36,22 @@ export function useConflictCheck({
   durationMin: number;
   enabled?: boolean;
 }): { conflicts: Conflict[]; checking: boolean } {
-  const [conflicts, setConflicts] = useState<Conflict[]>([]);
-  const [checking, setChecking] = useState(false);
+  const isReady =
+    enabled && Boolean(whenAt) && Number.isFinite(durationMin) && durationMin > 0;
+  const currentKey = isReady ? `${whenAt}|${durationMin}` : "";
+
+  // Single combined state — the queryKey field lets us derive "stale vs.
+  // current" without any setState in the effect body. Updates only ever
+  // happen in the fetch resolver (async callback) and the setTimeout
+  // callback, which React's purity rule explicitly permits.
+  const [result, setResult] = useState<{
+    queryKey: string;
+    conflicts: Conflict[];
+    finished: boolean;
+  }>({ queryKey: "", conflicts: [], finished: true });
 
   useEffect(() => {
-    if (!enabled) {
-      setConflicts([]);
-      setChecking(false);
-      return;
-    }
-    if (!whenAt || !Number.isFinite(durationMin) || durationMin <= 0) {
-      setConflicts([]);
-      setChecking(false);
-      return;
-    }
-    setConflicts([]);
-    setChecking(true);
+    if (!isReady) return;
 
     const startDate = new Date(whenAt);
     const endDate = new Date(startDate.getTime() + durationMin * 60_000);
@@ -72,19 +73,21 @@ export function useConflictCheck({
           signal: ctl.signal,
         });
         if (!resp.ok) {
-          setConflicts([]);
+          if (!ctl.signal.aborted) {
+            setResult({ queryKey: currentKey, conflicts: [], finished: true });
+          }
           return;
         }
         const json = (await resp.json()) as { conflicts?: Conflict[] };
-        setConflicts(json.conflicts ?? []);
+        if (!ctl.signal.aborted) {
+          setResult({
+            queryKey: currentKey,
+            conflicts: json.conflicts ?? [],
+            finished: true,
+          });
+        }
       } catch {
         // Aborted or transient — silent.
-      } finally {
-        // Important: only flip the flag off if this specific request was
-        // the one that completed. AbortController guarantees this by
-        // throwing on the cancelled fetch — so we land here exactly once
-        // per "settled" request.
-        if (!ctl.signal.aborted) setChecking(false);
       }
     }, 150);
 
@@ -92,7 +95,15 @@ export function useConflictCheck({
       clearTimeout(timer);
       ctl.abort();
     };
-  }, [whenAt, durationMin, enabled]);
+  }, [currentKey, isReady, whenAt, durationMin]);
+
+  // Derived: only surface conflicts when they match the current inputs.
+  // While the key mismatches (inputs changed, fetch in flight), `checking`
+  // is true and `conflicts` is empty — exactly the "loading new results"
+  // state the UI wants.
+  const conflicts =
+    isReady && result.queryKey === currentKey ? result.conflicts : [];
+  const checking = isReady && result.queryKey !== currentKey;
 
   return { conflicts, checking };
 }

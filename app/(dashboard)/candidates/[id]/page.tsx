@@ -64,6 +64,14 @@ export default async function CandidatePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Single source-of-truth timestamp for "is this interview upcoming?"
+  // decisions on this page render. Server Components run once per request,
+  // so Date.now() here is request-scoped — semantically equivalent to a
+  // request header. The React purity rule doesn't distinguish server vs.
+  // client components though, hence the targeted disable.
+  // eslint-disable-next-line react-hooks/purity
+  const pageRenderTime = Date.now();
+
   const { id } = await params;
   const supabase = await createClient();
   const {
@@ -79,6 +87,7 @@ export default async function CandidatePage({
     { data: interviews },
     { data: tokenRow },
     { data: pastEmails },
+    { data: userSettings },
   ] = await Promise.all([
     supabase.from("candidates").select("*").eq("id", id).single(),
     supabase.from("job_descriptions").select("*"),
@@ -122,6 +131,15 @@ export default async function CandidatePage({
       .in("status", ["drafted", "sent"])
       .order("created_at", { ascending: false })
       .limit(10),
+    // User's saved signature. Threaded into the ColdEmailLauncher so the
+    // dialog can show a read-only preview of what gets appended at send.
+    user
+      ? admin
+          .from("user_settings")
+          .select("email_signature")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const grantedScopes = new Set<string>(
@@ -237,6 +255,9 @@ export default async function CandidatePage({
                   ) as unknown as PastEmail[])
                 : []
             }
+            signature={
+              (userSettings?.email_signature as string | null)?.trim() || null
+            }
           />
         </div>
         <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2">
@@ -265,7 +286,11 @@ export default async function CandidatePage({
         )}
       </section>
 
-      <InterviewsSection interviews={allInterviews} candidateId={c.id} />
+      <InterviewsSection
+        interviews={allInterviews}
+        candidateId={c.id}
+        now={pageRenderTime}
+      />
 
       <ExtractedProfileSection rawProfile={c.raw_profile} />
 
@@ -497,13 +522,20 @@ type EducationEntry = {
 /**
  * Surfaces scheduled / past interviews for the candidate. Lives high on the
  * detail page so HR sees the latest scheduling status without scrolling.
+ *
+ * `now` is passed down from the page-level server component so the same
+ * timestamp is used for the upcoming/past partition AND for the per-row
+ * "is upcoming?" badge — and so the React purity rule doesn't flag a
+ * Date.now() call in render.
  */
 function InterviewsSection({
   interviews,
   candidateId,
+  now,
 }: {
   interviews: InterviewWithJd[];
   candidateId: string;
+  now: number;
 }) {
   if (interviews.length === 0) {
     return (
@@ -521,7 +553,6 @@ function InterviewsSection({
     );
   }
 
-  const now = Date.now();
   const upcoming = interviews.filter(
     (i) => new Date(i.starts_at).getTime() > now && i.status === "scheduled",
   );
@@ -539,19 +570,19 @@ function InterviewsSection({
       </div>
       <ul className="space-y-2">
         {[...upcoming, ...past].map((i) => (
-          <InterviewRow key={i.id} interview={i} />
+          <InterviewRow key={i.id} interview={i} now={now} />
         ))}
       </ul>
     </section>
   );
 }
 
-function InterviewRow({ interview }: { interview: InterviewWithJd }) {
+function InterviewRow({ interview, now }: { interview: InterviewWithJd; now: number }) {
   const start = new Date(interview.starts_at);
   const end = new Date(interview.ends_at);
   const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
   const isUpcoming =
-    start.getTime() > Date.now() && interview.status === "scheduled";
+    start.getTime() > now && interview.status === "scheduled";
 
   const statusStyles: Record<InterviewWithJd["status"], string> = {
     scheduled: isUpcoming

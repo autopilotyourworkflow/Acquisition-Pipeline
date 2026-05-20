@@ -12,7 +12,19 @@ const SECTIONS = [
   {
     href: "/settings/integrations",
     title: "Integrations",
-    desc: "Per-scope status for Google Calendar + Gmail. See what's granted and reconnect to add scopes.",
+    desc: "Connect to Google (Calendar, Gmail) and configure paid-service API keys (Apify, Proxycurl).",
+    ready: true,
+  },
+  {
+    href: "/settings/email-composer",
+    title: "Email composer",
+    desc: "Your signature + From name applied to every cold-outreach email you send from this account.",
+    ready: true,
+  },
+  {
+    href: "/settings/capture",
+    title: "Capture",
+    desc: "One-click bookmarklet for grabbing candidates from LinkedIn / JobsDB / any logged-in browser tab.",
     ready: true,
   },
   {

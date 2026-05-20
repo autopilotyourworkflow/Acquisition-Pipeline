@@ -73,7 +73,7 @@ What good looks like:
   - Body has ONE clear CTA: a low-friction next step. "Open to a 20-min chat next week?" beats "Let me know if you'd like to learn more."
   - Tone is peer-to-peer, not transactional. We respect that they probably aren't actively looking.
   - Length: under 150 words of body copy.
-  - Body MUST end with the signature block exactly as provided in the user message — preserve line breaks, do not rewrite it, do not abbreviate it. If no signature block was provided, end with "Best regards" on its own line.
+  - Close with a brief sign-off line ONLY — "Best regards," in English mode, "ขอบคุณครับ/ค่ะ" in Thai mode. Stop there. **Do NOT add a name, title, company, or signature block.** A signature is appended automatically after the model finishes. Adding one yourself produces a duplicate.
 
 Output ONLY via the compose_cold_email tool. Do not respond in free text. Do not preface the tool call. Do not summarize after.
 
@@ -97,8 +97,6 @@ export function buildColdEmailMessages(args: {
     | "notes"
   >;
   score?: Pick<ScoreRow, "reasoning" | "strengths" | "gaps" | "weighted_total"> | null;
-  fromName?: string | null;
-  signature?: string | null;
   /**
    * Target language for the email body. Defaults to "Thai" — Hotel Plus's
    * primary outreach language. Use `resolveColdEmailLanguage()` to convert
@@ -144,21 +142,11 @@ export function buildColdEmailMessages(args: {
       `Use the strongest specific item from the reasoning or strengths as the hook. If the gaps are non-trivial, acknowledge that the candidate doesn't tick every box and frame the role as a stretch worth exploring — never paper over it.`
     : "";
 
-  const signatureBlock = args.signature?.trim()
-    ? `\n\n## Signature block (use verbatim at the end of the body — preserve line breaks)\n${args.signature.trim()}`
-    : "\n\n## Signature\nNo personalized signature provided. End the body with a simple 'Best regards' on its own line.";
-
-  const fromHint = args.fromName?.trim()
-    ? `\n\nThe sender's display name will be: ${args.fromName.trim()} (Hotel Plus Recruiting). Don't address from this name in the subject — Gmail handles the sender header. Use it naturally in the body's sign-off if it fits the signature block above.`
-    : "";
-
   const userContent =
     `Draft ONE cold-outreach email for this candidate against the JD above.\n\n` +
     `# Candidate\n${candidateLines.join("\n")}` +
     scoreBlock +
-    signatureBlock +
-    fromHint +
-    `\n\nReturn via the compose_cold_email tool only.`;
+    `\n\nReturn via the compose_cold_email tool only. End the body with a brief sign-off line and nothing else — a signature block will be appended automatically at send time.`;
 
   return {
     system: [

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -15,7 +16,7 @@ import {
 import { CANDIDATE_STAGES, type CandidateStage } from "@/lib/db/enums";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
-import type { CandidateRow, JdRow } from "@/lib/db/types";
+import type { CandidateRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 type CandidateWithJd = CandidateRow & {
@@ -30,11 +31,9 @@ type CandidateWithJd = CandidateRow & {
  */
 export function KanbanBoard({
   candidates,
-  jds: _jds,
   onMove,
 }: {
   candidates: CandidateWithJd[];
-  jds: JdRow[];
   onMove: (candidateId: string, nextStage: CandidateStage) => void;
 }) {
   const sensors = useSensors(
@@ -112,23 +111,30 @@ function KanbanCard({ candidate }: { candidate: CandidateWithJd }) {
   // dnd-kit's PointerSensor with activationConstraint distance:5 means a quick
   // click (no movement) won't initiate drag — so onPointerUp without a drag
   // start is treated as a navigation click. We track the pointer-down position
-  // and only navigate if movement was below the drag threshold.
-  let downX = 0;
-  let downY = 0;
-  let dragStarted = false;
+  // in refs (not let-vars) because event handlers reassign them outside the
+  // render pass — React 19's purity rule requires non-state mutation to go
+  // through refs.
+  const downXRef = useRef(0);
+  const downYRef = useRef(0);
+  const dragStartedRef = useRef(false);
 
   function onPointerDown(e: React.PointerEvent) {
-    downX = e.clientX;
-    downY = e.clientY;
-    dragStarted = false;
+    downXRef.current = e.clientX;
+    downYRef.current = e.clientY;
+    dragStartedRef.current = false;
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) {
-      dragStarted = true;
+    if (
+      Math.hypot(
+        e.clientX - downXRef.current,
+        e.clientY - downYRef.current,
+      ) > 5
+    ) {
+      dragStartedRef.current = true;
     }
   }
   function onPointerUp() {
-    if (!dragStarted && !isDragging) {
+    if (!dragStartedRef.current && !isDragging) {
       router.push(`/candidates/${candidate.id}`);
     }
   }

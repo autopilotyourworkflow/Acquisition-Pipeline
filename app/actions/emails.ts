@@ -96,17 +96,11 @@ export async function sendColdEmail(input: {
     const fromName = settings?.email_from_name?.trim() || null;
     const signature = settings?.email_signature?.trim() || null;
 
-    // Append the signature ONLY if the model didn't already include it
-    // verbatim. Cheap substring check — good enough; false negatives just
-    // mean the user has one signature block where they expected two and
-    // can fix the draft before sending.
-    const bodyEndsWithSig =
-      signature !== null &&
-      body.toLowerCase().includes(signature.toLowerCase().slice(0, 40));
-    const finalBodyText =
-      signature && !bodyEndsWithSig
-        ? `${body}\n\n${signature}`
-        : body;
+    // ALWAYS append the signature when one is configured. The prompt no
+    // longer instructs Opus to include it, so we don't need a substring
+    // guard against duplication. If signature is null, the body goes out
+    // as-is (the model's sign-off line is the only close).
+    const finalBodyText = signature ? `${body}\n\n${signature}` : body;
     const finalBodyHtml = markdownToEmailHtml(finalBodyText);
 
     // If the caller passed an emailId, verify it belongs to this user
