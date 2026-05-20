@@ -183,7 +183,8 @@ Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/s
 /api/interviews/[id]           DELETE = cancel, PATCH = reschedule
 /api/schedule/conflicts        POST — warn-only conflict check (events.list overlap)
 /api/schedule/sync             POST — Google → DB reconcile (deletes detected from Google)
-/api/emails/draft              POST, SSE — Opus 4.7 streams a cold-outreach draft
+/api/emails/draft              POST, SSE — Opus/Haiku streams a cold-outreach draft + autosaves as 'drafted'
+/api/emails/list               GET — recent drafts + sends per candidate (history panel)
 ```
 
 **Libraries:**

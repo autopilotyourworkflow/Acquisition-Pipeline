@@ -19,6 +19,24 @@ type Props = {
   initialFromName: string | null;
 };
 
+/**
+ * Hotel Plus's canonical email signature (text rendering — no logo). Used
+ * as a one-click preset so the user doesn't have to retype it. The job
+ * title ("Career Opportunity Manager") is per-person; the rest is the
+ * company block.
+ */
+const HOTEL_PLUS_SIGNATURE_PRESET = `Best regards,
+Career Opportunity Manager
+
+HOTEL PLUS
+Hospitality Management | Online Revenue Management
+062-659-9604
+career@hotelplus.asia
+www.hotelplus.asia
+92/5 fl.2 unit 208, Sathon Thani 2 Bld, North Sathon Road, Bangkok 10500`;
+
+const HOTEL_PLUS_FROM_NAME_PRESET = "Hotel Plus Recruiting";
+
 export function EmailDefaultsPanel({
   initialSignature,
   initialFromName,
@@ -77,9 +95,22 @@ export function EmailDefaultsPanel({
         </div>
 
         <div>
-          <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
-            Signature
-          </label>
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            <label className="block text-[11px] uppercase tracking-wide text-slate-deep">
+              Signature
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setSignature(HOTEL_PLUS_SIGNATURE_PRESET);
+                if (!fromName.trim()) setFromName(HOTEL_PLUS_FROM_NAME_PRESET);
+              }}
+              disabled={pending}
+              className="text-[11px] text-terracotta-700 underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              Insert Hotel Plus default →
+            </button>
+          </div>
           <Textarea
             value={signature}
             onChange={(e) => setSignature(e.target.value)}
@@ -87,14 +118,15 @@ export function EmailDefaultsPanel({
               "Best regards,\nYour Name\nHotel Plus Recruiting\nhotelplus.asia"
             }
             disabled={pending}
-            rows={6}
+            rows={8}
             maxLength={1500}
             className="font-sans text-sm leading-relaxed"
           />
           <p className="mt-1 text-[11px] text-slate-mid">
             Plain text. Appended to the body of every cold email send, with
-            two blank lines above it. Drafts shown in the dialog don&apos;t
-            include the signature — it&apos;s added at send time.
+            two blank lines above it. The &quot;Insert Hotel Plus default&quot;
+            button populates the company block — edit the job title to match
+            yours.
           </p>
         </div>
 

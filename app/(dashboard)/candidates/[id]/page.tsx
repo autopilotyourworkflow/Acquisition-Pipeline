@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { InterviewActions } from "@/components/interviews/InterviewActions.client";
 import { ScoreCard } from "@/components/screener/ScoreCard";
 import { ColdEmailLauncher } from "@/components/emails/ColdEmailLauncher.client";
+import type { PastEmail } from "@/components/emails/ColdEmailDialog.client";
 import type { CandidateRow, JdRow, ScoreRow, AttachmentRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +78,7 @@ export default async function CandidatePage({
     { data: attachments },
     { data: interviews },
     { data: tokenRow },
+    { data: pastEmails },
   ] = await Promise.all([
     supabase.from("candidates").select("*").eq("id", id).single(),
     supabase.from("job_descriptions").select("*"),
@@ -108,6 +110,18 @@ export default async function CandidatePage({
           .eq("provider", "google")
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // Past cold-email drafts + sends for this candidate. Threaded into the
+    // ColdEmailLauncher so the dialog's history panel renders without an
+    // extra round-trip on open.
+    supabase
+      .from("emails")
+      .select(
+        "id, status, subject, body_markdown, rationale, sent_at, gmail_message_id, created_at, updated_at",
+      )
+      .eq("candidate_id", id)
+      .in("status", ["drafted", "sent"])
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   const grantedScopes = new Set<string>(
@@ -215,6 +229,14 @@ export default async function CandidatePage({
             jdId={candidateJd?.id ?? null}
             jdTitle={candidateJd?.title ?? null}
             hasGmailSend={hasGmailSend}
+            pastEmails={
+              candidateJd
+                ? ((pastEmails ?? []).filter(
+                    (e) =>
+                      e.status === "drafted" || e.status === "sent",
+                  ) as unknown as PastEmail[])
+                : []
+            }
           />
         </div>
         <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2">

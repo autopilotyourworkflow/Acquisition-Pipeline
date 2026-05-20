@@ -685,3 +685,21 @@ The dialog's typewriter pulls partial subject + body out of the streaming tool-i
 *Phase 3e complete. Module 4 of the rubric is in. 40 cowork-log entries. Next: 4a (JD prompt-builder) and 4c (auto-email-reader) as overdelivery, then final polish.*
 
 ---
+
+## 41. Iterating cold email: defaults, drafts as first-class history, and a tiny update-vs-insert call
+
+First QA pass on cold email surfaced three things in one breath: pickers for model + language, draft history per candidate, and the actual Hotel Plus signature to seed. Easy individually; the interesting one was draft history, because once you commit to "save every AI draft so the user can pick from past attempts," you have to answer what *send* means against that store.
+
+The naive shape: send always inserts. Result — generating five drafts before liking one creates one *sent* row plus five orphan *drafted* rows per candidate, forever. After two candidates and three retries each, the table is mostly draft cruft. The cleaner shape: when a draft was autosaved at stream completion, the send action UPDATEs that row from `drafted` to `sent` rather than inserting a duplicate. The dialog gets an `emailId` back in the `draft_complete` SSE event, holds it as state, and passes it along when the user clicks Send. If the user regenerated, the new draft replaces `emailId` in state and the previous drafted row stays around as historical artifact (still a `drafted` row, eligible to be loaded from history later). If the user loaded a past *sent* row to base a new outreach on, we drop the emailId so the new send becomes a fresh insert — preserving the original send record.
+
+That single bit of state — "is this current editor content backed by a drafted row I can promote, or is it a fresh composition?" — turned out to be the entire architectural decision. The audit log mirrors it: insert when fresh, update when promoting a draft. `withAudit` doesn't care which; it just records the `before/after` faithfully. The activity feed now distinguishes "drafted email" rows that never went out (those are filtered from the dialog history but still in the DB) from "sent email" rows, with the same emailId tying them together.
+
+The pickers were straightforward — model defaults to Opus 4.7 (voice matters), language defaults to Thai (Hotel Plus is a Thai firm; most outreach is in Thai). The `auto` language option reads the candidate's scraper-detected `detected_language` and picks Thai for `th`, English for everything else. The persona prompt branches on a "Thai" or "English" string and embeds an explicit LANGUAGE directive at the top — for Thai, it specifies ครับ/ค่ะ politeness without sliding into palace-formal register, and keeps rationale-for-recruiter in English.
+
+The signature preset is a one-click button, not an auto-populate. Auto-populate would feel pushy and risks overwriting in-progress edits. A button is discoverable, idempotent, and lets the user keep their job title field intact while seeding the company block.
+
+The other tiny decision: the dialog auto-fires the AI stream only when the candidate has *no* history. With history present, the dialog opens to an "awaiting" state — history visible, "Draft a new email" button explicit. This costs one click for first-timers (none, since they have no history) and saves Opus tokens for everyone else, because the most common second-visit intent isn't "generate again" — it's "look at what I drafted last time."
+
+**Autosave changes what *send* means. Once every draft is persisted, send needs to know whether to promote-or-insert — and the cheapest way to know is to carry the candidate's row id through the UI and let the action branch on its presence.**
+
+---

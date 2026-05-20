@@ -17,27 +17,48 @@ import { sendColdEmail } from "@/app/actions/emails";
 import { updateCandidateStage } from "@/app/actions/candidates";
 
 /**
- * "Draft cold email" dialog — Phase 3e.
+ * "Draft cold email" dialog — Phase 3e + iteration.
  *
- * Lifecycle inside the open state:
- *  1. mounted → fire POST /api/emails/draft, stream the tool-input JSON
- *  2. streaming → typewriter shows extracted subject + body so far
- *  3. complete → editable form (subject Input, body Textarea, rationale below)
- *  4. send → call sendColdEmail action, toast on success, close dialog
+ * UI tour:
+ *  - Top of dialog: model picker (Opus 4.7 / Haiku 4.5) + language picker
+ *    (Thai default / English / Auto). Default Thai per Hotel Plus context.
+ *  - "Past drafts & sends" collapsible — shows the last 10 emails for this
+ *    candidate + JD so HR can load a past draft into the editor without
+ *    paying for a fresh AI run.
+ *  - Stream area: typewriter while drafting; switches to subject/body
+ *    editor + rationale dropdown on completion.
+ *  - Footer: Cancel / Regenerate / Send. Send calls the server action,
+ *    which UPDATEs the autosaved draft row to status='sent' rather than
+ *    inserting a duplicate.
  *
- * Closing while streaming aborts the fetch — no zombie connection.
- *
- * Why the manual regex unparse instead of incremental JSON.parse:
- * Anthropic's input_json_delta events give partial JSON chunks that are
- * valid prefixes of the final object. JSON.parse refuses to parse them
- * mid-stream, so a tiny "extract string field by name" regex pulls out
- * the subject + body for the typewriter UI. Final shape comes from the
- * draft_complete event, which carries the validated object.
+ * Behavior decisions:
+ *  - On open with NO past history → auto-fires the stream with defaults.
+ *  - On open WITH past history → shows the history panel first; user
+ *    picks a past draft or clicks "Draft new". Avoids spending tokens
+ *    when the user just wanted to re-send a previous draft.
+ *  - Regenerate aborts the current stream and fires a new one with
+ *    the latest picker selections.
  */
 
-type Stage =
+type ModelChoice = "claude-opus-4-7" | "claude-haiku-4-5";
+type LanguageChoice = "th" | "en" | "auto";
+
+export type PastEmail = {
+  id: string;
+  status: "drafted" | "sent" | "failed" | "discarded";
+  subject: string;
+  body_markdown: string;
+  rationale: string | null;
+  sent_at: string | null;
+  gmail_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type Mode =
+  | { kind: "awaiting" } // history shown, user hasn't requested a draft yet
   | { kind: "streaming"; partialSubject: string; partialBody: string }
-  | { kind: "complete"; subject: string; body: string; rationale: string }
+  | { kind: "ready" } // editor populated
   | { kind: "error"; message: string };
 
 type Props = {
@@ -51,31 +72,38 @@ type Props = {
   };
   jdId: string;
   jdTitle: string;
+  initialPastEmails: PastEmail[];
 };
 
+const MODEL_OPTIONS: { value: ModelChoice; label: string }[] = [
+  { value: "claude-opus-4-7", label: "Opus 4.7 (best voice)" },
+  { value: "claude-haiku-4-5", label: "Haiku 4.5 (cheaper, faster)" },
+];
+
+const LANGUAGE_OPTIONS: { value: LanguageChoice; label: string }[] = [
+  { value: "th", label: "Thai (default)" },
+  { value: "en", label: "English" },
+  { value: "auto", label: "Auto (match candidate profile)" },
+];
+
 /**
- * Pull a partial string value for a named JSON field out of an
- * accumulating tool-input JSON chunk. The chunk is a prefix of a valid
- * JSON object — we look for `"field": "..."` and unescape the content
- * we've seen so far. Returns null if the field hasn't started yet.
+ * Extract a partial string value for a named JSON field out of a streaming
+ * tool-input JSON chunk. The chunk is a prefix of a valid JSON object —
+ * we look for `"field": "..."` and unescape what we've seen so far.
+ * Returns null if the field hasn't started yet.
  */
-function extractPartialField(
-  raw: string,
-  field: string,
-): string | null {
+function extractPartialField(raw: string, field: string): string | null {
   const re = new RegExp(`"${field}"\\s*:\\s*"`);
   const m = re.exec(raw);
   if (!m) return null;
   const start = m.index + m[0].length;
-  // Walk forward tracking escape state so we can stop at the unescaped
-  // closing quote — or, if we never see it, return everything since `start`.
   let out = "";
   let i = start;
   while (i < raw.length) {
     const ch = raw[i];
     if (ch === "\\") {
       const next = raw[i + 1];
-      if (next === undefined) break; // partial escape — drop it for now
+      if (next === undefined) break;
       if (next === "n") out += "\n";
       else if (next === "r") out += "\r";
       else if (next === "t") out += "\t";
@@ -94,7 +122,7 @@ function extractPartialField(
       i += 2;
       continue;
     }
-    if (ch === '"') break; // end of field value
+    if (ch === '"') break;
     out += ch;
     i++;
   }
@@ -102,118 +130,183 @@ function extractPartialField(
 }
 
 export function ColdEmailDialog(props: Props) {
-  const { open, onOpenChange, candidate, jdId, jdTitle } = props;
+  const { open, onOpenChange, candidate, jdId, jdTitle, initialPastEmails } = props;
   const router = useRouter();
-  const [stage, setStage] = useState<Stage>({
-    kind: "streaming",
-    partialSubject: "",
-    partialBody: "",
-  });
-  const [editedSubject, setEditedSubject] = useState("");
-  const [editedBody, setEditedBody] = useState("");
+  const [pastEmails, setPastEmails] = useState<PastEmail[]>(initialPastEmails);
+  const [mode, setMode] = useState<Mode>(
+    initialPastEmails.length === 0
+      ? { kind: "streaming", partialSubject: "", partialBody: "" }
+      : { kind: "awaiting" },
+  );
+  const [model, setModel] = useState<ModelChoice>("claude-opus-4-7");
+  const [language, setLanguage] = useState<LanguageChoice>("th");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
   const [rationale, setRationale] = useState("");
+  const [currentEmailId, setCurrentEmailId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
 
-  // Kick off the draft stream when the dialog opens. The parent
-  // (ColdEmailLauncher) mounts this component only while open === true,
-  // so we don't need a !open branch — unmount handles teardown via the
-  // effect cleanup below, and the next open gets a fresh component with
-  // fresh state automatically.
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    controllerRef.current = controller;
+  // Helper: kick off (or re-kick off) the SSE draft stream.
+  const fireDraftStream = useCallback(
+    (chosenModel: ModelChoice, chosenLanguage: LanguageChoice) => {
+      // Abort any in-flight stream first.
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      setMode({ kind: "streaming", partialSubject: "", partialBody: "" });
+      setSubject("");
+      setBody("");
+      setRationale("");
+      setCurrentEmailId(null);
 
-    async function run() {
-      try {
-        const resp = await fetch("/api/emails/draft", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ candidateId: candidate.id, jdId }),
-          signal: controller.signal,
-        });
-        if (!resp.ok || !resp.body) {
-          const text = await resp.text().catch(() => "");
-          setStage({
-            kind: "error",
-            message: text || `Request failed (${resp.status})`,
-          });
-          return;
-        }
-
-        const reader = resp.body
-          .pipeThrough(new TextDecoderStream())
-          .getReader();
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += value;
-          let idx: number;
-          while ((idx = buffer.indexOf("\n\n")) !== -1) {
-            const frame = buffer.slice(0, idx);
-            buffer = buffer.slice(idx + 2);
-            handleFrame(frame);
-          }
-        }
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setStage({
-          kind: "error",
-          message: err instanceof Error ? err.message : "Stream failed",
-        });
-      }
-    }
-
-    function handleFrame(frame: string) {
-      let event = "message";
-      const dataLines: string[] = [];
-      for (const line of frame.split("\n")) {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:"))
-          dataLines.push(line.slice(5).trimStart());
-      }
-      if (dataLines.length === 0) return;
-      const data = (() => {
+      (async () => {
         try {
-          return JSON.parse(dataLines.join("\n"));
-        } catch {
-          return null;
+          const resp = await fetch("/api/emails/draft", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              candidateId: candidate.id,
+              jdId,
+              model: chosenModel,
+              language: chosenLanguage,
+            }),
+            signal: controller.signal,
+          });
+          if (!resp.ok || !resp.body) {
+            const text = await resp.text().catch(() => "");
+            setMode({
+              kind: "error",
+              message: text || `Request failed (${resp.status})`,
+            });
+            return;
+          }
+
+          const reader = resp.body
+            .pipeThrough(new TextDecoderStream())
+            .getReader();
+          let buffer = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += value;
+            let idx: number;
+            while ((idx = buffer.indexOf("\n\n")) !== -1) {
+              const frame = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + 2);
+              handleFrame(frame);
+            }
+          }
+        } catch (err) {
+          if (controller.signal.aborted) return;
+          setMode({
+            kind: "error",
+            message: err instanceof Error ? err.message : "Stream failed",
+          });
         }
       })();
-      if (!data) return;
 
-      if (event === "draft_partial") {
-        const text = (data.text ?? "") as string;
-        const partialSubject = extractPartialField(text, "subject") ?? "";
-        const partialBody = extractPartialField(text, "body_markdown") ?? "";
-        setStage({ kind: "streaming", partialSubject, partialBody });
-      } else if (event === "draft_complete") {
-        const subject = (data.subject ?? "") as string;
-        const body = (data.body ?? "") as string;
-        const r = (data.rationale ?? "") as string;
-        setStage({ kind: "complete", subject, body, rationale: r });
-        setEditedSubject(subject);
-        setEditedBody(body);
-        setRationale(r);
-      } else if (event === "draft_error") {
-        setStage({
-          kind: "error",
-          message: data.message ?? "Unknown error",
-        });
+      function handleFrame(frame: string) {
+        let event = "message";
+        const dataLines: string[] = [];
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:"))
+            dataLines.push(line.slice(5).trimStart());
+        }
+        if (dataLines.length === 0) return;
+        const data = (() => {
+          try {
+            return JSON.parse(dataLines.join("\n"));
+          } catch {
+            return null;
+          }
+        })();
+        if (!data) return;
+
+        if (event === "draft_partial") {
+          const text = (data.text ?? "") as string;
+          const partialSubject = extractPartialField(text, "subject") ?? "";
+          const partialBody = extractPartialField(text, "body_markdown") ?? "";
+          setMode({ kind: "streaming", partialSubject, partialBody });
+        } else if (event === "draft_complete") {
+          const newSubject = (data.subject ?? "") as string;
+          const newBody = (data.body ?? "") as string;
+          const newRationale = (data.rationale ?? "") as string;
+          const emailId = (data.emailId ?? null) as string | null;
+          setSubject(newSubject);
+          setBody(newBody);
+          setRationale(newRationale);
+          setCurrentEmailId(emailId);
+          setMode({ kind: "ready" });
+          // Optimistically prepend the new draft to the history list so the
+          // user sees it immediately if they expand the history panel.
+          if (emailId) {
+            const nowIso = new Date().toISOString();
+            setPastEmails((prev) => [
+              {
+                id: emailId,
+                status: "drafted",
+                subject: newSubject,
+                body_markdown: newBody,
+                rationale: newRationale,
+                sent_at: null,
+                gmail_message_id: null,
+                created_at: nowIso,
+                updated_at: nowIso,
+              },
+              ...prev,
+            ]);
+          }
+        } else if (event === "draft_error") {
+          setMode({
+            kind: "error",
+            message: data.message ?? "Unknown error",
+          });
+        }
       }
-    }
+    },
+    [candidate.id, jdId],
+  );
 
-    run();
+  // Initial auto-fire when the dialog opens with no history.
+  useEffect(() => {
+    if (!open) return;
+    if (mode.kind !== "streaming") return;
+    // Only auto-fire if we haven't started yet (controllerRef empty)
+    if (controllerRef.current) return;
+    fireDraftStream(model, language);
+    // Cleanup on unmount: abort any in-flight stream.
     return () => {
-      controller.abort();
+      controllerRef.current?.abort();
+      controllerRef.current = null;
     };
-  }, [open, candidate.id, jdId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Load a past draft/send into the editor (no streaming).
+  const handleLoadPast = useCallback((past: PastEmail) => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    setSubject(past.subject);
+    setBody(past.body_markdown);
+    setRationale(past.rationale ?? "");
+    // Only set currentEmailId when the row is a draft we can UPDATE on
+    // send. For 'sent' rows we want a fresh insert so the original send
+    // record is preserved.
+    setCurrentEmailId(past.status === "drafted" ? past.id : null);
+    setMode({ kind: "ready" });
+    setShowHistory(false);
+  }, []);
+
+  const handleRegenerate = useCallback(() => {
+    fireDraftStream(model, language);
+  }, [fireDraftStream, model, language]);
 
   const handleSend = useCallback(async () => {
     if (sending) return;
-    if (!editedSubject.trim() || editedBody.trim().length < 20) {
+    if (!subject.trim() || body.trim().length < 20) {
       toast.error("Subject and body are required");
       return;
     }
@@ -221,9 +314,10 @@ export function ColdEmailDialog(props: Props) {
     const r = await sendColdEmail({
       candidateId: candidate.id,
       jdId,
-      subject: editedSubject,
-      body: editedBody,
-      rationale,
+      subject,
+      body,
+      rationale: rationale || undefined,
+      emailId: currentEmailId,
     });
     setSending(false);
     if (!r.ok) {
@@ -234,9 +328,7 @@ export function ColdEmailDialog(props: Props) {
 
     const isAlreadyApplied = candidate.current_stage === "applied";
     toast.success(`Email sent to ${candidate.full_name}`, {
-      description: isAlreadyApplied
-        ? "Logged in the activity feed."
-        : "Logged in the activity feed.",
+      description: "Logged in the activity feed.",
       duration: 12000,
       action: isAlreadyApplied
         ? undefined
@@ -261,9 +353,10 @@ export function ColdEmailDialog(props: Props) {
     router.refresh();
   }, [
     sending,
-    editedSubject,
-    editedBody,
+    subject,
+    body,
     rationale,
+    currentEmailId,
     candidate.id,
     candidate.full_name,
     candidate.current_stage,
@@ -271,6 +364,11 @@ export function ColdEmailDialog(props: Props) {
     onOpenChange,
     router,
   ]);
+
+  const streaming = mode.kind === "streaming";
+  const isReady = mode.kind === "ready";
+  const isAwaiting = mode.kind === "awaiting";
+  const isError = mode.kind === "error";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -284,29 +382,168 @@ export function ColdEmailDialog(props: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        {stage.kind === "streaming" && (
+        {/* Model + Language pickers */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+              Model
+            </label>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value as ModelChoice)}
+              disabled={streaming || sending}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            >
+              {MODEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+              Language
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as LanguageChoice)}
+              disabled={streaming || sending}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            >
+              {LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* History panel — only visible if there's history */}
+        {pastEmails.length > 0 && (
+          <div className="rounded-md border border-sand-200 bg-cream/40">
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-navy hover:bg-cream/60"
+            >
+              <span>
+                Past drafts &amp; sends{" "}
+                <span className="font-mono text-[10px] text-slate-deep">
+                  ({pastEmails.length})
+                </span>
+              </span>
+              <span className="text-xs text-slate-deep">
+                {showHistory ? "Hide ▴" : "Show ▾"}
+              </span>
+            </button>
+            {showHistory && (
+              <ul className="max-h-48 overflow-y-auto border-t border-sand-200">
+                {pastEmails.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadPast(p)}
+                      className="flex w-full items-start justify-between gap-3 border-b border-sand-100 px-3 py-2 text-left text-xs hover:bg-cream/60"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <StatusChip status={p.status} />
+                          <span className="truncate font-medium text-navy">
+                            {p.subject || "(no subject)"}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-slate-deep">
+                          {p.body_markdown.slice(0, 160)}
+                          {p.body_markdown.length > 160 && "…"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] text-slate-mid">
+                        {new Date(p.created_at).toLocaleString("en-GB", {
+                          timeZone: "Asia/Bangkok",
+                          hour12: false,
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Main pane */}
+        {isAwaiting && (
+          <div className="space-y-3 rounded-md border border-dashed border-sand-200 bg-cream/40 p-5 text-center">
+            <p className="text-sm text-charcoal">
+              Pick a past draft above, or draft a fresh one with the current
+              model + language.
+            </p>
+            <Button onClick={() => fireDraftStream(model, language)}>
+              Draft a new email
+            </Button>
+          </div>
+        )}
+
+        {streaming && (
           <StreamingPane
-            partialSubject={stage.partialSubject}
-            partialBody={stage.partialBody}
+            partialSubject={
+              mode.kind === "streaming" ? mode.partialSubject : ""
+            }
+            partialBody={mode.kind === "streaming" ? mode.partialBody : ""}
+            model={model}
           />
         )}
 
-        {stage.kind === "complete" && (
+        {isReady && (
           <EditablePane
-            subject={editedSubject}
-            setSubject={setEditedSubject}
-            body={editedBody}
-            setBody={setEditedBody}
+            subject={subject}
+            setSubject={setSubject}
+            body={body}
+            setBody={setBody}
             rationale={rationale}
             sending={sending}
-            onSend={handleSend}
-            onCancel={() => onOpenChange(false)}
           />
         )}
 
-        {stage.kind === "error" && (
-          <ErrorPane message={stage.message} onClose={() => onOpenChange(false)} />
+        {isError && (
+          <div className="rounded-md border border-danger/30 bg-danger/5 p-4">
+            <p className="text-sm font-medium text-danger">Draft failed</p>
+            <p className="mt-1 text-sm text-danger/90">
+              {mode.kind === "error" ? mode.message : ""}
+            </p>
+          </div>
         )}
+
+        {/* Footer */}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={sending}
+          >
+            Cancel
+          </Button>
+          {(isReady || isError) && (
+            <Button
+              variant="outline"
+              onClick={handleRegenerate}
+              disabled={sending}
+            >
+              {isError ? "Try again" : "Regenerate"}
+            </Button>
+          )}
+          {isReady && (
+            <Button onClick={handleSend} disabled={sending}>
+              {sending ? "Sending…" : "Send"}
+            </Button>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -315,20 +552,27 @@ export function ColdEmailDialog(props: Props) {
 function StreamingPane({
   partialSubject,
   partialBody,
+  model,
 }: {
   partialSubject: string;
   partialBody: string;
+  model: ModelChoice;
 }) {
   const hasAny = partialSubject.length > 0 || partialBody.length > 0;
   return (
     <div className="space-y-3 rounded-md border border-dashed border-sand-200 bg-cream/40 p-4">
-      <div className="flex items-center gap-2">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-info" />
-        <p className="text-sm font-medium text-navy">Claude is drafting…</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-info" />
+          <p className="text-sm font-medium text-navy">
+            {model === "claude-opus-4-7" ? "Opus 4.7" : "Haiku 4.5"} is
+            drafting…
+          </p>
+        </div>
       </div>
       {!hasAny ? (
         <p className="text-xs text-slate-mid">
-          Waiting for the first token. This usually takes a couple of seconds.
+          Waiting for the first token. Usually 2-4 seconds.
         </p>
       ) : (
         <div className="space-y-3">
@@ -337,9 +581,7 @@ function StreamingPane({
               Subject
             </p>
             <p className="rounded-sm bg-warm-white px-3 py-2 text-sm text-navy">
-              {partialSubject || (
-                <span className="text-slate-mid">…</span>
-              )}
+              {partialSubject || <span className="text-slate-mid">…</span>}
             </p>
           </div>
           <div>
@@ -363,8 +605,6 @@ function EditablePane({
   setBody,
   rationale,
   sending,
-  onSend,
-  onCancel,
 }: {
   subject: string;
   setSubject: (s: string) => void;
@@ -372,8 +612,6 @@ function EditablePane({
   setBody: (s: string) => void;
   rationale: string;
   sending: boolean;
-  onSend: () => void;
-  onCancel: () => void;
 }) {
   return (
     <div className="space-y-3">
@@ -415,36 +653,28 @@ function EditablePane({
           </p>
         </details>
       )}
-      <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel} disabled={sending}>
-          Cancel
-        </Button>
-        <Button onClick={onSend} disabled={sending}>
-          {sending ? "Sending…" : "Send"}
-        </Button>
-      </div>
     </div>
   );
 }
 
-function ErrorPane({
-  message,
-  onClose,
-}: {
-  message: string;
-  onClose: () => void;
-}) {
+function StatusChip({ status }: { status: PastEmail["status"] }) {
+  const styles: Record<PastEmail["status"], string> = {
+    drafted: "bg-sand-100 text-charcoal",
+    sent: "bg-success/10 text-success",
+    failed: "bg-danger/15 text-danger",
+    discarded: "bg-warning/15 text-warning",
+  };
+  const label: Record<PastEmail["status"], string> = {
+    drafted: "draft",
+    sent: "sent",
+    failed: "failed",
+    discarded: "discarded",
+  };
   return (
-    <div className="space-y-3 rounded-md border border-danger/30 bg-danger/5 p-4">
-      <div>
-        <p className="text-sm font-medium text-danger">Draft failed</p>
-        <p className="mt-1 text-sm text-danger/90">{message}</p>
-      </div>
-      <div className="flex justify-end">
-        <Button variant="outline" onClick={onClose}>
-          Close
-        </Button>
-      </div>
-    </div>
+    <span
+      className={`shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${styles[status]}`}
+    >
+      {label[status]}
+    </span>
   );
 }

@@ -4,26 +4,40 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   streamWithTool,
   ClaudeValidationError,
+  type ModelId,
 } from "@/lib/anthropic/client";
 import {
   composeColdEmailTool,
   type ComposeColdEmailInput,
 } from "@/lib/anthropic/tools/compose_cold_email";
-import { buildColdEmailMessages } from "@/lib/anthropic/prompts/cold-email";
+import {
+  buildColdEmailMessages,
+  resolveColdEmailLanguage,
+  type ColdEmailLanguage,
+} from "@/lib/anthropic/prompts/cold-email";
+import { ORG_ID } from "@/lib/db/constants";
 import type { CandidateRow, JdRow, ScoreRow } from "@/lib/db/types";
 
 /**
  * POST /api/emails/draft
  *
- * Body: { candidateId: string, jdId: string }
+ * Body: {
+ *   candidateId: string,
+ *   jdId: string,
+ *   model?: 'claude-opus-4-7' | 'claude-haiku-4-5',
+ *   language?: 'th' | 'en' | 'auto'
+ * }
  *
  * SSE event types:
- *   - draft_partial   { text }                            typewriter (raw tool-input JSON)
- *   - draft_complete  { subject, body, rationale, telemetry }   validated final draft
- *   - draft_error     { message, telemetry?, raw? }       failure
+ *   - draft_partial   { text }                                       typewriter (raw tool-input JSON)
+ *   - draft_complete  { emailId, subject, body, rationale, telemetry, model, language }
+ *   - draft_error     { message, telemetry?, raw? }                  failure
  *
- * Mirrors the shape of /api/score/run so the client-side SSE parser
- * pattern (used by ScoreStream) drops in with minimal change.
+ * On successful streaming, the route auto-persists a `drafted` row in
+ * the `emails` table BEFORE emitting draft_complete. The client gets
+ * the new row's id back as `emailId` so it can later send-by-update
+ * rather than send-by-insert (keeps the email count clean for users
+ * who try multiple drafts before sending one).
  */
 
 export const runtime = "nodejs";
@@ -32,7 +46,13 @@ export const dynamic = "force-dynamic";
 type RequestBody = {
   candidateId: string;
   jdId: string;
+  model?: ModelId;
+  language?: ColdEmailLanguage;
 };
+
+const ALLOWED_MODELS: ModelId[] = ["claude-opus-4-7", "claude-haiku-4-5"];
+const DEFAULT_MODEL: ModelId = "claude-opus-4-7";
+const DEFAULT_LANGUAGE: ColdEmailLanguage = "th";
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -65,6 +85,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const model: ModelId =
+    body.model && ALLOWED_MODELS.includes(body.model) ? body.model : DEFAULT_MODEL;
+  const languagePref: ColdEmailLanguage =
+    body.language === "th" || body.language === "en" || body.language === "auto"
+      ? body.language
+      : DEFAULT_LANGUAGE;
+
   const [
     { data: candidate, error: cErr },
     { data: jd, error: jErr },
@@ -81,9 +108,6 @@ export async function POST(req: NextRequest) {
       .select("*")
       .eq("id", body.jdId)
       .single(),
-    // Latest score against THIS JD specifically — the prompt uses its
-    // reasoning to inform the hook. If there isn't one, the draft still
-    // works; the model just has less to ground on.
     supabase
       .from("scores")
       .select("*")
@@ -92,8 +116,6 @@ export async function POST(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    // Signature + from-name come from user_settings. Admin client because
-    // RLS is per-user but we want a single read here.
     createAdminClient()
       .from("user_settings")
       .select("email_signature, email_from_name")
@@ -124,12 +146,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Resolve the language preference against the candidate's detected
+  // language. `auto` picks Thai for Thai-detected profiles, English otherwise.
+  const detectedLang =
+    typeof candidateRow.raw_profile?.detected_language === "string"
+      ? (candidateRow.raw_profile.detected_language as string)
+      : null;
+  const targetLanguage = resolveColdEmailLanguage(languagePref, detectedLang);
+
   const { system, messages } = buildColdEmailMessages({
     jd: jdRow,
     candidate: candidateRow,
     score: (latestScore as ScoreRow | null) ?? null,
     fromName: userSettings?.email_from_name ?? null,
     signature: userSettings?.email_signature ?? null,
+    targetLanguage,
   });
 
   const encoder = new TextEncoder();
@@ -140,7 +171,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const { stream, result } = streamWithTool<ComposeColdEmailInput>({
-          model: "claude-opus-4-7",
+          model,
           system,
           messages,
           tool: composeColdEmailTool,
@@ -169,11 +200,40 @@ export async function POST(req: NextRequest) {
         }
 
         const { value, telemetry } = await result;
+
+        // Autosave the draft so the user can pick it from history later
+        // even if they close without sending. Failure here doesn't block
+        // the response — the user still sees the draft in the dialog.
+        let emailId: string | null = null;
+        try {
+          const admin = createAdminClient();
+          const { data: inserted } = await admin
+            .from("emails")
+            .insert({
+              org_id: ORG_ID,
+              candidate_id: body.candidateId,
+              jd_id: body.jdId,
+              user_id: user.id,
+              status: "drafted",
+              subject: value.subject,
+              body_markdown: value.body_markdown,
+              rationale: value.rationale,
+            })
+            .select("id")
+            .single();
+          emailId = inserted?.id ?? null;
+        } catch (err) {
+          console.error("[/api/emails/draft] autosave failed", err);
+        }
+
         emit("draft_complete", {
+          emailId,
           subject: value.subject,
           body: value.body_markdown,
           rationale: value.rationale,
           telemetry,
+          model,
+          language: targetLanguage,
         });
       } catch (err) {
         if (err instanceof ClaudeValidationError) {

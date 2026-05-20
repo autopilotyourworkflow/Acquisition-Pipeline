@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ColdEmailDialog } from "./ColdEmailDialog.client";
+import { ColdEmailDialog, type PastEmail } from "./ColdEmailDialog.client";
 
 /**
  * Server-component-friendly wrapper around ColdEmailDialog. The candidate
@@ -17,6 +17,10 @@ import { ColdEmailDialog } from "./ColdEmailDialog.client";
  *
  * If any precondition is missing, the parent passes a disabled-shape
  * variant of the button with an explanatory tooltip via `title`.
+ *
+ * `pastEmails` is the latest 10 drafts/sends for this candidate+JD, fetched
+ * server-side and threaded through so the dialog can render its history
+ * panel instantly on open (no extra round-trip).
  */
 
 type Props = {
@@ -24,6 +28,7 @@ type Props = {
   jdId: string | null;
   jdTitle: string | null;
   hasGmailSend: boolean;
+  pastEmails: PastEmail[];
 };
 
 export function ColdEmailLauncher({
@@ -31,6 +36,7 @@ export function ColdEmailLauncher({
   jdId,
   jdTitle,
   hasGmailSend,
+  pastEmails,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -73,7 +79,14 @@ export function ColdEmailLauncher({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Draft cold email</Button>
+      <Button onClick={() => setOpen(true)}>
+        Draft cold email
+        {pastEmails.length > 0 && (
+          <span className="ml-1.5 rounded-sm bg-warm-white/20 px-1 font-mono text-[10px]">
+            {pastEmails.length}
+          </span>
+        )}
+      </Button>
       {open && (
         <ColdEmailDialog
           open={open}
@@ -86,6 +99,7 @@ export function ColdEmailLauncher({
           }}
           jdId={jdId}
           jdTitle={jdTitle}
+          initialPastEmails={pastEmails}
         />
       )}
     </>

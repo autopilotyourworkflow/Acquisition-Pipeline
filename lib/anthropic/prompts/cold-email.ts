@@ -2,6 +2,34 @@ import type { CacheableTextBlock } from "@/lib/anthropic/client";
 import type { CandidateRow, JdRow, ScoreRow } from "@/lib/db/types";
 
 /**
+ * Languages the cold-email composer supports. Default is Thai — Hotel Plus
+ * is a Thai consulting firm and most outreach should be in Thai unless the
+ * candidate is non-Thai-speaking. `auto` reads the candidate's
+ * `raw_profile.detected_language` (set by the scraper) and picks Thai for
+ * `th`, English for `en`/`other`. Always passed through to the prompt as
+ * a resolved string ("Thai" or "English") so the model gets an unambiguous
+ * directive.
+ */
+export type ColdEmailLanguage = "th" | "en" | "auto";
+export const COLD_EMAIL_LANGUAGES: ColdEmailLanguage[] = ["th", "en", "auto"];
+export const COLD_EMAIL_LANGUAGE_LABELS: Record<ColdEmailLanguage, string> = {
+  th: "Thai (default)",
+  en: "English",
+  auto: "Auto (match candidate)",
+};
+
+export function resolveColdEmailLanguage(
+  pref: ColdEmailLanguage,
+  detected: string | null | undefined,
+): "Thai" | "English" {
+  if (pref === "th") return "Thai";
+  if (pref === "en") return "English";
+  // auto
+  if (detected === "th") return "Thai";
+  return "English";
+}
+
+/**
  * Cold-outreach email prompt — Phase 3e.
  *
  * Voice matters here, not cost: this is Opus 4.7 territory. Generic cold
@@ -18,7 +46,14 @@ import type { CandidateRow, JdRow, ScoreRow } from "@/lib/db/types";
 
 export const COLD_EMAIL_PROMPT_VERSION = "cold-email.v1";
 
-export const COLD_EMAIL_SYSTEM_PERSONA = `You are a recruiting partner for Hotel Plus (hotelplus.asia), a Thai hotel-management consulting firm. You write cold-outreach emails the way a senior recruiter writes them: short, specific, deferential, allergic to template language.
+function buildSystemPersona(targetLanguage: "Thai" | "English"): string {
+  const languageDirective =
+    targetLanguage === "Thai"
+      ? `LANGUAGE: Write the subject and body in **Thai**. Use polite, professional Thai appropriate for a recruiting outreach — ครับ/ค่ะ as fits the sender, no slang, no overly formal palace language. Keep proper nouns (company names, role titles, foreign-language skills) in their natural form. The rationale field stays in English — it's for the internal recruiter, who reads English.`
+      : `LANGUAGE: Write the subject and body in **English**. Polite, professional tone. The rationale field also stays in English.`;
+  return `You are a recruiting partner for Hotel Plus (hotelplus.asia), a Thai hotel-management consulting firm. You write cold-outreach emails the way a senior recruiter writes them: short, specific, deferential, allergic to template language.
+
+${languageDirective}
 
 Your job: draft ONE personalized cold email from Hotel Plus to a candidate the team has identified as a strong potential fit for a specific role.
 
@@ -43,6 +78,7 @@ What good looks like:
 Output ONLY via the compose_cold_email tool. Do not respond in free text. Do not preface the tool call. Do not summarize after.
 
 Rationale field: write ONE or TWO short sentences for the human recruiter explaining WHY this specific hook will land with this specific candidate. This is internal — they'll read it before deciding to send. Be honest; if the fit is partial, say what's strong AND what's a stretch.`;
+}
 
 /**
  * Build the messages for a cold-email composition run. JD body is cacheable
@@ -63,7 +99,14 @@ export function buildColdEmailMessages(args: {
   score?: Pick<ScoreRow, "reasoning" | "strengths" | "gaps" | "weighted_total"> | null;
   fromName?: string | null;
   signature?: string | null;
+  /**
+   * Target language for the email body. Defaults to "Thai" — Hotel Plus's
+   * primary outreach language. Use `resolveColdEmailLanguage()` to convert
+   * a user preference + candidate-detected-language into the resolved value.
+   */
+  targetLanguage?: "Thai" | "English";
 }): { system: CacheableTextBlock[]; messages: { role: "user"; content: string }[] } {
+  const targetLanguage = args.targetLanguage ?? "Thai";
   const jdBlock =
     `# Job Description: ${args.jd.title}\n\n` +
     `## Must-have\n${args.jd.must_have.map((s) => `- ${s}`).join("\n")}\n\n` +
@@ -119,8 +162,10 @@ export function buildColdEmailMessages(args: {
 
   return {
     system: [
-      { type: "text", text: COLD_EMAIL_SYSTEM_PERSONA },
-      // Cacheable: same JD across many candidate drafts.
+      { type: "text", text: buildSystemPersona(targetLanguage) },
+      // Cacheable: same JD across many candidate drafts. Note: the persona
+      // block is NOT cacheable because it varies by `targetLanguage` —
+      // cache only the JD body where reuse is highest.
       { type: "text", cache: true, text: jdBlock },
     ],
     messages: [{ role: "user", content: userContent }],

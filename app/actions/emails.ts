@@ -36,15 +36,24 @@ async function getActor() {
  *     if the model didn't already (the prompt instructs it to, but we don't
  *     trust the model unconditionally).
  *  3. Send via Gmail.
- *  4. Insert the `emails` row (status='sent') and audit-log it.
+ *  4. EITHER update the existing drafted row to status='sent' (if `emailId`
+ *     was passed — typical path after the SSE route autosaved a draft) OR
+ *     insert a fresh 'sent' row.
+ *  5. Audit-log the change.
  *
- * Ordering matters: we send FIRST, then insert. If the insert fails after
- * a successful send, we still log a 'sent' row via the catch block so the
- * activity log doesn't lose the event. The reverse ordering (insert as
- * 'drafted', then send, then update to 'sent') would leave orphan 'drafted'
- * rows on any HTTP hiccup, which is worse UX than the rare insert-after-send
- * failure (a) almost never happens, b) is already retried by Supabase's
- * connection pool, c) leaves the activity log noisier rather than cleaner).
+ * Ordering matters: we send FIRST, then persist. If persistence fails after
+ * a successful send, we still treat the user-facing result as success so
+ * they don't re-send. The 'failed' branch captures only the case where
+ * Gmail itself rejected the send.
+ *
+ * The `emailId` parameter is the draft row id returned by /api/emails/draft
+ * in the draft_complete SSE event. When present, we UPDATE that row rather
+ * than INSERT a new one — this keeps the `emails` table tidy when a user
+ * generates a draft and then sends it (otherwise they'd accumulate one
+ * drafted + one sent row per send). When the user loads a past draft from
+ * history and sends it edited, the same path applies. When the user
+ * regenerated or skipped autosave entirely, emailId is null and we insert
+ * fresh.
  */
 export async function sendColdEmail(input: {
   candidateId: string;
@@ -52,6 +61,8 @@ export async function sendColdEmail(input: {
   subject: string;
   body: string;
   rationale?: string;
+  /** If provided, UPDATE that drafted row to 'sent' instead of inserting. */
+  emailId?: string | null;
 }): Promise<ActionResult<{ emailId: string }>> {
   try {
     const { supabase, userId } = await getActor();
@@ -98,6 +109,22 @@ export async function sendColdEmail(input: {
         : body;
     const finalBodyHtml = markdownToEmailHtml(finalBodyText);
 
+    // If the caller passed an emailId, verify it belongs to this user
+    // before relying on it as the update target. Defends against a hostile
+    // client sending another user's draft id.
+    let priorRow: Record<string, unknown> | null = null;
+    if (input.emailId) {
+      const { data: prior } = await admin
+        .from("emails")
+        .select("*")
+        .eq("id", input.emailId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (prior && prior.status === "drafted") {
+        priorRow = prior as Record<string, unknown>;
+      }
+    }
+
     let messageId: string;
     let threadId: string;
     try {
@@ -114,17 +141,32 @@ export async function sendColdEmail(input: {
     } catch (err) {
       if (err instanceof GmailSendError) {
         // Persist a 'failed' row so /activity has a record of the attempt.
-        await admin.from("emails").insert({
-          org_id: ORG_ID,
-          candidate_id: input.candidateId,
-          jd_id: input.jdId,
-          user_id: userId,
-          status: "failed",
-          subject,
-          body_markdown: finalBodyText,
-          rationale: input.rationale ?? null,
-          error: err.message,
-        });
+        // If a draft row existed, mark IT failed rather than inserting a
+        // second row — keeps history clean.
+        if (priorRow) {
+          await admin
+            .from("emails")
+            .update({
+              status: "failed",
+              subject,
+              body_markdown: finalBodyText,
+              rationale: input.rationale ?? null,
+              error: err.message,
+            })
+            .eq("id", priorRow.id as string);
+        } else {
+          await admin.from("emails").insert({
+            org_id: ORG_ID,
+            candidate_id: input.candidateId,
+            jd_id: input.jdId,
+            user_id: userId,
+            status: "failed",
+            subject,
+            body_markdown: finalBodyText,
+            rationale: input.rationale ?? null,
+            error: err.message,
+          });
+        }
         const hint =
           err.reason === "missing_scope"
             ? " Visit /settings/integrations and re-connect Google to grant the gmail.send scope."
@@ -136,57 +178,105 @@ export async function sendColdEmail(input: {
       throw err;
     }
 
-    // Insert the 'sent' row and audit it.
-    const { data: emailRow, error: insErr } = await admin
-      .from("emails")
-      .insert({
-        org_id: ORG_ID,
-        candidate_id: input.candidateId,
-        jd_id: input.jdId,
-        user_id: userId,
-        status: "sent",
-        subject,
-        body_markdown: finalBodyText,
-        rationale: input.rationale ?? null,
-        gmail_message_id: messageId,
-        gmail_thread_id: threadId,
-        sent_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-    if (insErr || !emailRow) {
-      // Email already went out — log the row failure but treat as success
-      // from the user's perspective so they don't re-send.
-      console.error("[sendColdEmail] DB insert failed after Gmail send", {
-        candidateId: input.candidateId,
-        messageId,
-        error: insErr,
-      });
-      return {
-        ok: true,
-        data: { emailId: messageId },
-      };
+    // Persist the 'sent' row — UPDATE the prior draft if we have one,
+    // INSERT fresh otherwise. Audit-log the corresponding action.
+    let emailRow: Record<string, unknown> | null = null;
+    let auditAction: "insert" | "update" = "insert";
+    if (priorRow) {
+      const { data: updated, error: updErr } = await admin
+        .from("emails")
+        .update({
+          status: "sent",
+          subject,
+          body_markdown: finalBodyText,
+          rationale: input.rationale ?? null,
+          gmail_message_id: messageId,
+          gmail_thread_id: threadId,
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", priorRow.id as string)
+        .select()
+        .single();
+      if (!updErr && updated) {
+        emailRow = updated as Record<string, unknown>;
+        auditAction = "update";
+      }
+    }
+    if (!emailRow) {
+      const { data: inserted, error: insErr } = await admin
+        .from("emails")
+        .insert({
+          org_id: ORG_ID,
+          candidate_id: input.candidateId,
+          jd_id: input.jdId,
+          user_id: userId,
+          status: "sent",
+          subject,
+          body_markdown: finalBodyText,
+          rationale: input.rationale ?? null,
+          gmail_message_id: messageId,
+          gmail_thread_id: threadId,
+          sent_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      if (insErr || !inserted) {
+        console.error("[sendColdEmail] DB persist failed after Gmail send", {
+          candidateId: input.candidateId,
+          messageId,
+          error: insErr,
+        });
+        return { ok: true, data: { emailId: messageId } };
+      }
+      emailRow = inserted as Record<string, unknown>;
     }
 
     const rowHash = computeRowHash(emailRow);
     await admin
       .from("emails")
       .update({ row_hash: rowHash })
-      .eq("id", emailRow.id);
+      .eq("id", emailRow.id as string);
 
     await withAudit({
       actorId: userId,
       orgId: ORG_ID,
-      action: "insert",
+      action: auditAction,
       table: "emails",
-      targetId: emailRow.id,
-      before: null,
+      targetId: emailRow.id as string,
+      before: priorRow,
       mutate: async () => ({ ...emailRow, row_hash: rowHash }),
     });
 
     revalidatePath(`/candidates/${input.candidateId}`);
     revalidatePath("/activity");
-    return { ok: true, data: { emailId: emailRow.id } };
+    return { ok: true, data: { emailId: emailRow.id as string } };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Mark an autosaved draft as 'discarded'. Used when the user closes the
+ * dialog without sending and wants a clean history list. Optional — the
+ * UI can skip this and just leave 'drafted' rows in place.
+ */
+export async function discardColdEmailDraft(input: {
+  emailId: string;
+}): Promise<ActionResult> {
+  try {
+    const { userId } = await getActor();
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("emails")
+      .update({ status: "discarded" })
+      .eq("id", input.emailId)
+      .eq("user_id", userId)
+      .eq("status", "drafted");
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, data: undefined };
   } catch (err) {
     return {
       ok: false,
