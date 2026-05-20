@@ -592,15 +592,15 @@ The auth-degrade path matters too: if the user signed in via email OTP and never
 
 ## 36. Six bugs, one chain — when a QA pass exposes the shape
 
-Ben deployed the conflict-detection build and immediately hit six things in one screenshot: reschedule had no warning, Google deletes didn't reflect on the web, the warning was slow, conflicting events at non-exact-start times showed without a title, CV URLs were back to the long form on reschedule, and the web showed three interviews while Google showed two. Six issues, surface-level different, and three of them ended up sharing root causes.
+Beam deployed the conflict-detection build and immediately hit six things in one screenshot: reschedule had no warning, Google deletes didn't reflect on the web, the warning was slow, conflicting events at non-exact-start times showed without a title, CV URLs were back to the long form on reschedule, and the web showed three interviews while Google showed two. Six issues, surface-level different, and three of them ended up sharing root causes.
 
 The slow warning + missing title were the same bug. I'd reached for FreeBusy first because that's the API named after the question I was asking ("is the user busy?"). But FreeBusy returns intervals *clipped to your query window* — proposing 17:10–17:40 against a 17:00–17:30 standup returns a busy block of 17:10–17:30, which never matches the event's actual 17:00–17:30 start/end on the secondary `events.list` call I was using for titles. Two API calls, expensively coordinated, producing worse data than one. Dropped FreeBusy entirely, kept only `events.list`, ran overlap math directly on the returned events. Faster *and* correct. The lesson: the API with the on-point name isn't always the right shape — sometimes the more general endpoint gives you everything you need in fewer calls.
 
 The CV-URL regression was the kind of bug that only happens when the same logical operation lives in two places. The create path wrapped the signed Supabase URL with the link shortener; the reschedule path had its own inlined copy that just assigned the long URL directly. Both worked. One was wrong. The fix wasn't to patch the reschedule path — it was to extract `getCandidateCvInviteUrl()` into `lib/interviews/cv-link.ts` and have both routes call it. Now the long URL physically can't sneak back in because no caller chooses; there's exactly one function for "what CV link goes in an invite?" "Never let this happen again" is an architectural property, not a checklist item.
 
-The Google→DB sync was the architectural omission. We'd built three routes that pushed changes to Google (create / reschedule / cancel) and zero that pulled changes back. Ben deleting an event in his Google app left our DB blind. The fix added one function `reconcileWithGoogle()` plus a server-side reconcile on `/schedule` page load — one `events.list` call, build a set of live event IDs, anything in our DB whose `google_event_id` isn't in the set gets marked cancelled through `withAudit` so it's still undo-able. The defensive bail (if Google returns >250 events and indicates more pages, skip rather than risk false cancellations) cost three lines and removed a whole class of "wait, where did my interview go" incidents.
+The Google→DB sync was the architectural omission. We'd built three routes that pushed changes to Google (create / reschedule / cancel) and zero that pulled changes back. Beam deleting an event in his Google app left our DB blind. The fix added one function `reconcileWithGoogle()` plus a server-side reconcile on `/schedule` page load — one `events.list` call, build a set of live event IDs, anything in our DB whose `google_event_id` isn't in the set gets marked cancelled through `withAudit` so it's still undo-able. The defensive bail (if Google returns >250 events and indicates more pages, skip rather than risk false cancellations) cost three lines and removed a whole class of "wait, where did my interview go" incidents.
 
-The ghost interview at 17:30 in Ben's screenshot was just the first observable instance of the sync gap. Whether he created two and clicked submit three times, or created three and deleted one in Google, didn't matter — the right answer was to make our DB reflect Google's reality on every page load, and let the underlying cause stop mattering. The Refresh button is just there for the moment between "I deleted it" and "I'm about to navigate."
+The ghost interview at 17:30 in Beam's screenshot was just the first observable instance of the sync gap. Whether he created two and clicked submit three times, or created three and deleted one in Google, didn't matter — the right answer was to make our DB reflect Google's reality on every page load, and let the underlying cause stop mattering. The Refresh button is just there for the moment between "I deleted it" and "I'm about to navigate."
 
 **When a QA pass surfaces three bugs that share a root cause, the right deliverable isn't three fixes — it's a piece of architecture that makes the failure mode unrepresentable.**
 
@@ -648,15 +648,15 @@ There was a quieter call in the same file: the orchestrator scores each candidat
 
 ## 39. The spec was built on a wrong assumption — and the iteration loop that followed
 
-The Phase 3d prompt looked clean on paper. JD-level "Find candidates" dialog, Apify for LinkedIn, SerpAPI+Jina for JobsDB, scoring on the way in. I built it, pushed it, and Ben's first real run produced two "<UNKNOWN>" candidates from a JobsDB Jina-only fallback that had scraped a job-listing search page and tried to make people out of it. Money spent: $0.09. Real candidates extracted: zero.
+The Phase 3d prompt looked clean on paper. JD-level "Find candidates" dialog, Apify for LinkedIn, SerpAPI+Jina for JobsDB, scoring on the way in. I built it, pushed it, and Beam's first real run produced two "<UNKNOWN>" candidates from a JobsDB Jina-only fallback that had scraped a job-listing search page and tried to make people out of it. Money spent: $0.09. Real candidates extracted: zero.
 
 The wrong assumption was *that JobsDB had public candidate URLs at all*. It doesn't. Ever. JobsDB is an employer-side product — candidate detail pages are login-walled by definition. So the whole "fan out search across LinkedIn + JobsDB" framing was just LinkedIn with a useless second checkbox. The fix wasn't to make JobsDB outbound less flaky; it was to delete the premise. Disabled the checkbox, added a money guard that drops any "candidate" with a placeholder name before scoring spend, and reframed the JobsDB workflow entirely around a **bookmarklet** that piggybacks on the user's logged-in browser session — the only context in which JobsDB candidate data actually exists.
 
 The bookmarklet bug arc was its own lesson. First version used `fetch()` from the source page — blocked by LinkedIn's CSP `connect-src`. Switched to a `window.open()` to our own `/bookmarklet-capture` page carrying the payload in the URL hash; that bypasses CSP because the POST originates from our same-origin tab. Then React 16.9+ refused to render `javascript:` URLs in JSX `href` props (silently replaces them with an error stub) — fixed by setting the href via DOM after mount with a `useRef`. Then LinkedIn's lazy-loaded experience sections returned empty captures unless the page was scrolled first — added a top-to-bottom scroll dance in the bookmarklet. Then Haiku occasionally returned `experience` and `education` as strings instead of arrays — extended the coercer to degrade malformed array fields to `[]` rather than failing the whole extraction.
 
-The Proxycurl-to-Apify swap had its own rabbit hole. Proxycurl gates on a paid work email at signup. Apify has a free $5/month credit and a marketplace of LinkedIn actors. But picking an actor was guesswork until Ben hit a 403 ("full-permission-actor-not-approved") on the first real call, which led to fetching the actor's docs and discovering the input shape I'd built against was completely wrong — `{ queries, keywords, maxItems, maxResults }` vs. the actor's actual `{ searchQuery, currentJobTitles, locations, profileScraperMode, maxItems }`. Even after the approval click, the first fixed-shape run returned zero results because we were ANDing 4 strict job-title filters together. Loosened to "top 4 keywords + top 2 title hints inline in searchQuery." That finally landed real candidates.
+The Proxycurl-to-Apify swap had its own rabbit hole. Proxycurl gates on a paid work email at signup. Apify has a free $5/month credit and a marketplace of LinkedIn actors. But picking an actor was guesswork until Beam hit a 403 ("full-permission-actor-not-approved") on the first real call, which led to fetching the actor's docs and discovering the input shape I'd built against was completely wrong — `{ queries, keywords, maxItems, maxResults }` vs. the actor's actual `{ searchQuery, currentJobTitles, locations, profileScraperMode, maxItems }`. Even after the approval click, the first fixed-shape run returned zero results because we were ANDing 4 strict job-title filters together. Loosened to "top 4 keywords + top 2 title hints inline in searchQuery." That finally landed real candidates.
 
-The Sourced-stage call came at the end, after Ben pointed out that mixing outbound candidates with inbound "Applied" applicants broke the funnel's narrative. Outbound = we found them, they haven't engaged. Inbound = they engaged with us. Different next actions, different visual urgency. Added the stage in front of `applied`, gave it a navy-tinted badge that reads as "passive / untouched", and now the Kanban tells a coherent story left-to-right: passive → engaged → screened → interviewed → hired.
+The Sourced-stage call came at the end, after Beam pointed out that mixing outbound candidates with inbound "Applied" applicants broke the funnel's narrative. Outbound = we found them, they haven't engaged. Inbound = they engaged with us. Different next actions, different visual urgency. Added the stage in front of `applied`, gave it a navy-tinted badge that reads as "passive / untouched", and now the Kanban tells a coherent story left-to-right: passive → engaged → screened → interviewed → hired.
 
 **The most expensive bugs aren't logic errors in the code — they're foundational assumptions in the spec that don't match production reality. The pivot to bookmarklet wasn't a defensive retreat from JobsDB; it was the first version of the feature that could actually exist.**
 
@@ -668,7 +668,7 @@ The Sourced-stage call came at the end, after Ben pointed out that mixing outbou
 
 ## 40. One column for two funnels, and what it means for a cold-email button
 
-The clean version of cold email would have its own stage: `sourced → contacted → screened`. We reached for it instinctively when Ben asked whether the candidate should auto-move after send. *Applied* didn't fit — an outbound candidate who got cold-emailed hasn't applied. A new enum value would have been the rigorous answer.
+The clean version of cold email would have its own stage: `sourced → contacted → screened`. We reached for it instinctively when Beam asked whether the candidate should auto-move after send. *Applied* didn't fit — an outbound candidate who got cold-emailed hasn't applied. A new enum value would have been the rigorous answer.
 
 But "rigorous" was wrong here. A new stage means a new Kanban column on /tracker, a new label in three other files, an extra `ALTER TYPE` migration risk, and — most importantly — a funnel that visually separates two paths that *converge in practice*. The day after a cold-email reply lands and an inbound resume hits the same JD, both candidates are at the same point in HR's workflow: respond, screen, decide whether to interview. Splitting that column buys precision at the cost of clutter.
 
@@ -743,5 +743,70 @@ The send path now branches on `looksLikeHtml(signature)`: HTML signatures flow v
 ---
 
 *43 cowork-log entries. Phase 3e is now QA-stable across English + Thai, with a real-looking signature.*
+
+---
+
+## 44. The Applied/Contacted drag bug was the dnd-kit defaults, not state
+
+After the lint cleanup walk-back, Beam tested again: candidates still couldn't be dropped on the Applied/Contacted column. Specifically. Other columns worked. That specificity was the clue — if state sync were broken, *every* drop would fail. The bug had to be in the collision detection.
+
+`closestCenter` (dnd-kit's default) picks the droppable whose geometric center is closest to the dragged item's center. Sounds reasonable. In practice for a tall column layout, the "center" of each droppable is influenced by how tall the column ends up — a column with five cards is taller than a column with one card, so its center sits lower. When a user drags from a denser source column toward a sparser target column, the source column's center is often *closer* to the dragged card's position (because the dragged card's vertical position partially overlaps the source's bottom), and the drop resolves back to source. The drop "didn't register" from the user's perspective; geometrically it did, just on the wrong column.
+
+The fix swapped `closestCenter` for a `pointerWithin`-then-`rectIntersection` chain. pointerWithin asks "what droppable is the user's cursor literally inside?" which matches intent directly. rectIntersection is the fallback when the cursor briefly escapes the column during a fast drag — it picks the droppable with the largest area overlap with the dragged item's bounding rect. Combined, the user gets what they meant.
+
+The second half of the fix was the droppable shape. The original layout put the droppable on the inner card-list div (excluding the column header). The header was ~28px of dead zone where drops resolved to whichever droppable's center was closest — usually a neighboring column. Hoisted the `setNodeRef` to the entire column wrapper so the whole visible column counts. With both changes, Applied/Contacted drops reliably.
+
+The signature also got the real Hotel Plus brand assets — Beam dropped imageshack URLs for the actual yellow H+ logo + the "เพิ่มรายได้ ลดต้นทุน" marketing banner. The preset HTML now hotlinks both. ImageShack has no published rate limit for hotlinked images and is fine for typical recruiting volume; the fallback if it ever becomes flaky is to drop both files into `public/email-assets/` and serve from the Next.js CDN.
+
+**When a feature works for nine columns out of ten, the bug isn't in the state machine — it's in the geometry. dnd-kit's defaults are sensible but not always intent-matching for vertical-column layouts.**
+
+---
+
+## 45. The state of things before the redesign — what shipped, what's worth keeping, what's worth a second pass
+
+Beam's planning a full redesign in the next chat session. Before walking out, it's worth being honest about what got built and what's load-bearing vs. cosmetic. Five days from "any stack, no hand-holding" to a working acquisition pipeline that does the four rubric modules plus a real chunk of overdelivery — solid as raw output. But "solid" isn't "right," and a redesign is the chance to ask whether the right things got built.
+
+**What shipped (load-bearing):**
+- The `withAudit` HOF + audit-log + any-age undo. Every mutation flows through one place; the activity feed is just a SELECT from `activity_log`. Undo is a generic "revert any logged change" not feature-specific. This is the spine.
+- The Claude client with retry + tool-use forcing + cache markers + cost telemetry. Every AI call goes through `callWithTool` / `streamWithTool`. Zero `@anthropic-ai/sdk` imports anywhere else. Cost tracking + failure handling are uniform across surfaces.
+- Tool-schema-as-contract pattern (`lib/anthropic/tools/*`). Zod schemas double as the input_schema, the validator, and the typed return. The schema *is* the contract — no parallel "what does Claude return" type that drifts.
+- The scraper's single-normalize-path (`lib/scrape/normalize.ts`). All five sources (paste / URL / PDF / screenshot / thirdparty) funnel through the same `extract_candidate` tool. One save path, one validation, one place to debug a weird CV.
+- The Kanban Tracker as the home screen. The Table view exists but Kanban is what HR returns to. Sourced → Applied/Contacted → Screening → Interview → Offer → Hired tells the story.
+
+**What worked but might have been over-engineered:**
+- Team-mode scoring (3 scorers at different temperatures + a manager that consolidates). Demonstrates AI-team thinking but recruiters in practice will use single-mode 95% of the time. The infrastructure is clean; whether it earns its complexity is a real question for the redesign.
+- The link shortener (`/l/<slug>`). Built because calendar invite descriptions had ugly 400-char signed URLs. Solves the problem cleanly, but a future iteration might just attach the PDF to the invite directly (a Google Drive permission ladder + a `gcal.events.attachments[]` array).
+- The audit-wrapped undo for every action. The model says "every change is reversible." In practice, most actions don't need undo — only the destructive ones. The current design pays a tiny perf + complexity tax on inserts that will never be undone. Defensible, but not free.
+
+**What was hard and is worth re-examining:**
+- The cold-email signature flow. Three iterations before it landed: first plain text, then plain text with the model trying to include the signature (and double-bagging it), then full HTML stored as the same field with at-send detection. The HTML route was correct from the start; we just didn't see it until iteration three. **A redesign should probably make signature a first-class structured artifact, not a text blob with detection-on-read.**
+- The Kanban drop targets. Took the whole session to land on `pointerWithin` + bigger droppable. The "you can drag but can't drop on this specific column" symptom is the kind of bug that only shows up with a particular density of cards. A redesign should consider whether Kanban is even the right primary UI vs. an Inbox-style list — many recruiting teams in practice use lists more than boards.
+- The dialog scroll. The cold-email dialog grew tall enough on short viewports that the Send button slipped below the fold. Fixed with `flex flex-col max-h-[90vh]` + a scrollable middle. But the dialog itself is doing too much — model picker, language picker, history panel, body editor, signature preview, rationale. **In a redesign, this could split into a dedicated `/candidates/[id]/email/new` route with the same controls but real page-scroll affordances.**
+
+**Architectural decisions worth re-litigating:**
+- **Storing the scoring persona as a free-text blob.** It's flexible but error-prone (the "must end with submit_score" reminder is in the prompt because the model sometimes forgets the tool call when given a malformed override). A structured persona (seniority + weight knobs + anti-bias toggles + custom rubric) would be safer and lend itself to the AI prompt-builder (4a) feature naturally.
+- **Single `applied` enum value, dual "Applied / Contacted" label.** Solves the immediate problem (don't add a Kanban column) but corrupts the funnel data — analytics can't distinguish "candidate engaged after we cold-emailed" from "candidate applied via a posting." The right answer is probably a real `contacted` stage *between* `sourced` and `applied`. Punted because of the deadline.
+- **8 Kanban columns at 288px each = 2304px wide.** Requires horizontal scrolling on most screens. The funnel is correct but the UI assumes a wide monitor. A vertical list grouped by stage might actually be better.
+
+**What I'd take into the redesign as non-negotiable:**
+- The audit + undo backbone. This is the project's strongest architectural decision.
+- The single Claude client. Cost tracking + retry + cache hits + tool-use forcing live in one file. Don't fork it.
+- The single-normalize-path scraper funnel. Adding a new scraper input type means writing the fetch and ending at `normalizeCandidate({ text })`. The shape is right.
+- The contract-style tool definitions. Zod-schema-as-truth is a discipline that pays off the moment Claude returns something unexpected — the validator catches it, the typed value flows through.
+- The brand register (navy/cream/terracotta, Fraunces + Inter). It reads as a real product, not a CRUD form.
+
+**What I'd drop or rebuild:**
+- The HTML-vs-plain auto-detection on signature. Make signature a structured object — body fragments + footer image refs.
+- Team-mode UI (keep the infrastructure, hide the controls behind a power-user flag).
+- The bookmarklet capture flow — works but is hostile UX. A real browser extension (Phase 5, deferred) would be cleaner.
+- The 8-column Kanban. Try a list view grouped by stage with collapsible sections, or a two-pane "Inbox + selected candidate" layout.
+
+The five days produced a working system. A redesign isn't admitting failure — it's the second iteration that incorporates everything we learned from the first.
+
+**The takeaway from 45 entries: the architecture spine is sound, the surface needs another pass. The redesign is the right call.**
+
+---
+
+*45 cowork-log entries. Phase 3e cold-email is QA-stable. Phase 4a + 4c surfaced as "coming soon" placeholders so the reviewer sees the roadmap. Submission-ready. Next chat: full redesign.*
 
 ---

@@ -106,7 +106,7 @@ SSE events: draft_partial { text }, draft_complete { subject, body, rationale, t
 - [ ] Toast offers "Move to Applied?" → clicking it updates the candidate's stage
 
 ## First action
-Confirm two things with Ben:
+Confirm two things with Beam:
 1. What's his default signature + from name? (Or leave blank and let him fill it later.)
 2. After send, should we auto-prompt "Move candidate to Applied?" — or just send the email and leave the stage alone (HR drags manually)?
 

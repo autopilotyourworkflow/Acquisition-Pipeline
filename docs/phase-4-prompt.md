@@ -1,30 +1,33 @@
 # Phase 4 — overdelivery pass (status index)
 
-Phases 1, 2, 3 are done. Phase 4 is the "overdelivery" pass — items beyond the rubric's required four modules. Originally six potential items; planned cut: build 4a + 4b + 4c, defer 4d/4e/4f to Phase 5 polish. A small finish-Phase-3 task (conflict detection) ships first.
+Phases 1, 2, 3, and Pre-Phase 4 are done. Two new outbound-flow modules (3d / 3e) ship *before* Phase 4 because they replace the standalone 4b cold-email plan with a JD-outward flow (source candidates → email them). Phase 4 then narrows to 4a + 4c.
 
 ## Status table
 
 | Module | Status | Prompt | Why prioritize |
 |---|---|---|---|
-| Pre — Scheduling conflict detection | not started | [pre-phase-4-conflict-detection.md](pre-phase-4-conflict-detection.md) | Closes a rubric requirement (Module 4 explicitly asks for it). ~30 min of build. Do this first. |
+| Pre — Scheduling conflict detection | ✅ done | [pre-phase-4-conflict-detection.md](pre-phase-4-conflict-detection.md) | Closed a rubric requirement (Module 4 explicitly asks for it). |
+| 3d — Outbound sourcing + JobsDB inbound | not started | [phase-3d-outbound-sourcing.md](phase-3d-outbound-sourcing.md) | Assignment brief explicitly calls out JobsDB candidate scraping. Outbound sourcing is the parent flow that makes cold email (3e) a natural consequence. |
+| 3e — Cold email (review-before-send) | not started | [phase-3e-cold-email.md](phase-3e-cold-email.md) | **Replaces former 4b.** Once 3d sources candidates, the next-step CTA is "email them." Single-candidate review-before-send flow. |
 | 4a — AI prompt-builder questionnaire | not started | [phase-4a-prompt-builder.md](phase-4a-prompt-builder.md) | High rubric ROI — the system teaches users how to configure it well. Most demo-able overdelivery. |
-| 4b — Cold-email drafter (draft + send) | not started | [phase-4b-cold-email.md](phase-4b-cold-email.md) | Visible action on the candidate data. Pairs naturally with 4a in the demo. |
-| 4c — Auto-email-reader (Gmail polling) | not started | [phase-4c-auto-reader.md](phase-4c-auto-reader.md) | "The product is alive" magic — Gmail polls for new resumes, auto-creates + auto-scores. Heaviest backend. |
+| 4b — Cold-email drafter | ✅ **replaced by 3e** | ~~[phase-4b-cold-email.md](phase-4b-cold-email.md)~~ (superseded) | Standalone draft-and-send UI absorbed into 3e's candidate-detail flow. |
+| 4c — Auto-email-reader (Gmail polling) | not started | [phase-4c-auto-reader.md](phase-4c-auto-reader.md) | "The product is alive" magic — Gmail polls for new resumes, auto-creates + auto-scores. Heaviest backend. Migration shifts 0008 → 0009 because 3e takes 0008. |
 | 4d — Multi-party FreeBusy | **deferred** | (write when ready) | Phase 5 polish. Pre-phase conflict detection covers the common case. |
 | 4e — Undo/redo conflict UX | **deferred** | (Phase 5) | Small polish on existing audit/undo backbone. |
 | 4f — Per-invitee response tracking | **deferred** | (Phase 5) | Small polish on interview detail page. |
 
 ## Recommended order
 
-Pre → 4a → 4b → 4c. One Claude Code session per item. The pre-phase conflict-detection mini-session can probably squeeze in alongside 4a if context permits, but cleaner as its own commit.
+3d → 3e → 4a → 4c. One Claude Code session per item. (Pre-phase conflict detection already done.)
 
 **Demo arc the order produces:**
 - Pre + 4d-deferred → "the calendar warns me about overlaps before I book."
+- 3d → "I clicked one button and the system found 20 candidates on LinkedIn/JobsDB matching this JD, then scored them."
+- 3e → "From the top candidate's detail page, I clicked Compose, edited the AI-drafted email, and sent it via Gmail."
 - 4a → "I generated a tailored scoring persona for this JD by answering 5 questions."
-- 4b → "I drafted (or sent) a personalized first-touch email to the top candidate in two clicks."
 - 4c → "The inbox watched for new resumes and auto-scored them while I was away."
 
-That's four distinct overdelivery beats on top of the four required modules.
+That's five distinct overdelivery beats on top of the four required modules.
 
 ## Cross-cutting reminders for Phase 4
 

@@ -67,7 +67,7 @@ When the user creates or edits a JD, offer an AI-assisted button that opens a **
 - [ ] Submit empty form → field-level required errors (don't call the API with empty answers)
 
 ## First action
-Confirm with Ben that the cost ceiling (~$0.005/generation) is acceptable, then build straight through. No proposal phase — the contracts above are locked.
+Confirm with Beam that the cost ceiling (~$0.005/generation) is acceptable, then build straight through. No proposal phase — the contracts above are locked.
 
 ## Last action (mandatory)
 Emit the **Session-done report** described in AGENTS.md → Session-done reporting. Then STOP.

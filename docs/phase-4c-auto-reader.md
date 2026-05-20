@@ -18,7 +18,7 @@ I'm continuing the Hotel Plus take-home. Phases 1, 2, 3 done; pre-Phase-4, 4a, 4
 Auto-watch a configured Gmail inbox. Every poll tick (default 15 min, configurable per-user from 30s to 30 min), check for new messages matching a subject filter + having ≥1 PDF attachment. For each match: download the PDFs, hash-dedup, create candidate(s) with `source: 'email'`, auto-score against a default JD. Demonstrates the system "going to work" without HR clicking anything.
 
 ## Pre-decided contracts
-- **Trigger:** **cron-job.org** (free external scheduler). Ben sets up one job pointing at `https://acq.autopilotyourworkflow.com/api/cron/gmail-poll` at 1-minute cadence. Reason: Vercel Hobby allows only daily crons. The endpoint itself decides per-user cadence by checking `next_poll_at` per config row.
+- **Trigger:** **cron-job.org** (free external scheduler). Beam sets up one job pointing at `https://acq.autopilotyourworkflow.com/api/cron/gmail-poll` at 1-minute cadence. Reason: Vercel Hobby allows only daily crons. The endpoint itself decides per-user cadence by checking `next_poll_at` per config row.
 - **Endpoint auth:** new env var `CRON_SECRET`. The endpoint requires `Authorization: Bearer ${CRON_SECRET}` header. Cron-job.org supports custom headers — set this in the job config. Returns 401 if missing.
 - **Per-user polling frequency:** stored in `gmail_watch_configs.polling_frequency_sec` (default 900 = 15 min). Endpoint logic per config row: `if now < next_poll_at: skip` else process and set `next_poll_at = now + polling_frequency_sec`.
 - **Business hours:** stored per-config (`business_hours_start`, `business_hours_end`, `timezone`). Default Asia/Bangkok 09:00–18:00. Out-of-hours = log + early return for that config (still updates `next_poll_at` so we don't try every minute).
@@ -34,7 +34,7 @@ Auto-watch a configured Gmail inbox. Every poll tick (default 15 min, configurab
 
 ## Migration
 
-`supabase/migrations/0008_auto_reader.sql`:
+`supabase/migrations/0009_auto_reader.sql` (was 0008 — bumped to 0009 because Phase 3d takes 0007 and Phase 3e takes 0008):
 - New table `gmail_watch_configs`:
   - `id uuid pk`, `org_id uuid`, `user_id uuid` (unique — one config per user), `is_active boolean default false`
   - `default_jd_id uuid references job_descriptions(id)`
@@ -100,7 +100,7 @@ Add `CRON_SECRET` to `.env.local` (use a long random string — `openssl rand -h
 
 ## cron-job.org setup (manual, after deploy)
 
-After the code is shipped, Ben sets up:
+After the code is shipped, Beam sets up:
 1. cron-job.org account (free).
 2. New job:
    - URL: `https://acq.autopilotyourworkflow.com/api/cron/gmail-poll`
@@ -121,7 +121,7 @@ The Auto-Reader settings page should include a "Set this up at cron-job.org" cal
 - Calendaring on email replies (Phase 5 / never)
 
 ## Smoke tests
-- [ ] Apply migration `0008_auto_reader.sql`
+- [ ] Apply migration `0009_auto_reader.sql`
 - [ ] Set `CRON_SECRET` env var locally + in Vercel
 - [ ] Add `gmail.readonly` to bundled scopes → sign out + sign in with Google → `/settings/integrations` shows "Gmail Read: granted"
 - [ ] Visit `/settings/auto-reader` → form renders with defaults (toggle off)
@@ -137,7 +137,7 @@ The Auto-Reader settings page should include a "Set this up at cron-job.org" cal
 - [ ] cron-job.org configured + verified pinging every minute
 
 ## First action
-Confirm with Ben:
+Confirm with Beam:
 1. Add `gmail.readonly` to bundled OAuth scopes (requires existing users to re-consent) — OK?
 2. The cron-job.org setup is a manual step at the end — make sure he's aware before building so he can plan time for it.
 

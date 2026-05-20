@@ -14,6 +14,17 @@ Notable Next.js 16 specifics:
 ## What this project is
 Recruiting Pipeline Tool — a take-home assignment for **Hotel Plus** (hotelplus.asia), a Thai hotel-management consulting firm hiring a Full Stack Developer. The app runs HR's full recruiting workflow in one place: scrape candidates, score with Claude, track in a Kanban, schedule interviews via Google Calendar, draft cold-outreach emails via Gmail. Deadline is 5 days from 2026-05-18.
 
+## ⚠️ Heads-up for the next chat session — Beam is planning a redesign
+
+If you're loading into this project fresh and Beam mentions a redesign: **read `cowork-log.md` entry #45 first**. It's the honest inventory of what shipped, what's load-bearing, what's worth keeping, and what's worth a second pass. Saves the 30 minutes of reverse-engineering you'd otherwise spend.
+
+The short version:
+- **Keep:** the `withAudit` HOF + audit-log + any-age undo spine; the single Claude client (`lib/anthropic/client.ts`) with tool-use forcing; the scraper's single-normalize-path (`lib/scrape/normalize.ts`); zod-schema-as-contract tool defs; navy/cream/terracotta brand register.
+- **Re-litigate:** scoring persona stored as a free-text blob (vs. structured weight knobs + rubric); single `applied` enum with a "Applied / Contacted" dual label (corrupts funnel analytics — a real `contacted` stage between `sourced` and `applied` is probably right); 8-column wide-scroll Kanban (a list grouped by stage might be better UX); the cold-email dialog doing too much in one modal (could split into a real route).
+- **Drop:** HTML-vs-plain auto-detection on signature (make it a structured object); team-mode scoring UI surface (keep the infra, hide behind a power-user flag); the bookmarklet (replace with a real Chrome extension when there's time).
+
+When Beam starts the redesign, default to reading: (1) this file, (2) `cowork-log.md` entry #45 only — not the whole log, (3) the file inventory section below to see what currently exists, (4) the schema migration list. That's the full state-load.
+
 ## How to use this file (READ ME FIRST — saves you hours)
 
 **This file is autoloaded into every session via `CLAUDE.md`. You already have it. Do NOT re-read it as "homework" — that's a wasted load.**
@@ -317,9 +328,10 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | Pre-Phase 4 — Scheduling conflict detection + Google→DB sync | Day 4 | ✅ **COMPLETE.** Warn-only conflict detection on `/schedule/new` and both reschedule dialogs via `events.list` (dropped FreeBusy after it broke title matching — FreeBusy clips intervals to the query window). Shared `useConflictCheck` hook + `ConflictWarning` component, 150ms debounce + "Checking…" indicator. Reschedule-CV-URL regression fixed by centralizing the link path in `lib/interviews/cv-link.ts` — both POST and PATCH go through one helper now. Google → DB reconciliation on `/schedule` page load + "Refresh from Google" button (`reconcileWithGoogle` in `lib/google/calendar.ts` + `/api/schedule/sync`). One cowork-log entry (#36). |
 | 3d — Outbound sourcing + JobsDB inbound | Day 4-5 | ✅ **COMPLETE (pivoted mid-build).** JD-level "Find candidates" dialog with Apify-backed LinkedIn outbound (harvestapi/linkedin-profile-search actor; Short/Full/Full+email mode picker; cost preview; 5–50 cap). Scoring runs inline via new `lib/scoring/score-one.ts`. JobsDB *outbound* retired after we discovered it had no public candidate URLs — replaced by a **bookmarklet** that piggybacks on the user's logged-in browser session (LinkedIn / JobsDB / any site). New-tab capture page bypasses source-site CSP via URL hash. Outbound candidates land in a new **"Sourced" Kanban column** (migration 0010) — distinct funnel entry vs inbound "Applied". `/settings/integrations` now hosts Apify + Proxycurl key fields + draggable bookmarklet. Money guard: empty/placeholder candidates skipped before scoring spend. Migrations 0007 (sourcing_runs), 0008 (bookmarklet_token), 0009 (apify_token), 0010 (sourced stage). Cowork-log entries 38–39. |
 | 3e — Cold email (review-before-send) | Day 5 | ✅ **COMPLETE.** "Draft cold email" CTA on candidate detail page (visible iff candidate has email + JD + user has `gmail.send` scope). Opus 4.7 SSE-streams the draft via new `lib/anthropic/tools/compose_cold_email.ts` + `lib/anthropic/prompts/cold-email.ts` (anti-spam framing: no clichés, hook-from-experience required). Editable subject + body in dialog with typewriter UI driven by regex extraction over partial JSON. Send via new `lib/google/gmail.ts` (hand-rolled MIME multipart/alternative + base64url, no `googleapis` dep). New `emails` table + RLS (migration 0011) logs every send/failure; activity log records via `withAudit`. Toast after send offers "Move to Applied / Contacted?" one-click stage transition. **Funnel decision:** single `applied` enum kept; label renamed to "Applied / Contacted" (`STAGE_LABELS.applied`). Source badge disambiguates inbound vs outbound. Signature + from-name editor added to `/settings/integrations` (plaintext text columns — not credentials). Cowork-log entry 40. Migration 0011 applied. |
-| 4 — AI assists for JD authoring + auto-email-reader (4a + 4c; 4b replaced by 3e) | Day 5 | not started (overdelivery — both optional). 4a = AI prompt-builder questionnaire (Haiku). 4c = auto-email-reader via cron-job.org + Vercel endpoint (Opus + Haiku, migration **0012**, new `CRON_SECRET` + `gmail.readonly` scope). 4d/4e/4f stay deferred to Phase 5. Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4c-auto-reader.md` (migration number in 4c prompt needs updating: 0009 → 0012 when picked up). |
-| 5 — Browser extension + polish + demo + deferred 4d/4e/4f | Day 5 | not started |
-| 6 — Final Phase: secrets audit + handoff | end | not started |
+| 4 — AI assists for JD authoring + auto-email-reader (4a + 4c; 4b replaced by 3e) | Day 5 | 🟡 **UI PLACEHOLDERS SHIPPED, FEATURES DEFERRED.** Time-bound call before the redesign session. Roadmap is visible to the reviewer but the features themselves don't run. **4a** = AI prompt-builder questionnaire (Haiku) — terracotta callout inside the JD editor's "Advanced — custom scoring persona" section, "Start interview" button disabled with tooltip. **4c** = auto-email-reader via cron-job.org + Vercel endpoint — full "Auto-import from Gmail" section on `/settings/capture` with the planned form (enabled toggle, default JD picker, sender/subject filters) rendered at 70% opacity + disabled button + expandable "How it'll work" explainer. Both placeholders are explicitly labeled `coming soon`. Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4c-auto-reader.md`. |
+| 5 — Browser extension + polish + demo + deferred 4d/4e/4f | Day 5 | not started — bookmarklet covers the MVP capture path. |
+| 6 — Final Phase: secrets audit + handoff | end | not started — submission deadline 2026-05-22 13:00 Bangkok. |
+| **Next session — Full redesign** | TBD | 🔄 Beam is planning a full redesign in the next chat session. The spine (audit + undo + single Claude client + scraper normalize-path + brand register) is sound; the surface is up for a second pass. Read cowork-log entry #45 for the honest "what worked / what to redesign" inventory before starting. |
 
 Update this table at the end of each phase. Append a fresh entry to `cowork-log.md` after every major decision or successfully completed module.
 
@@ -394,7 +406,7 @@ A user-requested overdelivery feature: when a user creates or edits a JD, offer 
 
 ## Session-done reporting (mandatory on every session)
 
-Before declaring your session complete, you MUST emit a structured report. This is non-negotiable — without it, Ben can't checkpoint and verify quality.
+Before declaring your session complete, you MUST emit a structured report. This is non-negotiable — without it, Beam can't checkpoint and verify quality.
 
 When you finish the last task in the session, output a final message in this exact shape:
 
@@ -431,11 +443,11 @@ When you finish the last task in the session, output a final message in this exa
 **Recommended next session:** docs/phase-XX.md (or "none — phase complete")
 ```
 
-After printing this, STOP. Do not commit unless Ben explicitly says to. Do not start the next session. The point is to give him a verification surface — if anything looks wrong, he'll push back BEFORE the commit hits main.
+After printing this, STOP. Do not commit unless Beam explicitly says to. Do not start the next session. The point is to give him a verification surface — if anything looks wrong, he'll push back BEFORE the commit hits main.
 
-## Writing handoff prompts for OTHER sessions (if Ben asks you to draft one)
+## Writing handoff prompts for OTHER sessions (if Beam asks you to draft one)
 
-When Ben says "write me the prompt for the next chat" or similar, you are *NOT* writing a free-form summary. You are writing a tight contract. Hard rules:
+When Beam says "write me the prompt for the next chat" or similar, you are *NOT* writing a free-form summary. You are writing a tight contract. Hard rules:
 
 - **Token cap: ~1000 tokens.** If your prompt is longer than ~150 lines of markdown, it's too verbose. Cut.
 - **Inline pre-decided contracts.** Never ask the next agent to "propose the architecture" — that triggers research mode, which is the #1 token sink. State the decision: "Use AES-256-GCM. Key from `OAUTH_ENCRYPTION_SECRET` env var. Encrypt before INSERT to `oauth_tokens.refresh_token_encrypted`." Lock it.
@@ -443,10 +455,10 @@ When Ben says "write me the prompt for the next chat" or similar, you are *NOT* 
 - **Explicit file list.** "Files to create: 1. X, 2. Y, 3. Z." Not "build whatever you need to make this work."
 - **Out-of-scope list.** "Do NOT build: A, B, C — those are Phase N." This stops well-meaning over-implementation.
 - **Smoke test list.** Exact assertions to verify before reporting done.
-- **First action.** "Confirm <thing> with Ben, then build straight through. No proposal phase — the contracts above are locked."
+- **First action.** "Confirm <thing> with Beam, then build straight through. No proposal phase — the contracts above are locked."
 - **No `Read these files first` lists.** AGENTS.md autoloads. MEMORY.md autoloads. The next chat already has both. Telling it to "re-read" forces duplicate loads and wastes 30k+ tokens.
 
-Save the new prompt under `docs/phase-XYZ.md`. The naming convention is `phase-<phase-number><letter>-<short-name>.md` (e.g. `phase-4a-cold-email.md`). After Ben confirms the prompt, also update `docs/phase-3-prompt.md` (the status index) to point at it.
+Save the new prompt under `docs/phase-XYZ.md`. The naming convention is `phase-<phase-number><letter>-<short-name>.md` (e.g. `phase-4a-cold-email.md`). After Beam confirms the prompt, also update `docs/phase-3-prompt.md` (the status index) to point at it.
 
 Look at `docs/phase-3a-oauth.md`, `docs/phase-3b-scraper.md`, and `docs/phase-3c-scheduler.md` as templates of what a tight prompt looks like — they're 600-900 tokens each and complete.
 

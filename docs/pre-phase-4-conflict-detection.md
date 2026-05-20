@@ -65,7 +65,7 @@ Finish Module 4 (Scheduler) by adding the conflict-detection requirement from th
 Topic: choosing "warn but don't block" over hard-block. The reasoning: HR's calendar isn't a single source of truth for HR's time — buffer blocks, focus blocks, "tentative" events all show as busy. A rigid block would create friction every time. A warning informs the user without dictating to them. Match Day 4 voice (you'll be writing under `*Day 4 — <today's date in Bangkok>*` if no Day 4 entries exist yet).
 
 ## First action
-Run the four smoke tests' setup checks (does Ben have any blocked calendar events right now? does email-OTP signin exist?) — actually no, just confirm with Ben that he's ready to run the smoke tests after the build, then build straight through.
+Run the four smoke tests' setup checks (does Beam have any blocked calendar events right now? does email-OTP signin exist?) — actually no, just confirm with Beam that he's ready to run the smoke tests after the build, then build straight through.
 
 ## Last action (mandatory)
 Emit the **Session-done report** described in AGENTS.md → Session-done reporting. Then STOP.

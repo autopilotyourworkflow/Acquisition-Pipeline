@@ -167,7 +167,7 @@
 }
 
 /* Marquee on truncated content — MONTH VIEW ONLY.
-   Week view was removed at Ben's request: the nested flex math made the
+   Week view was removed at Beam's request: the nested flex math made the
    scroll feel jittery and the layout reorder already gives the title a
    clean static fallback (time | title with ellipsis). Day view doesn't
    need it because chips have plenty of horizontal room. */

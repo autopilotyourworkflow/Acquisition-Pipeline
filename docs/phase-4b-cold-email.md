@@ -1,5 +1,10 @@
 # Phase 4b — Cold-email drafter (draft + send + signature + confirm)
 
+> ⚠️ **SUPERSEDED — replaced by Phase 3e (`docs/phase-3e-cold-email.md`).**
+> Phase 4b was the standalone "draft + send a one-off email" plan. It got absorbed into Phase 3e (review-before-send, integrated with the outbound-sourcing flow from Phase 3d). Do NOT build from this file — go to `phase-3e-cold-email.md` instead.
+
+---
+
 Paste into a fresh Claude Code chat.
 
 ---
@@ -102,7 +107,7 @@ hotelplus.asia
 - [ ] `gmail_drafts` table has one `draft` row (after draft) and one `sent` row (after send) — verify via SQL
 
 ## First action
-Confirm with Ben:
+Confirm with Beam:
 1. Opus 4.7 for quality (~$0.05/draft) — OK?
 2. Default signature template (above) — OK, or want a different one?
 

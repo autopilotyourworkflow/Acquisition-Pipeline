@@ -8,9 +8,9 @@ I'm continuing the Hotel Plus take-home (`acq.autopilotyourworkflow.com`). Phase
 
 ## Step 0 — Verify 3a (OAuth) + 3b (Scraper) before building
 
-I (Ben) will run each check below in the browser / Supabase SQL editor. Tell me to start. If a check fails, I'll paste the error/observation here, then we diagnose and fix in this same chat before moving to Step 1.
+I (Beam) will run each check below in the browser / Supabase SQL editor. Tell me to start. If a check fails, I'll paste the error/observation here, then we diagnose and fix in this same chat before moving to Step 1.
 
-**Verification checklist (Ben runs these, reports back):**
+**Verification checklist (Beam runs these, reports back):**
 
 1. **OAuth row populated.** After signing out + signing in with Google, Supabase SQL:
    ```sql
@@ -71,9 +71,9 @@ Single-attendee Google Calendar event with Meet link, description pre-filled fro
 - Proxycurl key field on integrations (Phase 5)
 - Reschedule / cancel flow (Phase 4)
 
-**Step 1+2 smoke tests (Ben runs after you build):**
+**Step 1+2 smoke tests (Beam runs after you build):**
 - Score a candidate (any model). Go to `/schedule` → pick that candidate → startsAt = now+30min, endsAt = now+60min → submit
-- Google Calendar event appears in Ben's calendar with: Meet link, description containing the prep questions
+- Google Calendar event appears in Beam's calendar with: Meet link, description containing the prep questions
 - `/settings/integrations` shows green checks on all 3 scopes
 - Sign out → sign in via email OTP → `/schedule` shows "Connect Google" empty state, no 500
 
@@ -89,4 +89,4 @@ Single-attendee Google Calendar event with Meet link, description pre-filled fro
 
 **First action:** ask me to start running the Step 0 checks. I'll paste results as I go. Don't propose architecture, don't read files — just wait for my report. Once Step 0 passes, install `googleapis` and build straight through.
 
-**Last action (mandatory):** before declaring the session complete, emit the **Session-done report** described in `AGENTS.md → Session-done reporting`. List files created, files modified, smoke tests passed, smoke tests Ben needs to run, anything deferred, the cowork-log entries added. Then STOP — do not commit until Ben signs off.
+**Last action (mandatory):** before declaring the session complete, emit the **Session-done report** described in `AGENTS.md → Session-done reporting`. List files created, files modified, smoke tests passed, smoke tests Beam needs to run, anything deferred, the cowork-log entries added. Then STOP — do not commit until Beam signs off.
