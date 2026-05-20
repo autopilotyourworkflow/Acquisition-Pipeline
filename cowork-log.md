@@ -643,3 +643,25 @@ There was a quieter call in the same file: the orchestrator scores each candidat
 **When stubs share the UI surface with live providers, treat the user's selection as intent to look in those places — not as an obligation to allocate budget to them. And when an in-process helper is the right shape, paying a small duplication cost beats wedging an HTTP call into a place that wasn't built for one.**
 
 ---
+
+*Day 5 — 2026-05-21*
+
+## 39. The spec was built on a wrong assumption — and the iteration loop that followed
+
+The Phase 3d prompt looked clean on paper. JD-level "Find candidates" dialog, Apify for LinkedIn, SerpAPI+Jina for JobsDB, scoring on the way in. I built it, pushed it, and Ben's first real run produced two "<UNKNOWN>" candidates from a JobsDB Jina-only fallback that had scraped a job-listing search page and tried to make people out of it. Money spent: $0.09. Real candidates extracted: zero.
+
+The wrong assumption was *that JobsDB had public candidate URLs at all*. It doesn't. Ever. JobsDB is an employer-side product — candidate detail pages are login-walled by definition. So the whole "fan out search across LinkedIn + JobsDB" framing was just LinkedIn with a useless second checkbox. The fix wasn't to make JobsDB outbound less flaky; it was to delete the premise. Disabled the checkbox, added a money guard that drops any "candidate" with a placeholder name before scoring spend, and reframed the JobsDB workflow entirely around a **bookmarklet** that piggybacks on the user's logged-in browser session — the only context in which JobsDB candidate data actually exists.
+
+The bookmarklet bug arc was its own lesson. First version used `fetch()` from the source page — blocked by LinkedIn's CSP `connect-src`. Switched to a `window.open()` to our own `/bookmarklet-capture` page carrying the payload in the URL hash; that bypasses CSP because the POST originates from our same-origin tab. Then React 16.9+ refused to render `javascript:` URLs in JSX `href` props (silently replaces them with an error stub) — fixed by setting the href via DOM after mount with a `useRef`. Then LinkedIn's lazy-loaded experience sections returned empty captures unless the page was scrolled first — added a top-to-bottom scroll dance in the bookmarklet. Then Haiku occasionally returned `experience` and `education` as strings instead of arrays — extended the coercer to degrade malformed array fields to `[]` rather than failing the whole extraction.
+
+The Proxycurl-to-Apify swap had its own rabbit hole. Proxycurl gates on a paid work email at signup. Apify has a free $5/month credit and a marketplace of LinkedIn actors. But picking an actor was guesswork until Ben hit a 403 ("full-permission-actor-not-approved") on the first real call, which led to fetching the actor's docs and discovering the input shape I'd built against was completely wrong — `{ queries, keywords, maxItems, maxResults }` vs. the actor's actual `{ searchQuery, currentJobTitles, locations, profileScraperMode, maxItems }`. Even after the approval click, the first fixed-shape run returned zero results because we were ANDing 4 strict job-title filters together. Loosened to "top 4 keywords + top 2 title hints inline in searchQuery." That finally landed real candidates.
+
+The Sourced-stage call came at the end, after Ben pointed out that mixing outbound candidates with inbound "Applied" applicants broke the funnel's narrative. Outbound = we found them, they haven't engaged. Inbound = they engaged with us. Different next actions, different visual urgency. Added the stage in front of `applied`, gave it a navy-tinted badge that reads as "passive / untouched", and now the Kanban tells a coherent story left-to-right: passive → engaged → screened → interviewed → hired.
+
+**The most expensive bugs aren't logic errors in the code — they're foundational assumptions in the spec that don't match production reality. The pivot to bookmarklet wasn't a defensive retreat from JobsDB; it was the first version of the feature that could actually exist.**
+
+---
+
+*Phase 3d complete. Day 5 of 5 begins. Next: Phase 3e (cold email — Module 4 of the rubric). 39 cowork-log entries.*
+
+---

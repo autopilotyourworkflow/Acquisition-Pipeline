@@ -204,13 +204,17 @@ lib/supabase/{server,browser,admin,middleware}.ts
 hooks/use-conflict-check.ts                shared FreeBusy-driven conflict hook + formatConflictRange
 ```
 
-**Schema (migrations applied — all 6):**
+**Schema (migrations applied — all 10):**
 - `0001_init.sql` — full base schema, RLS, 12 tables, seed JD
 - `0002_phase2_fixes.sql` — `attachments.content_hash` + `scoring_prompts` table + seed v1
 - `0003_team_scoring.sql` — `scores.scoring_mode` + `scores.team_agents`
 - `0004_per_jd_prompt.sql` — `job_descriptions.scoring_persona_override`
 - `0005_user_settings.sql` — `user_settings` table (per-user, encrypted Proxycurl key)
 - `0006_short_links.sql` — `short_links` table (slug, url, expires_at; public SELECT RLS)
+- `0007_sourcing.sql` — `outbound_sourced` enum + `sourcing_runs` table + `serpapi_key_encrypted` (column unused after JobsDB outbound was retired; harmless)
+- `0008_bookmarklet.sql` — `user_settings.bookmarklet_token` (per-user capture credential)
+- `0009_apify.sql` — `user_settings.apify_api_token_encrypted` (swapped from Proxycurl for outbound LinkedIn)
+- `0010_sourced_stage.sql` — `candidate_stage` enum gets `sourced` value BEFORE `applied`
 
 **Components:**
 ```
@@ -222,17 +226,32 @@ components/interviews/          InterviewActions.client (reschedule + cancel men
 components/schedule/            ConflictWarning (shared by booking + both reschedule dialogs)
 ```
 
+**Things that DO exist now from Phase 3d (don't rebuild):**
+- `lib/sourcing/*` — types, query (Opus derive), orchestrator (`run.ts` async generator), providers (linkedin = Apify, jobsdb retired, indeed/seek stubs)
+- `lib/anthropic/tools/derive_sourcing_query.ts` — JD → search query tool
+- `lib/scoring/score-one.ts` — in-process single-mode scorer (used by orchestrator so no HTTP-self-call)
+- `lib/crypto/secret-key.ts` — generic AES-256-GCM helper (reuses `OAUTH_ENCRYPTION_SECRET`)
+- `app/api/source/run/route.ts` — SSE POST endpoint bridging the orchestrator
+- `app/api/scrape/bookmarklet/route.ts` — CORS-open, token-authed capture endpoint
+- `app/bookmarklet-capture/page.tsx` — public capture receiver (bypasses source-site CSP via window.open)
+- `app/actions/integrations.ts` — save/clear Apify, Proxycurl, SerpAPI keys
+- `app/actions/bookmarklet.ts` — regenerate/clear bookmarklet token
+- `app/(dashboard)/settings/integrations/{api-keys,bookmarklet-panel}.client.tsx` — keys + draggable bookmarklet UI
+- `app/(dashboard)/jds/[id]/source-dialog.client.tsx` — "Find candidates" dialog w/ Apify scraper-mode picker
+- `app/(dashboard)/jds/[id]/sourcing-history.tsx` — last-5-runs panel
+
 **Things that DON'T exist yet (build when phases get there):**
-- `lib/google/gmail.ts` — Gmail SDK wrapper (Phase 4)
+- `lib/google/gmail.ts` — Gmail SDK wrapper (Phase 3e; reused + extended by 4c)
+- `lib/anthropic/tools/compose_cold_email.ts` — cold-email tool (Phase 3e)
+- `app/actions/emails.ts` + `emails` table — cold-email drafts + sends (Phase 3e, migration 0011)
 - `lib/anthropic/prompts/persona-interview.ts` — JD prompt-builder interviewer (Phase 4a)
 - `lib/anthropic/tools/propose_scoring_persona.ts` — persona output tool (Phase 4a)
 - `app/api/jds/propose-prompt` — multi-turn SSE for JD wizard (Phase 4a)
 - `components/jds/PromptInterview.client.tsx` — JD wizard chat UI (Phase 4a)
-- `app/api/emails/draft` — Gmail draft create (Phase 4b)
-- `app/api/cron/gmail-poll` — auto-email-reader (Phase 4c)
+- `app/api/cron/gmail-poll` — auto-email-reader (Phase 4c, migration 0012)
 - `gmail_watch_configs` table — per-user inbox watch config (Phase 4c)
 - FreeBusy multi-attendee picker (Phase 4d) — *booker-only conflict check is done; multi-attendee panelist FreeBusy is the deferred piece*
-- `extension/` — Chrome MV3 (Phase 5)
+- `extension/` — Chrome MV3 (Phase 5; bookmarklet covers the MVP capture path already)
 
 ## Files this project does NOT use
 - `react-pdf` — not installed. Use `unpdf` for parsing.
@@ -281,7 +300,9 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ **COMPLETE.** Foundation (`withAudit` HOF + Claude client w/ retry/cache/telemetry/tool-use forcing + `scoring.v1` prompt). Tracker (Kanban + Table + JD CRUD, click-through, score badges, drag w/ UndoToast). Screener (SSE stream, ScoreCard, unpdf upload + dedup, model picker, team-mode 3+1, score history). Editable prompts (`/settings/prompts`), per-JD overrides, `/activity` audit log, any-age Undo, candidate detail page, bundled OAuth scopes. 20 cowork-log entries. Migrations 0001-0004 applied. |
 | 3 — Scraper + Scheduler basics | Day 3-4 | ✅ **COMPLETE.** 3a (OAuth tokens) ✅, 3b (Scraper — all 5 tabs) ✅, 3c (Scheduler + Integrations) ✅. `/schedule` shows list + Schedule-X v2 calendar (month/week/day/agenda) with brand theme; form moved to `/schedule/new`. Cancel + reschedule via dropdown (Google `events.delete` / `events.patch`, `sendUpdates='all'`). Hotel Plus invite template — candidate-facing; prep questions stay internal on the detail page. Link shortener `/l/<slug>` (migration 0006) for clean CV URLs in invites. `/settings/integrations` shows per-scope status (Calendar / Gmail Compose / Gmail Send). SMTP via Resend through Supabase. Hardening pass: scraper SSE parser, URL fetch normalization + Jina Reader fallback, editable preview + source retention, PDF upload-before-parse (was writing 0-byte files), scoring loop runaway-fire fixed (stable React key + ref pattern on onDone), bytea hex encoding for OAuth refresh tokens, attachment View/Download signed URLs (24h preview, 30-day download), experience bullets in scraped profiles. Migrations 0001-0006 applied. |
 | Pre-Phase 4 — Scheduling conflict detection + Google→DB sync | Day 4 | ✅ **COMPLETE.** Warn-only conflict detection on `/schedule/new` and both reschedule dialogs via `events.list` (dropped FreeBusy after it broke title matching — FreeBusy clips intervals to the query window). Shared `useConflictCheck` hook + `ConflictWarning` component, 150ms debounce + "Checking…" indicator. Reschedule-CV-URL regression fixed by centralizing the link path in `lib/interviews/cv-link.ts` — both POST and PATCH go through one helper now. Google → DB reconciliation on `/schedule` page load + "Refresh from Google" button (`reconcileWithGoogle` in `lib/google/calendar.ts` + `/api/schedule/sync`). One cowork-log entry (#36). |
-| 4 — Overdelivery (split into 4a / 4b / 4c; 4d/4e/4f deferred to Phase 5) | Day 4 | not started. 4a = AI prompt-builder questionnaire (Haiku). 4b = cold-email drafter + send + signature + confirm (Opus, migration 0007). 4c = auto-email-reader via cron-job.org + Vercel endpoint (Opus + Haiku, migration 0008, new `CRON_SECRET` + `gmail.readonly` scope). Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4b-cold-email.md`, `docs/phase-4c-auto-reader.md`. Status index: `docs/phase-4-prompt.md`. |
+| 3d — Outbound sourcing + JobsDB inbound | Day 4-5 | ✅ **COMPLETE (pivoted mid-build).** JD-level "Find candidates" dialog with Apify-backed LinkedIn outbound (harvestapi/linkedin-profile-search actor; Short/Full/Full+email mode picker; cost preview; 5–50 cap). Scoring runs inline via new `lib/scoring/score-one.ts`. JobsDB *outbound* retired after we discovered it had no public candidate URLs — replaced by a **bookmarklet** that piggybacks on the user's logged-in browser session (LinkedIn / JobsDB / any site). New-tab capture page bypasses source-site CSP via URL hash. Outbound candidates land in a new **"Sourced" Kanban column** (migration 0010) — distinct funnel entry vs inbound "Applied". `/settings/integrations` now hosts Apify + Proxycurl key fields + draggable bookmarklet. Money guard: empty/placeholder candidates skipped before scoring spend. Migrations 0007 (sourcing_runs), 0008 (bookmarklet_token), 0009 (apify_token), 0010 (sourced stage). Cowork-log entries 38–39. |
+| 3e — Cold email (review-before-send) | Day 5 | not started. **Plugs into the Sourced column as the next-action surface.** Opus drafter + edit dialog + Gmail send via `gmail.send` scope. `lib/google/gmail.ts` new file. Migration 0011 (new `emails` table + signature/from-name in user_settings). Prompt: `docs/phase-3e-cold-email.md`. |
+| 4 — AI assists for JD authoring + auto-email-reader (4a + 4c; 4b replaced by 3e) | Day 5 | not started (overdelivery — both optional). 4a = AI prompt-builder questionnaire (Haiku). 4c = auto-email-reader via cron-job.org + Vercel endpoint (Opus + Haiku, migration **0012**, new `CRON_SECRET` + `gmail.readonly` scope). 4d/4e/4f stay deferred to Phase 5. Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4c-auto-reader.md` (migration number in 4c prompt needs updating: 0009 → 0012 when picked up). |
 | 5 — Browser extension + polish + demo + deferred 4d/4e/4f | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |
 
