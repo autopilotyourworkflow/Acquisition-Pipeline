@@ -4,6 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { ApiKeysPanel } from "./api-keys.client";
+import { BookmarkletPanel } from "./bookmarklet-panel.client";
+
+function getAppBaseUrl(): string {
+  // Resolves to the deployed origin in prod (set in Vercel as
+  // NEXT_PUBLIC_APP_URL or VERCEL_URL). Falls back to the production
+  // domain so the bookmarklet always targets a real endpoint.
+  const env =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    "https://acq.autopilotyourworkflow.com";
+  return env.replace(/\/$/, "");
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Integrations · Settings · Acquisition" };
@@ -66,7 +78,9 @@ export default async function IntegrationsPage() {
       .maybeSingle(),
     admin
       .from("user_settings")
-      .select("proxycurl_api_key_encrypted, serpapi_key_encrypted, updated_at")
+      .select(
+        "proxycurl_api_key_encrypted, serpapi_key_encrypted, bookmarklet_token, updated_at",
+      )
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
@@ -172,6 +186,12 @@ export default async function IntegrationsPage() {
       )}
 
       <ApiKeysPanel status={apiKeyStatus} />
+
+      <BookmarkletPanel
+        hasToken={Boolean(settingsRow?.bookmarklet_token)}
+        initialToken={null}
+        apiBase={getAppBaseUrl()}
+      />
     </div>
   );
 }

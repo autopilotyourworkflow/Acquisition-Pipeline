@@ -476,18 +476,25 @@ function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-xs text-charcoal space-y-1">
-        <p>
-          <strong>For public JobsDB pages</strong> (job listings, public
-          profiles): paste the URL below and we&apos;ll fetch + normalize it
-          via Jina Reader.
+      <div className="rounded-md border border-terracotta/40 bg-terracotta/5 px-3 py-3 text-xs text-charcoal space-y-2">
+        <p className="font-medium text-navy">
+          The fastest JobsDB capture is the bookmarklet, not this tab.
         </p>
         <p>
-          <strong>For login-walled pages</strong> (your employer-side
-          applicant detail view): the URL flow will fail — neither cheerio
-          nor Jina can bypass JobsDB&apos;s auth. Open the page in your
-          browser, select-all the rendered text, and paste it into the
-          second box instead.
+          JobsDB applicant pages are behind a login wall — neither cheerio
+          nor Jina Reader can bypass it. Go to{" "}
+          <Link
+            href="/settings/integrations"
+            className="text-terracotta underline-offset-2 underline hover:text-terracotta/80"
+          >
+            Settings → Integrations
+          </Link>{" "}
+          and generate the bookmarklet. One click on any JobsDB candidate
+          page sends them straight to your Tracker.
+        </p>
+        <p>
+          Use this tab only as a fallback: paste rendered page text for
+          login-walled pages, or a URL for public listings.
         </p>
       </div>
       <input
