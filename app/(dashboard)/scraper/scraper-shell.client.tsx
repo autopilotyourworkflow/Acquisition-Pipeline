@@ -8,7 +8,7 @@ import { createCandidate } from "@/app/actions/candidates";
 import type { CandidateSource } from "@/lib/db/enums";
 import type { ExtractCandidateInput } from "@/lib/anthropic/tools/extract_candidate";
 
-type ScraperTab = "paste" | "url" | "pdf" | "screenshot" | "thirdparty";
+type ScraperTab = "paste" | "url" | "pdf" | "screenshot" | "thirdparty" | "jobsdb";
 
 /**
  * The original input the user provided, stashed alongside the extracted
@@ -20,7 +20,8 @@ type ScraperSource =
   | { kind: "url"; url: string }
   | { kind: "pdf"; filename: string; size: number }
   | { kind: "screenshot"; filename: string }
-  | { kind: "thirdparty"; linkedinUrl: string };
+  | { kind: "thirdparty"; linkedinUrl: string }
+  | { kind: "jobsdb"; url?: string; pasted?: string };
 
 type ExtractState =
   | { status: "idle" }
@@ -174,6 +175,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
         pdf: "pdf",
         screenshot: "screenshot",
         thirdparty: "thirdparty_api",
+        jobsdb: "jobsdb",
       };
 
       // Persist the original source content alongside the extracted candidate
@@ -234,6 +236,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
           <TabsTrigger value="pdf">PDF</TabsTrigger>
           <TabsTrigger value="screenshot">Screenshot</TabsTrigger>
           <TabsTrigger value="thirdparty">Third-party API</TabsTrigger>
+          <TabsTrigger value="jobsdb">JobsDB</TabsTrigger>
         </TabsList>
 
         <TabsContent value="paste" className="space-y-4">
@@ -254,6 +257,10 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
 
         <TabsContent value="thirdparty" className="space-y-4">
           <ThirdPartyTab onExtract={handleExtract} />
+        </TabsContent>
+
+        <TabsContent value="jobsdb" className="space-y-4">
+          <JobsDbTab onExtract={handleExtract} />
         </TabsContent>
       </Tabs>
 
@@ -434,6 +441,65 @@ function ThirdPartyTab({ onExtract }: { onExtract: ExtractFn }) {
       </Button>
       <p className="text-xs text-slate-mid">
         Uses Proxycurl API. Set your API key in Settings → Integrations for auto-use.
+      </p>
+    </div>
+  );
+}
+
+function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
+  const [url, setUrl] = useState("");
+  const [pasted, setPasted] = useState("");
+
+  const canSubmit = url.trim().length > 0 || pasted.trim().length > 0;
+
+  const handleSubmit = () => {
+    const cleanedUrl = url.trim().replace(/^['"“”‘’]+|['"“”‘’]+$/g, "").trim();
+    if (cleanedUrl) {
+      onExtract(
+        "/api/scrape/url",
+        { url: cleanedUrl },
+        { kind: "jobsdb", url: cleanedUrl },
+      );
+      return;
+    }
+    // Paste fallback for login-walled JobsDB pages — prepend a hint so the
+    // normalizer treats the dump as a candidate profile rather than a job
+    // listing.
+    const hintedText =
+      "Source: JobsDB candidate / application page.\n\n" + pasted.trim();
+    onExtract(
+      "/api/scrape/paste",
+      { text: hintedText },
+      { kind: "jobsdb", pasted: pasted.trim() },
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-xs text-charcoal">
+        Paste a JobsDB candidate / application URL. If the page is behind a
+        login wall, paste the page text in the second box instead — we&apos;ll
+        normalize it the same way.
+      </div>
+      <input
+        type="text"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://hk.jobsdb.com/…"
+        className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
+      />
+      <textarea
+        value={pasted}
+        onChange={(e) => setPasted(e.target.value)}
+        placeholder="…or paste the page text here (for login-walled pages)"
+        className="w-full h-40 rounded-lg border border-sand-200 bg-warm-white p-3 font-mono text-sm"
+      />
+      <Button onClick={handleSubmit} disabled={!canSubmit}>
+        Fetch &amp; Extract
+      </Button>
+      <p className="text-xs text-slate-mid">
+        The candidate will be saved with{" "}
+        <span className="font-mono">source: jobsdb</span>.
       </p>
     </div>
   );

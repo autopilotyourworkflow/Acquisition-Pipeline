@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
+import { ApiKeysPanel } from "./api-keys.client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Integrations · Settings · Acquisition" };
@@ -56,17 +57,35 @@ export default async function IntegrationsPage() {
   // oauth_tokens has owner-only RLS — read it via admin client so the page
   // works regardless of how the JWT is plumbed through server context.
   const admin = createAdminClient();
-  const { data: tokenRow } = await admin
-    .from("oauth_tokens")
-    .select("scopes, expires_at, updated_at")
-    .eq("user_id", user.id)
-    .eq("provider", "google")
-    .maybeSingle();
+  const [{ data: tokenRow }, { data: settingsRow }] = await Promise.all([
+    admin
+      .from("oauth_tokens")
+      .select("scopes, expires_at, updated_at")
+      .eq("user_id", user.id)
+      .eq("provider", "google")
+      .maybeSingle(),
+    admin
+      .from("user_settings")
+      .select("proxycurl_api_key_encrypted, serpapi_key_encrypted, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
   const granted = new Set<string>(
     (tokenRow?.scopes as string[] | undefined) ?? [],
   );
   const everythingMissing = !tokenRow;
+
+  const apiKeyStatus = {
+    proxycurlSaved: Boolean(settingsRow?.proxycurl_api_key_encrypted),
+    proxycurlUpdatedAt: settingsRow?.updated_at
+      ? (settingsRow.updated_at as string)
+      : null,
+    serpapiSaved: Boolean(settingsRow?.serpapi_key_encrypted),
+    serpapiUpdatedAt: settingsRow?.updated_at
+      ? (settingsRow.updated_at as string)
+      : null,
+  };
 
   return (
     <div className="space-y-6">
@@ -151,6 +170,8 @@ export default async function IntegrationsPage() {
           </p>
         </div>
       )}
+
+      <ApiKeysPanel status={apiKeyStatus} />
     </div>
   );
 }

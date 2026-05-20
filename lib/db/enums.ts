@@ -25,6 +25,7 @@ export const CANDIDATE_SOURCES = [
   "thirdparty_api",
   "extension",
   "manual",
+  "outbound_sourced",
 ] as const;
 export type CandidateSource = (typeof CANDIDATE_SOURCES)[number];
 
@@ -82,4 +83,5 @@ export const SOURCE_LABELS: Record<CandidateSource, string> = {
   thirdparty_api: "Third-party API",
   extension: "Extension",
   manual: "Manual",
+  outbound_sourced: "Outbound sourced",
 };

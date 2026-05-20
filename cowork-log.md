@@ -609,3 +609,37 @@ The ghost interview at 17:30 in Ben's screenshot was just the first observable i
 *Pre-Phase 4 complete: conflict detection (booker-only, warn-only, 150ms debounced) + Google→DB sync + CV-link centralization. 36 cowork-log entries. Ready for Phase 4a / 4b / 4c.*
 
 ---
+
+## 37. The cold-email feature couldn't stand alone, so it stopped trying
+
+The original Phase 4b plan was a self-contained module: a "Draft email" button on the candidate detail page, a "Send now" button next to it, a confirm dialog, a signature in `user_settings`. Clean, scoped, ~one-day build. Sitting with it today, the question that kept surfacing was *who would actually click that button*. The answer was always "a user who's already decided to reach out to a candidate they like." Which begged a different question: in our workflow, how do candidates get into the system at all?
+
+Today's two modes — manual paste in the Scraper and PDF upload — are both inbound. The candidate came to *us*. For those candidates, the cold-email button is awkward; you don't usually need to cold-pitch someone who already applied. Cold email earns its name when *we* went and found *them*.
+
+That reframed the work. The missing module wasn't "send email" — it was "outbound sourcing." Once you have a JD-driven "Find candidates for this JD" flow that drops sourced people into the Tracker with `source: outbound_sourced`, then cold email is no longer the headline feature; it's the *next-step CTA* from a sourced candidate's detail page. The two ship together, in that order: 3d builds the funnel, 3e gives it a mouth.
+
+The assignment brief made the JobsDB scrape requirement explicit, which gave 3d a natural shape with two sub-features under one phase: JobsDB inbound (HR pastes a candidate's JobsDB URL into a new Scraper tab) AND outbound sourcing (LinkedIn via Proxycurl as v1 backbone, JobsDB via Google site-search as best-effort, Indeed and SEEK stubbed for v2). Both share the JobsDB plumbing, so neither pays a tax for the other.
+
+Migration order shifted to match: 3d takes 0007 (`sourcing_runs` + new source enums + SerpAPI key), 3e takes 0008 (`emails` table + signature/from-name in user_settings), and Phase 4c's planned auto-reader migration slides down to 0009. Phase 4 narrowed to 4a (prompt-builder) + 4c (auto-email-reader); 4b is gone, replaced.
+
+**When a feature can't justify its own button, it's usually because it's missing the flow that calls it. Build the flow first, and the feature becomes a verb on something the user already wanted to do.**
+
+---
+
+*Phase 4 re-planned: cold email absorbed into outbound flow. 3d → 3e → 4a → 4c. 37 cowork-log entries. Build sessions next.*
+
+---
+
+## 38. Splitting N across providers when half of them aren't real
+
+Phase 3d's orchestrator had a small but interesting shape question: if HR picks LinkedIn + JobsDB and asks for 10 candidates, how do you allocate the work? The mechanical answer is "5 each, round-robin the remainder." That's what the code does. The interesting question is what to do when the user *also* checks Indeed and SEEK — both of which are stubs returning `{ candidates: [], note: 'not_implemented' }`.
+
+Two patterns suggested themselves. (a) Divide N evenly across every selected platform: a 10-candidate run with all four boxes ticked allocates 3 + 3 + 2 + 2 and quietly returns 6 results because two of those allocations evaporate into the void. (b) Allocate only to live providers; treat the stubs as visual selections that emit a `provider_done` event with the `not_implemented` note for honesty, but don't take any of N's budget.
+
+Picked (b). The reasoning: the user's intent when ticking JobsDB and SEEK together isn't "give me a third of my candidates from each" — it's "look in both places." If one place doesn't actually exist yet, the budget should flow to the place that does. The stub `provider_done` events still surface in the SSE log so the user sees "SEEK done: 0 found (not_implemented)" and isn't left wondering what happened to that checkbox. The UI also disables Indeed + SEEK by default, so this only matters when someone unchecks the disabled-state and ticks them anyway — but defending against that case keeps the contract clean.
+
+There was a quieter call in the same file: the orchestrator scores each candidate inline via a new `scoreCandidateSingle()` helper rather than by fetching `/api/score/run` over HTTP. The HTTP path was simpler to wire on paper — call our own endpoint, get SSE back, done — but it needed the user's session cookie, which a server-side async generator doesn't have, and it wrapped scoring in a stream protocol whose progressiveness we didn't need here. Extracting the helper duplicates ~30 lines of persistence code from the existing route, but it lets the orchestrator stay synchronous-ish (await one score, yield one event, await the next) and means a failed score for candidate #3 emits a localized error without taking down candidates #4-#10. Cleaner failure isolation in exchange for one duplicated copy of `INSERT INTO scores`.
+
+**When stubs share the UI surface with live providers, treat the user's selection as intent to look in those places — not as an obligation to allocate budget to them. And when an in-process helper is the right shape, paying a small duplication cost beats wedging an HTTP call into a place that wasn't built for one.**
+
+---
