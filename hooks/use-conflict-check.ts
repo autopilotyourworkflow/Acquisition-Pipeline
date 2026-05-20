@@ -34,19 +34,23 @@ export function useConflictCheck({
   whenAt: string;
   durationMin: number;
   enabled?: boolean;
-}): { conflicts: Conflict[] } {
+}): { conflicts: Conflict[]; checking: boolean } {
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
       setConflicts([]);
+      setChecking(false);
       return;
     }
     if (!whenAt || !Number.isFinite(durationMin) || durationMin <= 0) {
       setConflicts([]);
+      setChecking(false);
       return;
     }
     setConflicts([]);
+    setChecking(true);
 
     const startDate = new Date(whenAt);
     const endDate = new Date(startDate.getTime() + durationMin * 60_000);
@@ -54,6 +58,11 @@ export function useConflictCheck({
     const endISO = endDate.toISOString();
 
     const ctl = new AbortController();
+    // 150ms debounce is a perceptual sweet spot: long enough to coalesce
+    // bursts of keystrokes (datetime-local fires `change` on every minute
+    // increment), short enough that single-click time picks feel instant.
+    // The remaining latency (~300-500ms) is the Google API round trip we
+    // can't shrink without pre-fetching the whole calendar window.
     const timer = setTimeout(async () => {
       try {
         const resp = await fetch("/api/schedule/conflicts", {
@@ -70,8 +79,14 @@ export function useConflictCheck({
         setConflicts(json.conflicts ?? []);
       } catch {
         // Aborted or transient — silent.
+      } finally {
+        // Important: only flip the flag off if this specific request was
+        // the one that completed. AbortController guarantees this by
+        // throwing on the cancelled fetch — so we land here exactly once
+        // per "settled" request.
+        if (!ctl.signal.aborted) setChecking(false);
       }
-    }, 400);
+    }, 150);
 
     return () => {
       clearTimeout(timer);
@@ -79,7 +94,7 @@ export function useConflictCheck({
     };
   }, [whenAt, durationMin, enabled]);
 
-  return { conflicts };
+  return { conflicts, checking };
 }
 
 /**

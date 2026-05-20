@@ -4,20 +4,35 @@ import { formatConflictRange, type Conflict } from "@/hooks/use-conflict-check";
  * Shared inline warning rendered under time pickers when the proposed
  * interview window overlaps an existing event on the booker's calendar.
  *
- * Render-conditional: returns null when there are no conflicts, so callers
- * can drop it into a layout without an outer `if` guard.
+ * Returns null only when neither `conflicts` nor `checking` is truthy, so
+ * callers can drop it in without a guard. While `checking` is true, shows
+ * a low-key "Checking your calendar…" line — gives the user immediate
+ * feedback during the ~300-500ms Google API round-trip.
  *
  * Visual: terracotta-tinted card. Brand-aligned with the warning surfaces
  * already used elsewhere (scoring failures, integration errors).
  */
 export function ConflictWarning({
   conflicts,
+  checking = false,
   className,
 }: {
   conflicts: Conflict[];
+  checking?: boolean;
   className?: string;
 }) {
-  if (conflicts.length === 0) return null;
+  if (conflicts.length === 0 && !checking) return null;
+  if (conflicts.length === 0 && checking) {
+    return (
+      <p
+        className={`text-[11px] text-slate-mid ${className ?? ""}`}
+        role="status"
+        aria-live="polite"
+      >
+        Checking your calendar…
+      </p>
+    );
+  }
   return (
     <div
       className={`rounded-md border border-terracotta/40 bg-terracotta/10 px-4 py-3 ${className ?? ""}`}

@@ -537,11 +537,12 @@ function CalendarWithContextMenu({
   const [durationMin, setDurationMin] = useState<number>(30);
 
   // Conflict check only runs while the reschedule dialog is open.
-  const { conflicts: rescheduleConflicts } = useConflictCheck({
-    whenAt,
-    durationMin,
-    enabled: !!reschedule,
-  });
+  const { conflicts: rescheduleConflicts, checking: rescheduleChecking } =
+    useConflictCheck({
+      whenAt,
+      durationMin,
+      enabled: !!reschedule,
+    });
 
   useEffect(() => {
     if (reschedule) {
@@ -759,7 +760,10 @@ function CalendarWithContextMenu({
                 ))}
               </select>
             </div>
-            <ConflictWarning conflicts={rescheduleConflicts} />
+            <ConflictWarning
+              conflicts={rescheduleConflicts}
+              checking={rescheduleChecking}
+            />
             <DialogFooter>
               <Button
                 type="button"

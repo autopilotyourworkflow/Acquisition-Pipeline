@@ -75,7 +75,7 @@ export function InterviewActions({
   // Conflict check only fires while the reschedule dialog is open — no point
   // querying Google in the background when the dialog isn't mounted on
   // screen.
-  const { conflicts } = useConflictCheck({
+  const { conflicts, checking } = useConflictCheck({
     whenAt,
     durationMin,
     enabled: rescheduleOpen,
@@ -255,7 +255,7 @@ export function InterviewActions({
                 className="w-full rounded-md border border-sand-200 bg-cream px-3 py-2 text-sm text-navy"
               />
             </div>
-            <ConflictWarning conflicts={conflicts} />
+            <ConflictWarning conflicts={conflicts} checking={checking} />
             <DialogFooter>
               <Button
                 type="button"

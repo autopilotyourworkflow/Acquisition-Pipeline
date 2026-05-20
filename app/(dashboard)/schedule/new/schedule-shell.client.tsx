@@ -88,7 +88,7 @@ export function ScheduleShell({
   // Warn-only conflict detection. Submit stays enabled — HR may legitimately
   // want to double-book over a buffer block. Auth-degrades silently if the
   // user signed in via email-OTP (no Google scope).
-  const { conflicts } = useConflictCheck({ whenAt, durationMin });
+  const { conflicts, checking } = useConflictCheck({ whenAt, durationMin });
 
   if (candidates.length === 0) {
     return (
@@ -258,7 +258,11 @@ export function ScheduleShell({
           </p>
         </div>
 
-        <ConflictWarning conflicts={conflicts} className="md:col-span-2" />
+        <ConflictWarning
+          conflicts={conflicts}
+          checking={checking}
+          className="md:col-span-2"
+        />
 
         <div className="space-y-1.5 md:col-span-2">
           <Label htmlFor="invitees" className="text-xs text-slate-deep">
