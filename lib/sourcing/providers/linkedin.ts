@@ -1,17 +1,28 @@
 /**
  * LinkedIn provider — Apify-backed.
  *
- * We use Apify's marketplace actors instead of Proxycurl: free $5/month
- * credit, no payment-up-front friction, and same JSON-structured output.
+ * Default actor: harvestapi/linkedin-profile-search
+ *   https://apify.com/harvestapi/linkedin-profile-search
+ *   Pricing: $0.10 per search page (up to 25 profiles) in Short mode,
+ *   plus $0.004/profile in Full mode. Override with env var
+ *   APIFY_LINKEDIN_ACTOR_ID — but a different actor will likely need a
+ *   different input shape; you'd also need to adapt the actorInput
+ *   construction below.
  *
- * Actor: harvestapi~linkedin-profile-search (default)
- *   Override with env var APIFY_LINKEDIN_ACTOR_ID if you prefer a
- *   different actor — input shape `{ queries, maxItems }` is consistent
- *   across most LinkedIn search actors on Apify.
+ * Input shape per harvestapi docs:
+ *   - searchQuery: free-text (keywords + skill names go here)
+ *   - currentJobTitles: array of title strings
+ *   - locations: array of location strings
+ *   - profileScraperMode: "Short" | "Full" | "Full + email search"
+ *   - maxItems: cap on results
+ *
+ * Output shape (Short mode):
+ *   { id, publicIdentifier, linkedinUrl, firstName, lastName, headline,
+ *     location (object), experience[], education[], skills[] }
  *
  * Endpoint: POST /v2/acts/{actor}/run-sync-get-dataset-items
- *   Returns the dataset items inline (no polling). Apify charges only
- *   for the items actually returned.
+ *   Returns dataset items inline (no polling). One-time per-account
+ *   approval required for harvestapi actors — see Apify console.
  */
 
 import { normalizeCandidate } from "@/lib/scrape/normalize";
@@ -27,11 +38,12 @@ const PLATFORM: SourcingPlatform = "linkedin";
 const APIFY_ACTOR_ID =
   process.env.APIFY_LINKEDIN_ACTOR_ID || "harvestapi~linkedin-profile-search";
 
-// Apify charges per item returned. The exact rate depends on the actor;
-// $0.02–$0.04 per profile is typical for LinkedIn search actors. We
-// record a conservative estimate so the sourcing_runs.cost_usd column
-// reflects approximate real spend.
-const APIFY_COST_PER_ITEM = 0.04;
+// harvestapi/linkedin-profile-search pricing in Short mode is $0.10
+// per page of up to 25 profiles. Even N=5 still buys one page, so
+// the realistic per-call floor is ~$0.10 regardless of N. We charge
+// per item conservatively for the cost column ($0.01/profile is a
+// safe over-estimate; the page itself is the dominant cost).
+const APIFY_COST_PER_ITEM = 0.01;
 const NORMALIZE_COST_USD = 0.01; // Haiku per-call cost (input mostly cached)
 
 type LinkedInRunInput = {
@@ -42,25 +54,37 @@ type LinkedInRunInput = {
 };
 
 /**
- * Apify dataset items vary in shape across actors but most LinkedIn
- * search actors return at least these fields. We're defensive about
- * what we read and let Haiku do the heavy lifting of structuring it.
+ * Apify dataset items shape — modeled on harvestapi/linkedin-profile-search
+ * (Short mode) but the fallbacks accommodate other actors with similar
+ * outputs. Location may be a parsed object on harvestapi:
+ *   { city, country, countryCode, ... }
  */
+type ApifyLocation = {
+  city?: string;
+  country?: string;
+  countryCode?: string;
+  region?: string;
+  fullText?: string;
+};
+
 type ApifySearchItem = {
-  url?: string;
+  id?: string;
+  publicIdentifier?: string;
   linkedinUrl?: string;
   profileUrl?: string;
-  fullName?: string;
-  name?: string;
+  url?: string;
   firstName?: string;
   lastName?: string;
+  fullName?: string;
+  name?: string;
   headline?: string;
   title?: string;
   jobTitle?: string;
-  location?: string;
+  location?: string | ApifyLocation;
   about?: string;
   summary?: string;
   experience?: unknown;
+  education?: unknown;
   skills?: unknown;
   [key: string]: unknown;
 };
@@ -78,23 +102,21 @@ export async function runLinkedInSourcing(input: LinkedInRunInput): Promise<Prov
   const candidates: ProviderCandidate[] = [];
   let costAccumulated = 0;
 
-  // Compose the search query — Apify LinkedIn actors usually accept a
-  // plain free-text `queries` array. Splice in titles + location if we
-  // have them; the actor's own ranker handles the rest.
-  const queryString = [
-    ...input.query.keywords,
-    ...(input.query.titles.length > 0 ? [`(${input.query.titles.join(" OR ")})`] : []),
-    input.query.location ?? null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const actorInput = {
-    queries: [queryString],
-    keywords: queryString,
+  // Compose the actor input matching harvestapi/linkedin-profile-search.
+  // searchQuery is the free-text field — we put keywords there and use
+  // the typed `currentJobTitles` + `locations` fields for the structured
+  // filters so the actor's own ranker can weight them properly.
+  const actorInput: Record<string, unknown> = {
+    searchQuery: input.query.keywords.join(" "),
+    profileScraperMode: "Short",
     maxItems: input.nTarget,
-    maxResults: input.nTarget,
   };
+  if (input.query.titles.length > 0) {
+    actorInput.currentJobTitles = input.query.titles;
+  }
+  if (input.query.location) {
+    actorInput.locations = [input.query.location];
+  }
 
   const apifyUrl =
     `https://api.apify.com/v2/acts/${APIFY_ACTOR_ID}/run-sync-get-dataset-items` +
@@ -188,7 +210,10 @@ function formatApifyItem(item: ApifySearchItem, profileUrl: string | null): stri
   const title = item.headline ?? item.title ?? item.jobTitle ?? null;
   if (title) lines.push(`Current Title: ${title}`);
 
-  if (item.location) lines.push(`Location: ${item.location}`);
+  // harvestapi returns location as a parsed object; other actors return
+  // a string. Handle both so we never crash with `[object Object]`.
+  const locStr = formatLocation(item.location);
+  if (locStr) lines.push(`Location: ${locStr}`);
 
   const about = item.summary ?? item.about ?? null;
   if (about && typeof about === "string") {
@@ -220,4 +245,13 @@ function formatApifyItem(item: ApifySearchItem, profileUrl: string | null): stri
   lines.push(`\nRaw item (truncated):\n${raw}`);
 
   return lines.join("\n");
+}
+
+function formatLocation(loc: ApifySearchItem["location"]): string | null {
+  if (!loc) return null;
+  if (typeof loc === "string") return loc;
+  const parts = [loc.city, loc.region, loc.country].filter(Boolean);
+  if (parts.length > 0) return parts.join(", ");
+  if (loc.fullText) return loc.fullText;
+  return null;
 }
