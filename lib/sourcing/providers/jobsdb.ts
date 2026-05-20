@@ -101,7 +101,9 @@ export async function runJobsDbSourcing(input: JobsDbRunInput): Promise<Provider
 
 async function searchViaSerpApi(input: JobsDbRunInput): Promise<string[]> {
   if (!input.serpapiKey) return [];
-  const q = `site:jobsdb.com ${input.query.keywords.join(" ")}${
+  // Bias to th.jobsdb.com (Thailand) since this is a Thai-market hire,
+  // but also accept any jobsdb.com sub-domain so we don't miss results.
+  const q = `site:th.jobsdb.com OR site:jobsdb.com ${input.query.keywords.join(" ")}${
     input.query.titles.length > 0 ? ` (${input.query.titles.join(" OR ")})` : ""
   }${input.query.location ? ` ${input.query.location}` : ""}`;
   const params = new URLSearchParams({
@@ -120,10 +122,11 @@ async function searchViaSerpApi(input: JobsDbRunInput): Promise<string[]> {
 
 async function searchViaJinaFallback(input: JobsDbRunInput): Promise<string[]> {
   // No reliable JobsDB programmatic search without SerpAPI — we synthesize a
-  // search URL and let Jina Reader try to parse it. If JobsDB is gating
-  // login-walled content this will return little.
+  // search URL and let Jina Reader try to parse it. JobsDB Thailand is the
+  // assignment's market, but we try .com (the global router) so other
+  // markets still work if HR is sourcing internationally.
   const query = encodeURIComponent(input.query.keywords.join(" "));
-  const searchUrl = `https://hk.jobsdb.com/jobs?keywords=${query}`;
+  const searchUrl = `https://th.jobsdb.com/jobs?keywords=${query}`;
   const text = await fetchViaJina(searchUrl);
   if (!text) return [];
   // Extract any jobsdb.com URLs we find in the rendered text.

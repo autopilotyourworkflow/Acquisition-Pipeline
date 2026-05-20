@@ -169,6 +169,12 @@ function KeyRow({
           )}
         </div>
       </div>
+      {!saved && (
+        <p className="mt-2 text-[11px] text-slate-mid">
+          After saving, the field clears (we never echo the key back). The
+          badge above will flip to <span className="font-mono">Saved</span>.
+        </p>
+      )}
     </div>
   );
 }

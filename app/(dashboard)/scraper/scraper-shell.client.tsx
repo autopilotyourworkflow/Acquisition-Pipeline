@@ -476,22 +476,31 @@ function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-xs text-charcoal">
-        Paste a JobsDB candidate / application URL. If the page is behind a
-        login wall, paste the page text in the second box instead — we&apos;ll
-        normalize it the same way.
+      <div className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-xs text-charcoal space-y-1">
+        <p>
+          <strong>For public JobsDB pages</strong> (job listings, public
+          profiles): paste the URL below and we&apos;ll fetch + normalize it
+          via Jina Reader.
+        </p>
+        <p>
+          <strong>For login-walled pages</strong> (your employer-side
+          applicant detail view): the URL flow will fail — neither cheerio
+          nor Jina can bypass JobsDB&apos;s auth. Open the page in your
+          browser, select-all the rendered text, and paste it into the
+          second box instead.
+        </p>
       </div>
       <input
         type="text"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://hk.jobsdb.com/…"
+        placeholder="https://th.jobsdb.com/…"
         className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
       />
       <textarea
         value={pasted}
         onChange={(e) => setPasted(e.target.value)}
-        placeholder="…or paste the page text here (for login-walled pages)"
+        placeholder="…or paste the rendered page text here (login-walled pages — Ctrl/Cmd+A in your browser)"
         className="w-full h-40 rounded-lg border border-sand-200 bg-warm-white p-3 font-mono text-sm"
       />
       <Button onClick={handleSubmit} disabled={!canSubmit}>
@@ -499,7 +508,8 @@ function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
       </Button>
       <p className="text-xs text-slate-mid">
         The candidate will be saved with{" "}
-        <span className="font-mono">source: jobsdb</span>.
+        <span className="font-mono">source: jobsdb</span>. If both fields are
+        filled, the URL wins.
       </p>
     </div>
   );

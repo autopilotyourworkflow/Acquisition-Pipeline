@@ -170,6 +170,46 @@ function computeCost(
   );
 }
 
+/**
+ * Build the params object for messages.create / messages.stream, omitting
+ * `temperature` when the model rejects it. Claude Opus 4.7 deprecated the
+ * `temperature` parameter (the API returns 400 if it's set, regardless of
+ * value). For Haiku and earlier Opus we still pass `args.temperature ?? 0`
+ * so existing scoring + team-mode behavior is preserved.
+ */
+type BaseParams = Omit<
+  Parameters<Anthropic["messages"]["create"]>[0],
+  "stream"
+>;
+function buildMessageParams<T>(args: {
+  model: ModelId;
+  system: CacheableTextBlock[];
+  messages: MessageParam[];
+  tool: ToolDefinition<T>;
+  maxTokens?: number;
+  temperature?: number;
+}): BaseParams {
+  const params: BaseParams = {
+    model: args.model,
+    max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
+    system: toSystemBlocks(args.system),
+    messages: args.messages,
+    tools: [
+      {
+        name: args.tool.name,
+        description: args.tool.description,
+        input_schema:
+          args.tool.input_schema as Anthropic.Messages.Tool["input_schema"],
+      },
+    ],
+    tool_choice: { type: "tool", name: args.tool.name },
+  };
+  if (args.model !== "claude-opus-4-7") {
+    params.temperature = args.temperature ?? 0;
+  }
+  return params;
+}
+
 function shouldRetry(error: unknown): boolean {
   if (error instanceof Anthropic.APIError) {
     if (error.status === 429) return true;
@@ -260,21 +300,7 @@ export async function callWithTool<T>(args: {
   const started = Date.now();
 
   const { value: message, retries } = await withRetry((_attempt) =>
-    client.messages.create({
-      model: args.model,
-      max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
-      temperature: args.temperature ?? 0,
-      system: toSystemBlocks(args.system),
-      messages: args.messages,
-      tools: [
-        {
-          name: args.tool.name,
-          description: args.tool.description,
-          input_schema: args.tool.input_schema as Anthropic.Messages.Tool["input_schema"],
-        },
-      ],
-      tool_choice: { type: "tool", name: args.tool.name },
-    }),
+    client.messages.create(buildMessageParams(args)),
   );
 
   const usage = {
@@ -341,22 +367,7 @@ export function streamWithTool<T>(args: {
   async function* run(): AsyncIterable<RawMessageStreamEvent> {
     try {
       const { value: stream, retries } = await withRetry(async () =>
-        client.messages.stream({
-          model: args.model,
-          max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
-          temperature: args.temperature ?? 0,
-          system: toSystemBlocks(args.system),
-          messages: args.messages,
-          tools: [
-            {
-              name: args.tool.name,
-              description: args.tool.description,
-              input_schema:
-                args.tool.input_schema as Anthropic.Messages.Tool["input_schema"],
-            },
-          ],
-          tool_choice: { type: "tool", name: args.tool.name },
-        }),
+        client.messages.stream(buildMessageParams(args)),
       );
 
       for await (const event of stream) {
