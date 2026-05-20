@@ -33,29 +33,27 @@ type Props = {
 
 /**
  * Hotel Plus's canonical signature, hand-built as HTML to match the real
- * design as closely as possible WITHOUT requiring image hosting. The H+
- * logo is recreated with HTML+CSS (yellow background, bold black letters)
- * rather than a hosted PNG. Uses table layout (not flexbox) for Outlook
- * + older webmail compatibility — modern CSS Grid/Flexbox is unreliable
- * across email clients. All styles are inline because most clients strip
- * <style> tags.
+ * Gmail signature design. Uses table layout (not flexbox) for Outlook +
+ * older webmail compatibility. All styles inline because most clients
+ * strip <style> tags.
  *
- * The marketing banner photo from the original Gmail signature is
- * intentionally omitted — it needs a hosted image URL we don't yet have
- * a place for. Users can add a hosted <img> tag themselves if they
- * upload it elsewhere.
+ * Images are hotlinked from imageshack (the same hosting the user's
+ * original Gmail signature uses):
+ *   - LOGO_URL: the yellow H+ square with "HOTEL PLUS" caption
+ *   - BANNER_URL: the marketing banner with the tagline
+ *
+ * `border="0"` HTML attribute plus inline `border:0` style — Outlook
+ * adds a default border to <img> in a link context otherwise.
+ * `display:block` on images prevents the usual descender-induced gap
+ * below them in table cells.
  */
+const HOTEL_PLUS_LOGO_URL = "https://imagizer.imageshack.com/img924/2620/KKfUsC.jpg";
+const HOTEL_PLUS_BANNER_URL = "https://imagizer.imageshack.com/img924/9907/VcUSS0.png";
+
 const HOTEL_PLUS_SIGNATURE_PRESET = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#17202E;border-collapse:collapse;">
   <tr>
-    <td valign="top" style="padding-right:20px;width:100px;">
-      <table cellpadding="0" cellspacing="0" border="0" style="width:90px;background:#FFD93D;border-collapse:collapse;">
-        <tr>
-          <td align="center" valign="middle" style="height:90px;font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:44px;color:#17202E;line-height:90px;letter-spacing:-2px;">H+</td>
-        </tr>
-        <tr>
-          <td align="center" style="padding:4px 0 6px;font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:10px;color:#17202E;letter-spacing:1.5px;line-height:1;">HOTEL PLUS</td>
-        </tr>
-      </table>
+    <td valign="top" style="padding-right:20px;width:120px;">
+      <img src="${HOTEL_PLUS_LOGO_URL}" alt="Hotel Plus" width="110" border="0" style="display:block;border:0;outline:none;text-decoration:none;height:auto;" />
     </td>
     <td valign="top" style="padding-left:4px;">
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:800;line-height:1.1;color:#17202E;letter-spacing:0.5px;">HOTEL PLUS</div>
@@ -68,7 +66,12 @@ const HOTEL_PLUS_SIGNATURE_PRESET = `<table cellpadding="0" cellspacing="0" bord
       <div style="margin-top:6px;font-size:11px;color:#6B7280;line-height:1.4;">92/5 fl.2 unit 208, Sathon Thani 2 Bld<br/>North Sathon Road, Bangkok 10500</div>
     </td>
   </tr>
-</table>`;
+</table>
+<div style="margin-top:18px;">
+  <a href="https://www.hotelplus.asia" style="text-decoration:none;border:0;outline:none;">
+    <img src="${HOTEL_PLUS_BANNER_URL}" alt="Hotel Plus — Increase revenue, reduce operating costs" width="600" border="0" style="display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:100%;" />
+  </a>
+</div>`;
 
 const HOTEL_PLUS_FROM_NAME_PRESET = "Hotel Plus Recruiting";
 
