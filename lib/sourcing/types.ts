@@ -41,11 +41,15 @@ export type ProviderResult = {
   error?: string;
 };
 
+export type SourcingMode = "Short" | "Full" | "Full + email search";
+
 export type SourcingRequest = {
   jdId: string;
   userId: string;
   platforms: SourcingPlatform[];
   n: number;
+  /** LinkedIn scraper mode for the Apify call. Defaults to Short (cheapest). */
+  mode?: SourcingMode;
 };
 
 /** SSE event union the orchestrator emits. */

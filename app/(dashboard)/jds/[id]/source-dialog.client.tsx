@@ -24,13 +24,21 @@ import type { SourcingPlatform } from "@/lib/sourcing/types";
  * docs/phase-3d-outbound-sourcing.md. The recorded `cost_usd` on the
  * sourcing_runs row reflects actual spend (which may differ).
  */
-function estimateCost(n: number, enabled: Set<SourcingPlatform>): number {
-  const opus = 0.01;
-  // LinkedIn is the only live provider; JobsDB is disabled here and
-  // handled by the bookmarklet / email auto-import paths.
-  const linkedin = enabled.has("linkedin") ? 0.1 * n : 0;
-  const scoring = 0.05 * n;
-  return opus + linkedin + scoring;
+type ApifyMode = "Short" | "Full" | "Full + email search";
+
+function estimateCost(
+  n: number,
+  enabled: Set<SourcingPlatform>,
+  mode: ApifyMode,
+): number {
+  const opus = 0.05; // Opus query-derive (one-time)
+  // Apify harvestapi pricing: $0.10 per page of up to 25 in Short,
+  // plus $0.004/profile in Full, plus $0.01/profile in Full+email.
+  const pages = enabled.has("linkedin") ? Math.ceil(n / 25) : 0;
+  const perProfile = mode === "Short" ? 0 : mode === "Full" ? 0.004 : 0.01;
+  const apify = enabled.has("linkedin") ? pages * 0.1 + n * perProfile : 0;
+  const scoring = 0.01 * n; // Haiku per candidate
+  return opus + apify + scoring;
 }
 
 type LogLine = { kind: "info" | "ok" | "warn" | "err"; text: string };
@@ -45,6 +53,7 @@ export function SourceCandidatesDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [n, setN] = useState(20);
+  const [mode, setMode] = useState<ApifyMode>("Short");
   const [platforms, setPlatforms] = useState<Set<SourcingPlatform>>(
     new Set(["linkedin"]),
   );
@@ -53,7 +62,10 @@ export function SourceCandidatesDialog({
   const [stats, setStats] = useState({ found: 0, scored: 0, cost: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
-  const estCost = useMemo(() => estimateCost(n, platforms), [n, platforms]);
+  const estCost = useMemo(
+    () => estimateCost(n, platforms, mode),
+    [n, platforms, mode],
+  );
 
   function toggle(p: SourcingPlatform) {
     setPlatforms((prev) => {
@@ -87,6 +99,7 @@ export function SourceCandidatesDialog({
           jdId,
           platforms: Array.from(platforms),
           n,
+          mode,
         }),
         signal: controller.signal,
       });
@@ -277,10 +290,10 @@ export function SourceCandidatesDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="n" className="text-xs text-slate-deep">
-                Candidates to find (5–50)
+                Candidates (5–50)
               </Label>
               <Input
                 id="n"
@@ -293,6 +306,22 @@ export function SourceCandidatesDialog({
                 }
                 disabled={running}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mode" className="text-xs text-slate-deep">
+                Scraper mode
+              </Label>
+              <select
+                id="mode"
+                value={mode}
+                onChange={(e) => setMode(e.target.value as ApifyMode)}
+                disabled={running}
+                className="w-full h-9 rounded-md border border-sand-200 bg-warm-white px-2 text-sm text-navy focus:border-terracotta focus:outline-none"
+              >
+                <option value="Short">Short — name + headline (cheapest)</option>
+                <option value="Full">Full — + experience / education</option>
+                <option value="Full + email search">Full + email — also looks up email</option>
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-slate-deep">Est. cost</Label>

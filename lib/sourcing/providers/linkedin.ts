@@ -46,11 +46,15 @@ const APIFY_ACTOR_ID =
 const APIFY_COST_PER_ITEM = 0.01;
 const NORMALIZE_COST_USD = 0.01; // Haiku per-call cost (input mostly cached)
 
+export type ApifyScraperMode = "Short" | "Full" | "Full + email search";
+
 type LinkedInRunInput = {
   query: DeriveSourcingQueryInput;
   nTarget: number;
   /** Apify API token (passed by orchestrator after decrypting from user_settings). */
   apifyToken: string;
+  /** Scraper mode — defaults to Short (cheapest). Full adds per-profile detail. */
+  mode?: ApifyScraperMode;
 };
 
 /**
@@ -102,18 +106,22 @@ export async function runLinkedInSourcing(input: LinkedInRunInput): Promise<Prov
   const candidates: ProviderCandidate[] = [];
   let costAccumulated = 0;
 
-  // Compose the actor input matching harvestapi/linkedin-profile-search.
-  // searchQuery is the free-text field — we put keywords there and use
-  // the typed `currentJobTitles` + `locations` fields for the structured
-  // filters so the actor's own ranker can weight them properly.
+  // Compose the actor input. Lessons from real runs:
+  //  - searchQuery is fuzzy, but joining 10 keywords with spaces narrows
+  //    the result set to near zero. Cap at the top 4 keywords.
+  //  - currentJobTitles is a STRICT current-title filter; with 4 titles
+  //    AND'd we excluded everyone with "Senior X" or any variant.
+  //    Instead fold title hints into searchQuery as soft signals.
+  //  - locations is a well-supported typed filter; keep it strict.
+  const topKeywords = input.query.keywords.slice(0, 4);
+  const titleHints = input.query.titles.slice(0, 2);
+  const searchQuery = [...topKeywords, ...titleHints].join(" ").trim();
+
   const actorInput: Record<string, unknown> = {
-    searchQuery: input.query.keywords.join(" "),
-    profileScraperMode: "Short",
+    searchQuery,
+    profileScraperMode: input.mode ?? "Short",
     maxItems: input.nTarget,
   };
-  if (input.query.titles.length > 0) {
-    actorInput.currentJobTitles = input.query.titles;
-  }
   if (input.query.location) {
     actorInput.locations = [input.query.location];
   }

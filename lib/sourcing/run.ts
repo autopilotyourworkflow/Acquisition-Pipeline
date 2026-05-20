@@ -133,6 +133,7 @@ export async function* runSourcing(
           query,
           apifyToken,
           serpapiKey,
+          mode: req.mode,
         });
       } catch (err) {
         result = {
@@ -295,6 +296,7 @@ async function runProvider(
     query: Awaited<ReturnType<typeof deriveSearchQuery>>["query"];
     apifyToken: string | null;
     serpapiKey: string | null;
+    mode?: "Short" | "Full" | "Full + email search";
   },
 ): Promise<ProviderResult> {
   switch (platform) {
@@ -303,6 +305,7 @@ async function runProvider(
         query: ctx.query,
         nTarget: ctx.nTarget,
         apifyToken: ctx.apifyToken ?? "",
+        mode: ctx.mode,
       });
     case "jobsdb":
       // JobsDB outbound was retired — there are no public candidate

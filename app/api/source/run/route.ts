@@ -28,7 +28,14 @@ type RequestBody = {
   jdId: string;
   platforms: SourcingPlatform[];
   n: number;
+  mode?: "Short" | "Full" | "Full + email search";
 };
+
+const ALLOWED_MODES: ReadonlyArray<"Short" | "Full" | "Full + email search"> = [
+  "Short",
+  "Full",
+  "Full + email search",
+];
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -69,6 +76,7 @@ export async function POST(req: NextRequest) {
   if (n < 1) {
     return new Response(JSON.stringify({ error: "n must be >= 1" }), { status: 400 });
   }
+  const mode = body.mode && ALLOWED_MODES.includes(body.mode) ? body.mode : "Short";
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -81,6 +89,7 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           platforms,
           n,
+          mode,
         })) {
           // SSE event name = our union's `type` discriminator.
           emit(ev.type, ev);
