@@ -129,7 +129,7 @@ The same principle applies at the end of the project for the **Final Phase secre
 
 ---
 
-*Day 2 — 2026-05-18*
+*Day 1 — 2026-05-18*
 
 ## 9. Foundation contracts: thin HOFs over middleware sprawl
 
@@ -393,7 +393,7 @@ Sketched the full architecture (endpoint, tool, prompt, UI component) into AGENT
 
 ---
 
-*Day 3 — 2026-05-19*
+*Day 2 — 2026-05-19*
 
 ## 26. OAuth token persistence: refresh token rotation and revocation
 
@@ -454,7 +454,7 @@ Implementation: preview panel is a grid of text inputs bound to extracted fields
 
 ---
 
-*Day 4 — 2026-05-20*
+*Day 3 — 2026-05-20*
 
 ## 29. Graceful degrade for email-OTP users
 
@@ -553,3 +553,23 @@ The same pattern generalizes. Phase 4's cold-email module can do the same: the e
 ---
 
 *Phase 3 fully closed. 33 cowork-log entries. Ready for Phase 4.*
+
+---
+
+*Day 4 — 2026-05-20*
+
+## 34. Splitting Phase 4 — and the cron schedule that lives in the database
+
+Phase 4 was always going to be the messy one. Six potential overdelivery items, all loosely related, all medium-sized. The original phase doc listed them as a buffet. Sitting down to plan today, the problem was obvious: trying to drive any single Claude Code session through "pick three items and build them" was an invitation to context blow-up and half-finished modules. Better to split: one prompt per sub-feature, each ~700 tokens, each with locked contracts and a closing smoke-test list.
+
+The cut: 4a (AI prompt-builder questionnaire), 4b (cold email draft + send), 4c (auto-email-reader). Defer multi-party FreeBusy, undo/redo conflict UX, and per-invitee response tracking to Phase 5 polish. Pre-Phase-4 ships a small finish-Phase-3 task — Google FreeBusy conflict detection on the booking form, warn-only — because Module 4's rubric explicitly asks for it and it's 30 minutes of build.
+
+The interesting architectural call came from 4c. Vercel Hobby allows cron jobs to fire only once a day. We want auto-reader poll cadence of 15 minutes by default and 30 seconds for demo. Two paths: upgrade to Pro for demo week, or hit our endpoint from outside Vercel. We chose outside — cron-job.org, free, supports per-minute schedules with bearer-token auth.
+
+But that raised a deeper question: cron schedule is set at deploy time (one schedule for the whole app), and we want per-user cadence (15min / 5min / 1min / 30s). The shape that works: schedule the external cron at the shortest cadence (1 min). The endpoint then iterates `gmail_watch_configs`, and for each row checks `if now < next_poll_at: skip`. After processing, set `next_poll_at = now + polling_frequency_sec`. The DB carries the per-user schedule; the cron is just a heartbeat.
+
+The questionnaire-vs-chat call for 4a was the smaller story. I had a draft from a week ago that built a multi-turn chat with SSE + 10-turn safety cap. Looking at it fresh, the chat shape was performing complexity for the demo, not capturing more information. The user already knows what role they're hiring — they don't need to be coaxed through it. A questionnaire with five dropdowns and three textareas captures the same signal in a quarter of the code.
+
+**Schedule per-user cadence in the database; let the cron be the dumb heartbeat. And when you find yourself building a chat to ask five questions, build a form instead.**
+
+---
