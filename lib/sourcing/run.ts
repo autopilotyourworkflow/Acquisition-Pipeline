@@ -275,7 +275,9 @@ function splitAcrossPlatforms(
     indeed: 0,
     seek: 0,
   };
-  const live = platforms.filter((p) => p === "linkedin" || p === "jobsdb");
+  // Only LinkedIn is a live outbound provider. JobsDB / Indeed / SEEK
+  // can be selected (UI disables them by default) but never consume N.
+  const live = platforms.filter((p) => p === "linkedin");
   if (live.length === 0) return result;
   const base = Math.floor(n / live.length);
   let remainder = n - base * live.length;
@@ -303,11 +305,18 @@ async function runProvider(
         proxycurlKey: ctx.proxycurlKey ?? "",
       });
     case "jobsdb":
-      return runJobsDbSourcing({
-        query: ctx.query,
-        nTarget: ctx.nTarget,
-        serpapiKey: ctx.serpapiKey,
-      });
+      // JobsDB outbound was retired — there are no public candidate
+      // listings to fan out against. JobsDB capture happens via the
+      // bookmarklet (Settings → Integrations) + email auto-import.
+      // Keep the case for type-exhaustiveness; mark not_implemented.
+      void runJobsDbSourcing;
+      void ctx.serpapiKey;
+      return {
+        platform: "jobsdb",
+        candidates: [],
+        cost_usd: 0,
+        note: "retired_use_bookmarklet",
+      };
     case "indeed":
       return runIndeedSourcing();
     case "seek":

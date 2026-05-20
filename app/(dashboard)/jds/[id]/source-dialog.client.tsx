@@ -26,10 +26,11 @@ import type { SourcingPlatform } from "@/lib/sourcing/types";
  */
 function estimateCost(n: number, enabled: Set<SourcingPlatform>): number {
   const opus = 0.01;
+  // LinkedIn is the only live provider; JobsDB is disabled here and
+  // handled by the bookmarklet / email auto-import paths.
   const linkedin = enabled.has("linkedin") ? 0.1 * n : 0;
-  const jobsdb = enabled.has("jobsdb") ? 0.02 * n : 0;
   const scoring = 0.05 * n;
-  return opus + linkedin + jobsdb + scoring;
+  return opus + linkedin + scoring;
 }
 
 type LogLine = { kind: "info" | "ok" | "warn" | "err"; text: string };
@@ -254,10 +255,10 @@ export function SourceCandidatesDialog({
               />
               <PlatformBox
                 platform="jobsdb"
-                checked={platforms.has("jobsdb")}
-                onToggle={() => toggle("jobsdb")}
-                disabled={running}
-                note="experimental"
+                checked={false}
+                onToggle={() => {}}
+                disabled
+                title="JobsDB has no public candidate listings. Use the bookmarklet (Settings → Integrations) or email auto-import to capture from your JobsDB inbox."
               />
               <PlatformBox
                 platform="indeed"
