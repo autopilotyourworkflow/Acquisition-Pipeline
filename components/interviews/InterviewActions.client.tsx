@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConflictWarning } from "@/components/schedule/ConflictWarning";
+import { useConflictCheck } from "@/hooks/use-conflict-check";
 import {
   Dialog,
   DialogContent,
@@ -69,6 +71,15 @@ export function InterviewActions({
   const [whenAt, setWhenAt] = useState(() => isoToLocalInput(startsAt));
   const [durationMin, setDurationMin] = useState<number>(initialDurationMin);
   const [notes, setNotes] = useState("");
+
+  // Conflict check only fires while the reschedule dialog is open — no point
+  // querying Google in the background when the dialog isn't mounted on
+  // screen.
+  const { conflicts } = useConflictCheck({
+    whenAt,
+    durationMin,
+    enabled: rescheduleOpen,
+  });
 
   async function handleCancel() {
     setBusy(true);
@@ -244,6 +255,7 @@ export function InterviewActions({
                 className="w-full rounded-md border border-sand-200 bg-cream px-3 py-2 text-sm text-navy"
               />
             </div>
+            <ConflictWarning conflicts={conflicts} />
             <DialogFooter>
               <Button
                 type="button"

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   cancelInterviewEvent,
   GoogleNotConnectedError,
@@ -10,6 +9,7 @@ import {
 import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
 import { createShortLink } from "@/lib/short-links";
+import { getCandidateCvInviteUrl } from "@/lib/interviews/cv-link";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -187,25 +187,14 @@ export async function PATCH(
     jdTitle = (jdRow?.title as string | undefined) ?? null;
   }
 
-  let cvUrl: string | null = null;
-  const { data: latestAttachment } = await supabase
-    .from("attachments")
-    .select("storage_path")
-    .eq("candidate_id", candidate.id)
-    .eq("kind", "cv_pdf")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (latestAttachment) {
-    const admin = createAdminClient();
-    const { data: signed } = await admin.storage
-      .from("cvs")
-      .createSignedUrl(
-        latestAttachment.storage_path as string,
-        CV_SIGNED_URL_TTL_SECONDS,
-      );
-    if (signed?.signedUrl) cvUrl = signed.signedUrl;
-  }
+  // Same CV-link path the create route uses — short /l/<slug> URL, not the
+  // raw 400-char Supabase signed URL. Centralized in lib/interviews/cv-link.ts
+  // so this path can't regress again.
+  const cvUrl = await getCandidateCvInviteUrl({
+    candidateId: candidate.id as string,
+    userId: user.id,
+    ttlSeconds: CV_SIGNED_URL_TTL_SECONDS,
+  });
 
   const candidatePortfolioUrl =
     (candidate.linkedin_url as string | null) ??

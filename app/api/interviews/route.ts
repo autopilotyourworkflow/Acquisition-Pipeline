@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createInterviewEvent,
   GoogleNotConnectedError,
@@ -9,6 +8,7 @@ import {
 import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
 import { createShortLink } from "@/lib/short-links";
+import { getCandidateCvInviteUrl } from "@/lib/interviews/cv-link";
 
 // 30-day TTL on CV signed URLs. The interview lifecycle (schedule → meet →
 // follow-up) typically completes inside a month, so the link stays valid
@@ -97,49 +97,15 @@ export async function POST(req: NextRequest) {
     jdTitle = (jdRow?.title as string | undefined) ?? null;
   }
 
-  // Pull the most recent CV attachment (if any) and mint a 30-day signed URL.
-  // We embed this in the calendar event description so interviewers + the
-  // candidate can open the CV without leaving their calendar client.
-  let cvUrl: string | null = null;
-  const { data: latestAttachment } = await supabase
-    .from("attachments")
-    .select("storage_path, kind")
-    .eq("candidate_id", body.candidateId)
-    .eq("kind", "cv_pdf")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (latestAttachment) {
-    const admin = createAdminClient();
-    const { data: signed } = await admin.storage
-      .from("cvs")
-      .createSignedUrl(
-        latestAttachment.storage_path as string,
-        CV_SIGNED_URL_TTL_SECONDS,
-      );
-    if (signed?.signedUrl) {
-      // Wrap the long signed URL behind a short /l/<slug> link so the
-      // calendar invite description reads cleanly. The short link's
-      // expiry matches the underlying signed URL — once the signed URL
-      // dies, the short link returns 410.
-      try {
-        const short = await createShortLink({
-          url: signed.signedUrl,
-          ttlSeconds: CV_SIGNED_URL_TTL_SECONDS,
-          userId: user.id,
-        });
-        cvUrl = short.shortUrl;
-      } catch (shortErr) {
-        // Shortener failure isn't worth blocking the whole flow — fall
-        // back to the long URL.
-        console.error(
-          "[interviews] short-link mint failed, falling back to long URL:",
-          shortErr instanceof Error ? shortErr.message : shortErr,
-        );
-        cvUrl = signed.signedUrl;
-      }
-    }
-  }
+  // Pull the most recent CV attachment (if any) and mint a 30-day signed URL,
+  // wrapped behind a short /l/<slug> link so the calendar invite description
+  // reads cleanly. Centralized in lib/interviews/cv-link.ts so the reschedule
+  // path can't accidentally diverge again.
+  const cvUrl = await getCandidateCvInviteUrl({
+    candidateId: body.candidateId,
+    userId: user.id,
+    ttlSeconds: CV_SIGNED_URL_TTL_SECONDS,
+  });
 
   // "Portfolio" maps to whichever candidate URL is most likely portfolio-y.
   // LinkedIn first (most common), then source_url as the next-best signal.

@@ -1,5 +1,8 @@
 import { google } from "googleapis";
 import { getGoogleAccessToken } from "@/lib/google/oauth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { withAudit } from "@/lib/audit/wrap";
+import { ORG_ID } from "@/lib/db/constants";
 
 /**
  * Thin wrapper around Google Calendar's events.insert.
@@ -277,14 +280,27 @@ export async function rescheduleInterviewEvent(args: {
  * Read-only conflict check against the booker's primary calendar.
  *
  * Used by `/api/schedule/conflicts` to warn (not block) the user when the
- * proposed interview window overlaps an existing busy block on their own
+ * proposed interview window overlaps an existing event on their own
  * calendar. Multi-attendee FreeBusy (panelists, hiring manager) is Phase 5
  * — most external invitees won't share freebusy data with us anyway.
+ *
+ * Implementation note: we use `events.list` directly rather than
+ * `freebusy.query`. FreeBusy clips its returned intervals to the query
+ * window, which made title matching impossible when the user's proposed
+ * time wasn't an exact start/end match for an existing event (e.g.,
+ * proposing 17:10–17:40 when "Standup" runs 17:00–17:30). events.list
+ * returns full event objects with titles — one HTTP call instead of two,
+ * and overlap detection is straightforward.
  *
  * Auth-degrade: if the user hasn't connected Google (email-OTP signin) or
  * has revoked the scope, this returns `{ conflicts: [] }` silently rather
  * than throwing. The form already surfaces a "connect Google" hint via the
  * existing booking flow — duplicating it here would be noise.
+ *
+ * Tentative / declined events: events.list returns events the user organized
+ * AND events they were invited to. We DON'T filter out declined events —
+ * if it's on their calendar showing as busy, the user probably wants to
+ * see the warning. They can ignore it; we don't decide for them.
  */
 export async function checkBusy(args: {
   userId: string;
@@ -298,10 +314,6 @@ export async function checkBusy(args: {
     return { conflicts: [] };
   }
 
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: tokenResult.accessToken });
-  const calendar = google.calendar({ version: "v3", auth });
-
   const proposedStartMs = new Date(args.startsAt).getTime();
   const proposedEndMs = new Date(args.endsAt).getTime();
   if (
@@ -312,33 +324,20 @@ export async function checkBusy(args: {
     return { conflicts: [] };
   }
 
-  // freebusy.query returns busy intervals only — no event titles. We do a
-  // second events.list call within the same window so the warning can show
-  // *what's* in the way ("Standup" vs. just "10:00–10:30"). One extra HTTP
-  // round-trip is fine at this cadence (debounced ~400ms, one per submit
-  // attempt).
-  let busy: Array<{ start?: string | null; end?: string | null }> = [];
-  try {
-    const fb = await calendar.freebusy.query({
-      requestBody: {
-        timeMin: args.startsAt,
-        timeMax: args.endsAt,
-        items: [{ id: "primary" }],
-      },
-    });
-    busy = fb.data.calendars?.["primary"]?.busy ?? [];
-  } catch {
-    // If freebusy itself fails (rate-limited, transient), don't crash the
-    // form — silently degrade to "no warning".
-    return { conflicts: [] };
-  }
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: tokenResult.accessToken });
+  const calendar = google.calendar({ version: "v3", auth });
 
-  // Best-effort title resolution via events.list. Filter the events down
-  // to the busy intervals that actually overlap the proposed window.
-  let titledEvents: Array<{
+  // Widen the query window slightly so events that START before the proposed
+  // window but END inside it (or start inside and end after) are still
+  // returned. events.list uses `timeMin <= event.end` and `timeMax >= event.start`
+  // semantics, so passing exactly the proposed window already handles this
+  // correctly — but we keep the window tight so the response stays small.
+  let items: Array<{
     start?: string | null;
     end?: string | null;
     summary?: string | null;
+    status?: string | null;
   }> = [];
   try {
     const evs = await calendar.events.list({
@@ -346,47 +345,193 @@ export async function checkBusy(args: {
       timeMin: args.startsAt,
       timeMax: args.endsAt,
       singleEvents: true,
-      // We only need a handful of overlapping events — keep the response
-      // small. Default ordering is fine.
+      // Up to 25 overlapping events is more than any human schedule will hit
+      // in a sub-2-hour window. Bounds the response.
       maxResults: 25,
     });
-    titledEvents = (evs.data.items ?? []).map((e) => ({
+    items = (evs.data.items ?? []).map((e) => ({
       start: e.start?.dateTime ?? e.start?.date ?? null,
       end: e.end?.dateTime ?? e.end?.date ?? null,
       summary: e.summary ?? null,
+      status: e.status ?? null,
     }));
   } catch {
-    // Title lookup is best-effort; we still want to return the busy
-    // intervals from freebusy.
-    titledEvents = [];
+    // Soft fail — the form treats this as "no warning" so a transient
+    // calendar API blip doesn't block the user from submitting.
+    return { conflicts: [] };
   }
 
   const conflicts: Array<{ start: string; end: string; summary?: string }> = [];
-  for (const b of busy) {
-    if (!b.start || !b.end) continue;
-    const bStart = new Date(b.start).getTime();
-    const bEnd = new Date(b.end).getTime();
-    if (!Number.isFinite(bStart) || !Number.isFinite(bEnd)) continue;
-    // Standard half-open overlap: A overlaps B iff A.start < B.end AND
-    // A.end > B.start. Adjacent (end == start) is *not* a conflict.
-    if (bStart < proposedEndMs && bEnd > proposedStartMs) {
-      // Try to attach a title from titledEvents — match by start/end pair.
-      const matched = titledEvents.find(
-        (e) =>
-          e.start &&
-          e.end &&
-          new Date(e.start).getTime() === bStart &&
-          new Date(e.end).getTime() === bEnd,
-      );
+  for (const ev of items) {
+    if (!ev.start || !ev.end) continue;
+    // Skip explicitly cancelled events — Google sometimes still returns them
+    // with singleEvents=true.
+    if (ev.status === "cancelled") continue;
+    const eStart = new Date(ev.start).getTime();
+    const eEnd = new Date(ev.end).getTime();
+    if (!Number.isFinite(eStart) || !Number.isFinite(eEnd)) continue;
+    // Half-open overlap: A overlaps B iff A.start < B.end AND A.end > B.start.
+    // Adjacent (end == start) is NOT a conflict.
+    if (eStart < proposedEndMs && eEnd > proposedStartMs) {
       conflicts.push({
-        start: b.start,
-        end: b.end,
-        summary: matched?.summary ?? undefined,
+        start: ev.start,
+        end: ev.end,
+        summary: ev.summary ?? undefined,
       });
     }
   }
 
   return { conflicts };
+}
+
+/**
+ * One-way sync from Google Calendar → our DB. The other direction (our DB
+ * → Google) is already covered by the create / reschedule / cancel routes
+ * (which all call Google with `sendUpdates='all'`). This closes the loop
+ * for the case where HR deletes or modifies an event directly in Google
+ * Calendar — without this, the web app would keep showing the interview as
+ * scheduled forever.
+ *
+ * Strategy (one HTTP call, bounded N):
+ *   1. Read all our DB rows where status='scheduled', starts_at > now,
+ *      and we have a google_event_id (= the interview is on Google).
+ *   2. Fetch all *current* (non-cancelled, non-deleted) events from the
+ *      user's primary calendar between now and +90 days via a single
+ *      `events.list` call. Build a Set of event IDs we saw.
+ *   3. For each DB row whose google_event_id is NOT in that set, mark the
+ *      row as `cancelled` (going through withAudit so it appears in the
+ *      activity log + remains undo-able).
+ *
+ * Auth-degrade: bails silently if the user signed in via email-OTP and
+ * never connected Google. Their DB rows are then the source of truth and
+ * we have nothing to reconcile against — no error, no toast.
+ *
+ * Performance: page-load latency adds one Google API round-trip, ~150-400ms
+ * round trip from Vercel SG → Google. For 10 scheduled interviews it's a
+ * fixed cost; for 100, still one call. The DB writes per stale row are
+ * small (≤5 in any realistic case).
+ *
+ * Out of scope (yet): syncing time/title changes from Google. We only
+ * detect deletes here — covers the "I deleted it from my Google app and
+ * the web still shows it" demo case, which is what HR will actually do.
+ */
+export async function reconcileWithGoogle(args: {
+  userId: string;
+}): Promise<{ cancelled: number; checked: number }> {
+  const tokenResult = await getGoogleAccessToken(args.userId);
+  if (!tokenResult.ok) {
+    return { cancelled: 0, checked: 0 };
+  }
+
+  const admin = createAdminClient();
+
+  // Pull our side first. Only rows that should still be live on Google —
+  // no point checking already-cancelled ones, and no point checking past
+  // interviews (HR can't "delete" something that already happened in any
+  // meaningful sense).
+  const nowIso = new Date().toISOString();
+  const { data: rows, error: rowsErr } = await admin
+    .from("interviews")
+    .select("id, google_event_id, organizer_id, starts_at")
+    .eq("organizer_id", args.userId)
+    .eq("status", "scheduled")
+    .gte("starts_at", nowIso)
+    .not("google_event_id", "is", null);
+  if (rowsErr || !rows || rows.length === 0) {
+    return { cancelled: 0, checked: 0 };
+  }
+
+  // One events.list call covering the next 90 days. 90 days is generous —
+  // interview cycles rarely stretch past a month, and capping `maxResults`
+  // bounds the response anyway.
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + 90);
+
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: tokenResult.accessToken });
+  const calendar = google.calendar({ version: "v3", auth });
+
+  const liveIds = new Set<string>();
+  try {
+    const evs = await calendar.events.list({
+      calendarId: "primary",
+      timeMin: nowIso,
+      timeMax: horizon.toISOString(),
+      singleEvents: true,
+      maxResults: 250,
+      showDeleted: false,
+    });
+    // Safety bail: if Google indicates there are more pages we didn't fetch,
+    // we can't be sure a DB row missing from `liveIds` is actually deleted
+    // (it might just be on page 2). Marking anything cancelled in that
+    // state risks false positives — better to skip this reconciliation and
+    // try again next page load. At take-home scale (≤250 events in 90 days)
+    // this branch is unreachable, but it future-proofs against a busy
+    // calendar.
+    if (evs.data.nextPageToken) {
+      console.warn(
+        "[calendar.reconcile] >250 events in 90-day window, skipping to avoid false cancellations",
+      );
+      return { cancelled: 0, checked: rows.length };
+    }
+    for (const e of evs.data.items ?? []) {
+      if (e.id && e.status !== "cancelled") liveIds.add(e.id);
+    }
+  } catch (err) {
+    // If Google itself fails (rate-limited, transient), don't mark our
+    // rows as deleted — that would be data loss. Bail.
+    console.error(
+      "[calendar.reconcile] events.list failed, skipping reconciliation:",
+      err instanceof Error ? err.message : err,
+    );
+    return { cancelled: 0, checked: 0 };
+  }
+
+  let cancelled = 0;
+  for (const row of rows) {
+    const eventId = row.google_event_id as string | null;
+    if (!eventId) continue;
+    if (liveIds.has(eventId)) continue;
+
+    // The event is in our DB but no longer on Google → HR deleted it
+    // directly. Mirror that to our DB.
+    try {
+      // Re-fetch the full row so withAudit's `before` snapshot matches the
+      // current state of the world.
+      const { data: before } = await admin
+        .from("interviews")
+        .select("*")
+        .eq("id", row.id as string)
+        .single();
+      await withAudit({
+        actorId: args.userId,
+        orgId: ORG_ID,
+        action: "update",
+        table: "interviews",
+        targetId: row.id as string,
+        before: before ?? null,
+        mutate: async () => {
+          const { data, error } = await admin
+            .from("interviews")
+            .update({ status: "cancelled" })
+            .eq("id", row.id as string)
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        },
+      });
+      cancelled++;
+    } catch (err) {
+      console.error(
+        "[calendar.reconcile] failed to mark row cancelled:",
+        row.id,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  return { cancelled, checked: rows.length };
 }
 
 function buildDescription({

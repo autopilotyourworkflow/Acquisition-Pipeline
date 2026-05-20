@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { reconcileWithGoogle } from "@/lib/google/calendar";
 import { Button } from "@/components/ui/button";
 import {
   ScheduleOverview,
@@ -30,6 +31,12 @@ export default async function SchedulePage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Sync DB ↔ Google before reading: if HR deleted an event directly in
+  // Google Calendar, the row gets marked cancelled here so the rendered
+  // list reflects reality. Auth-degrades silently for email-OTP users
+  // (no Google scope = no reconciliation = no-op).
+  await reconcileWithGoogle({ userId: user.id });
 
   const { data: interviewsData } = await supabase
     .from("interviews")

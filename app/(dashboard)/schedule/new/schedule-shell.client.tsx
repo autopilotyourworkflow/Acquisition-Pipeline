@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ConflictWarning } from "@/components/schedule/ConflictWarning";
+import { useConflictCheck } from "@/hooks/use-conflict-check";
 import type { CandidateStage } from "@/lib/db/enums";
 
 export type ScheduleCandidate = {
@@ -46,37 +48,6 @@ function toLocalInput(d: Date): string {
   )}:${pad(d.getMinutes())}`;
 }
 
-/**
- * Format a busy interval into the user's locale time. Both endpoints come
- * from Google as ISO strings with offsets; `Date` parses them correctly,
- * `toLocaleTimeString` renders in the browser's timezone — which for HR in
- * Bangkok is the right thing.
- */
-function formatBusyRange(startISO: string, endISO: string): string {
-  const start = new Date(startISO);
-  const end = new Date(endISO);
-  const opts: Intl.DateTimeFormatOptions = {
-    hour: "numeric",
-    minute: "2-digit",
-  };
-  const sameDay =
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth() &&
-    start.getDate() === end.getDate();
-  const dateLabel = start.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-  const startLabel = start.toLocaleTimeString(undefined, opts);
-  const endLabel = end.toLocaleTimeString(undefined, opts);
-  return sameDay
-    ? `${dateLabel} · ${startLabel}–${endLabel}`
-    : `${dateLabel} ${startLabel} → ${end.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      })} ${endLabel}`;
-}
-
 const DURATION_OPTIONS: { value: number; label: string }[] = [
   { value: 15, label: "15 min" },
   { value: 30, label: "30 min" },
@@ -114,56 +85,10 @@ export function ScheduleShell({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Warn-only conflict detection. Fires ~400ms after the user stops changing
-  // either time field. Read-only check against the booker's primary calendar
-  // via /api/schedule/conflicts (which auth-degrades silently if Google
-  // isn't connected, so we don't need to special-case the OTP-only user).
-  // Submit stays enabled — HR may legitimately want to double-book over a
-  // buffer block.
-  const [conflicts, setConflicts] = useState<
-    Array<{ start: string; end: string; summary?: string }>
-  >([]);
-  useEffect(() => {
-    if (!whenAt || !Number.isFinite(durationMin) || durationMin <= 0) {
-      setConflicts([]);
-      return;
-    }
-    // Hide stale results immediately on any change. The debounce-tick will
-    // repopulate once the user settles.
-    setConflicts([]);
-
-    const startDate = new Date(whenAt);
-    const endDate = new Date(startDate.getTime() + durationMin * 60_000);
-    const startISO = startDate.toISOString();
-    const endISO = endDate.toISOString();
-
-    const ctl = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const resp = await fetch("/api/schedule/conflicts", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ startsAt: startISO, endsAt: endISO }),
-          signal: ctl.signal,
-        });
-        if (!resp.ok) {
-          setConflicts([]);
-          return;
-        }
-        const json = (await resp.json()) as {
-          conflicts?: Array<{ start: string; end: string; summary?: string }>;
-        };
-        setConflicts(json.conflicts ?? []);
-      } catch {
-        // Aborted by a later edit, or network blip — drop silently.
-      }
-    }, 400);
-
-    return () => {
-      clearTimeout(timer);
-      ctl.abort();
-    };
-  }, [whenAt, durationMin]);
+  // Warn-only conflict detection. Submit stays enabled — HR may legitimately
+  // want to double-book over a buffer block. Auth-degrades silently if the
+  // user signed in via email-OTP (no Google scope).
+  const { conflicts } = useConflictCheck({ whenAt, durationMin });
 
   if (candidates.length === 0) {
     return (
@@ -333,29 +258,7 @@ export function ScheduleShell({
           </p>
         </div>
 
-        {conflicts.length > 0 && (
-          <div
-            className="md:col-span-2 rounded-md border border-terracotta/40 bg-terracotta/10 px-4 py-3"
-            role="status"
-            aria-live="polite"
-          >
-            <p className="text-sm font-medium text-terracotta">
-              ⚠ Conflict on your calendar
-            </p>
-            <ul className="mt-1.5 space-y-0.5 text-xs text-charcoal">
-              {conflicts.map((c, i) => (
-                <li key={`${c.start}-${c.end}-${i}`}>
-                  {c.summary ? `${c.summary} — ` : ""}
-                  {formatBusyRange(c.start, c.end)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[11px] text-slate-mid">
-              You can still book over this — Hotel Plus calendars often hold
-              buffer blocks that are fine to overlap.
-            </p>
-          </div>
-        )}
+        <ConflictWarning conflicts={conflicts} className="md:col-span-2" />
 
         <div className="space-y-1.5 md:col-span-2">
           <Label htmlFor="invitees" className="text-xs text-slate-deep">

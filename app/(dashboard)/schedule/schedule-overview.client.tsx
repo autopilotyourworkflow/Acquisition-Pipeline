@@ -25,6 +25,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InterviewActions } from "@/components/interviews/InterviewActions.client";
+import { ConflictWarning } from "@/components/schedule/ConflictWarning";
+import { useConflictCheck } from "@/hooks/use-conflict-check";
 import { cn } from "@/lib/utils";
 
 const DURATION_OPTIONS: { value: number; label: string }[] = [
@@ -160,6 +162,41 @@ export function ScheduleOverview({
 }) {
   const router = useRouter();
   const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const resp = await fetch("/api/schedule/sync", { method: "POST" });
+      const json = (await resp.json().catch(() => ({}))) as {
+        cancelled?: number;
+        checked?: number;
+        error?: string;
+      };
+      if (!resp.ok) {
+        toast.error("Couldn't sync", { description: json.error ?? `HTTP ${resp.status}` });
+        return;
+      }
+      const cancelled = json.cancelled ?? 0;
+      if (cancelled > 0) {
+        toast.success(
+          `Synced — ${cancelled} interview${cancelled === 1 ? "" : "s"} marked cancelled.`,
+          {
+            description: "Deleted from Google Calendar; status updated here.",
+          },
+        );
+      } else {
+        toast.success("In sync with Google Calendar.");
+      }
+      router.refresh();
+    } catch (err) {
+      toast.error("Network error", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const events = useMemo(
     () =>
@@ -223,10 +260,22 @@ export function ScheduleOverview({
       onValueChange={(v) => setView(v as "calendar" | "list")}
       className="space-y-4"
     >
-      <TabsList>
-        <TabsTrigger value="calendar">Calendar</TabsTrigger>
-        <TabsTrigger value="list">List ({interviews.length})</TabsTrigger>
-      </TabsList>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <TabsList>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="list">List ({interviews.length})</TabsTrigger>
+        </TabsList>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleSync}
+          disabled={syncing}
+          className="h-8 px-3 text-xs"
+        >
+          {syncing ? "Syncing…" : "Refresh from Google"}
+        </Button>
+      </div>
 
       <TabsContent value="calendar">
         {interviews.length === 0 ? (
@@ -487,6 +536,13 @@ function CalendarWithContextMenu({
   const [whenAt, setWhenAt] = useState("");
   const [durationMin, setDurationMin] = useState<number>(30);
 
+  // Conflict check only runs while the reschedule dialog is open.
+  const { conflicts: rescheduleConflicts } = useConflictCheck({
+    whenAt,
+    durationMin,
+    enabled: !!reschedule,
+  });
+
   useEffect(() => {
     if (reschedule) {
       setWhenAt(isoToLocalInput(reschedule.startsAt));
@@ -703,6 +759,7 @@ function CalendarWithContextMenu({
                 ))}
               </select>
             </div>
+            <ConflictWarning conflicts={rescheduleConflicts} />
             <DialogFooter>
               <Button
                 type="button"
