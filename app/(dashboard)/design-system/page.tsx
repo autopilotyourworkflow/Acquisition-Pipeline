@@ -14,7 +14,16 @@ const PALETTE = [
   { name: "--destructive", hex: "#C42A2A", hsl: "2 65% 48%", use: "Error states (unchanged)" },
 ] as const;
 
-const STAGES = [
+type StageDef = {
+  stage: string;
+  bg: string;
+  text: string;
+  border: string;
+  label: string;
+  ring?: string;
+};
+
+const STAGES: StageDef[] = [
   { stage: "sourced", bg: "#F8F8F8", text: "#707070", border: "#EEEEEE", label: "Sourced" },
   { stage: "applied", bg: "#FFF1B8", text: "#000000", border: "#FFD52B", label: "Applied / Contacted" },
   { stage: "screening", bg: "#FFEA95", text: "#000000", border: "#FFD52B", label: "Screening" },
@@ -22,7 +31,7 @@ const STAGES = [
   { stage: "offer", bg: "#000000", text: "#FFD52B", border: "#000000", label: "Offer" },
   { stage: "hired", bg: "#FFFFFF", text: "#000000", border: "#000000", label: "Hired", ring: "#FFD52B" },
   { stage: "rejected", bg: "#EEEEEE", text: "#707070", border: "#EEEEEE", label: "Rejected" },
-] as const;
+];
 
 const TYPE_SPECIMENS = [
   { role: "Display / Hero", family: "Montserrat Black 900", sizeClass: "text-5xl font-black uppercase tracking-tight", sample: "HOTEL PLUS" },
