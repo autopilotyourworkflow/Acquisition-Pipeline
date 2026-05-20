@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "./sign-out-button.client";
+import { NavLink } from "./nav-link.client";
 import { Toaster } from "@/components/ui/sonner";
 
 export default async function DashboardLayout({
@@ -18,15 +19,17 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-sand-200 bg-warm-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4">
+      <header className="border-b border-black bg-yellow">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3">
           <Link href="/tracker" className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-terracotta font-display text-sm font-medium text-cream shadow-xs">
+            <div className="flex h-10 w-10 items-center justify-center rounded-none bg-black font-display text-base font-black text-yellow">
               H+
             </div>
-            <span className="font-display text-lg text-navy">Acquisition</span>
+            <span className="font-display text-lg font-bold tracking-tight text-black">
+              Acquisition
+            </span>
           </Link>
-          <nav className="flex items-center gap-2 text-sm">
+          <nav className="flex items-center gap-1">
             <NavLink href="/tracker">Tracker</NavLink>
             <NavLink href="/jds">JDs</NavLink>
             <NavLink href="/scraper">Scraper</NavLink>
@@ -36,7 +39,7 @@ export default async function DashboardLayout({
             <NavLink href="/settings">Settings</NavLink>
           </nav>
           <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-charcoal sm:inline">{user.email}</span>
+            <span className="hidden text-black/75 sm:inline">{user.email}</span>
             <SignOutButton />
           </div>
         </div>
@@ -46,16 +49,5 @@ export default async function DashboardLayout({
       </main>
       <Toaster />
     </div>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-md px-3 py-1.5 text-charcoal transition-colors hover:bg-sand-100 hover:text-navy"
-    >
-      {children}
-    </Link>
   );
 }

@@ -5,31 +5,33 @@ export default function AuthLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-sand-200 bg-warm-white">
-        <div className="mx-auto flex max-w-7xl items-center px-8 py-5">
+      <header className="border-b border-black bg-yellow">
+        <div className="mx-auto flex max-w-7xl items-center px-8 py-3">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-terracotta font-display text-lg font-medium text-cream shadow-xs">
+            <div className="flex h-10 w-10 items-center justify-center rounded-none bg-black font-display text-base font-black text-yellow">
               H+
             </div>
-            <span className="font-display text-xl text-navy">Acquisition</span>
+            <span className="font-display text-lg font-bold tracking-tight text-black">
+              Acquisition
+            </span>
           </Link>
         </div>
       </header>
       <main className="flex flex-1 items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">{children}</div>
       </main>
-      <footer className="border-t border-sand-200 bg-warm-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4 text-xs text-slate-mid">
+      <footer className="bg-black">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5 text-xs text-white/70">
           <span>
             Acquisition · Built for{" "}
             <a
               href="https://www.hotelplus.asia"
-              className="text-charcoal underline-offset-4 hover:underline"
+              className="font-semibold text-yellow underline-offset-4 hover:underline"
             >
               Hotel Plus
             </a>
           </span>
-          <span className="font-mono">v0.1.0</span>
+          <span className="font-mono text-gray-dim">v0.1.0</span>
         </div>
       </footer>
     </div>
