@@ -7,9 +7,12 @@ export const metadata = { title: "Job Descriptions · Acquisition" };
 
 export default async function JdsPage() {
   const supabase = await createClient();
+  // List view only needs identification + the must-have count + threshold —
+  // body_markdown (potentially several KB per JD) and the long persona
+  // override columns aren't rendered here, so don't pay to ship them.
   const { data: jds, error } = await supabase
     .from("job_descriptions")
-    .select("*")
+    .select("id, title, department, location, must_have, threshold")
     .order("created_at", { ascending: false });
 
   return (
@@ -40,7 +43,7 @@ export default async function JdsPage() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {(jds as JdRow[]).map((jd) => (
+          {(jds as Pick<JdRow, "id" | "title" | "department" | "location" | "must_have" | "threshold">[]).map((jd) => (
             <li key={jd.id}>
               <Link
                 href={`/jds/${jd.id}`}

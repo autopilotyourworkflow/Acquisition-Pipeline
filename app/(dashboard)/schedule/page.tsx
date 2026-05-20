@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { reconcileWithGoogle } from "@/lib/google/calendar";
@@ -31,11 +32,16 @@ export default async function SchedulePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  // Sync DB ↔ Google before reading: if HR deleted an event directly in
-  // Google Calendar, the row gets marked cancelled here so the rendered
-  // list reflects reality. Auth-degrades silently for email-OTP users
-  // (no Google scope = no reconciliation = no-op).
-  await reconcileWithGoogle({ userId: user.id });
+  // Sync DB ↔ Google in the background AFTER the response is sent. Was
+  // blocking page render by 500-2000ms while we waited on Google's API;
+  // moving it to `after()` lets the page hydrate from DB instantly and
+  // catch up cancellations on the next visit. The "Refresh from Google"
+  // button still triggers a foreground sync when HR wants it now.
+  after(() =>
+    reconcileWithGoogle({ userId: user.id }).catch((err) => {
+      console.warn("[schedule] background reconcile failed:", err);
+    }),
+  );
 
   const { data: interviewsData } = await supabase
     .from("interviews")

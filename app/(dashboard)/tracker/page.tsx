@@ -14,9 +14,15 @@ export default async function TrackerPage() {
     { data: jds, error: jErr },
     { data: scores },
   ] = await Promise.all([
+    // Trim the select to only the columns the Kanban + Table views actually
+    // render. Dropping raw_profile alone can cut 50-500KB off the response
+    // for orgs with many scraped LinkedIn profiles, since that column can
+    // hold the full JSON dump per candidate.
     supabase
       .from("candidates")
-      .select("*, job_descriptions(title)")
+      .select(
+        "id, org_id, full_name, email, phone, current_title, location, linkedin_url, source, source_url, stage, jd_id, applied_at, created_at, updated_at, job_descriptions(title)",
+      )
       .order("created_at", { ascending: false }),
     supabase
       .from("job_descriptions")
@@ -51,7 +57,9 @@ export default async function TrackerPage() {
   }
 
   const flattened = (candidates ?? []).map((row) => {
-    const { job_descriptions, ...rest } = row as CandidateRow & {
+    // Cast through unknown because we deliberately trimmed the select to
+    // omit raw_profile / notes / row_hash / created_by (perf win).
+    const { job_descriptions, ...rest } = row as unknown as CandidateRow & {
       job_descriptions: { title: string } | null;
     };
     return {
