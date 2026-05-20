@@ -11,13 +11,37 @@ import {
   useSensors,
   useDraggable,
   useDroppable,
-  closestCenter,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { CANDIDATE_STAGES, type CandidateStage } from "@/lib/db/enums";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import type { CandidateRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
+
+/**
+ * Combined collision detection. `pointerWithin` is the most precise —
+ * it returns the droppable the user's cursor is literally inside. We
+ * fall back to `rectIntersection` when the cursor isn't directly over
+ * any droppable (e.g. fast drags where the cursor leaves the column).
+ *
+ * This replaces the previous `closestCenter` which compared *center
+ * points* — fine for symmetric grids but flaky for tall narrow columns,
+ * because the "closest center" to a card's center during a drag can
+ * end up being the column the card came FROM (or a column with more
+ * cards filling the area) rather than the one the cursor is actually
+ * over. The "can't drop on Applied / Contacted" symptom was that:
+ * with the cursor over Applied, closestCenter would still bias toward
+ * the source column whose density matched the dragged card's vertical
+ * position more closely.
+ */
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return rectIntersection(args);
+};
 
 type CandidateWithJd = CandidateRow & {
   jd_title: string | null;
@@ -55,7 +79,11 @@ export function KanbanBoard({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={collisionDetection}
+      onDragEnd={onDragEnd}
+    >
       <div className="flex gap-3 overflow-x-auto pb-2">
         {CANDIDATE_STAGES.map((stage) => (
           <KanbanColumn key={stage} stage={stage} cards={byStage[stage]} />
@@ -72,22 +100,29 @@ function KanbanColumn({
   stage: CandidateStage;
   cards: CandidateWithJd[];
 }) {
+  // Make the ENTIRE column wrapper the droppable area (including the header)
+  // so a drop on the badge / count counts as a drop on the column. Previous
+  // version had the droppable only on the inner card list, which left a
+  // ~28px "dead zone" at the top of every column. Combined with the new
+  // pointerWithin collision detection, this makes the drop target match
+  // the column's visible bounds.
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   return (
-    <div className="flex w-72 shrink-0 flex-col">
+    <div
+      ref={setNodeRef}
+      data-stage={stage}
+      className={cn(
+        "flex w-72 shrink-0 flex-col rounded-md border border-dashed p-2 transition-colors",
+        isOver
+          ? "border-terracotta bg-terracotta-50/40"
+          : "border-sand-200 bg-cream/30",
+      )}
+    >
       <div className="mb-2 flex items-center justify-between px-1">
         <StageBadge stage={stage} />
         <span className="text-xs text-slate-mid">{cards.length}</span>
       </div>
-      <div
-        ref={setNodeRef}
-        className={cn(
-          "flex min-h-[300px] flex-col gap-2 rounded-md border border-dashed p-2 transition-colors",
-          isOver
-            ? "border-terracotta bg-terracotta-50/40"
-            : "border-sand-200 bg-cream/30",
-        )}
-      >
+      <div className="flex min-h-[280px] flex-col gap-2">
         {cards.map((c) => (
           <KanbanCard key={c.id} candidate={c} />
         ))}
