@@ -25,6 +25,7 @@ import { runJobsDbSourcing } from "@/lib/sourcing/providers/jobsdb";
 import { runIndeedSourcing } from "@/lib/sourcing/providers/indeed";
 import { runSeekSourcing } from "@/lib/sourcing/providers/seek";
 import { scoreCandidateSingle } from "@/lib/scoring/score-one";
+import type { ExtractCandidateInput } from "@/lib/anthropic/tools/extract_candidate";
 import type {
   SourcingEvent,
   SourcingRequest,
@@ -32,6 +33,28 @@ import type {
   ProviderResult,
   SourcingPlatform,
 } from "@/lib/sourcing/types";
+
+/**
+ * Money guard: if the normalize pass returned a placeholder name or no
+ * real signal, drop the candidate before we spend more money scoring it.
+ * Prior incident: the JobsDB Jina-only path scraped a job-listing search
+ * page and created "<UNKNOWN>" rows that wasted scoring budget on
+ * empty profiles.
+ */
+function isRealCandidate(c: ExtractCandidateInput): boolean {
+  const name = c.full_name?.trim() ?? "";
+  if (name.length < 3) return false;
+  const placeholders = ["unknown", "<unknown>", "candidate", "n/a", "—"];
+  if (placeholders.includes(name.toLowerCase())) return false;
+  // Need at least one substantive field beyond the name.
+  return Boolean(
+    c.email ||
+      c.current_title ||
+      c.linkedin_url ||
+      (c.experience && c.experience.length > 0) ||
+      (c.skills && c.skills.length > 0),
+  );
+}
 
 export async function* runSourcing(
   req: SourcingRequest,
@@ -123,6 +146,13 @@ export async function* runSourcing(
 
       // 5. Insert each candidate (audit-wrapped) and emit found.
       for (const pc of result.candidates) {
+        if (!isRealCandidate(pc.candidate)) {
+          yield {
+            type: "error",
+            message: `Skipped a result from ${pc.platform}: not a real candidate (page may not be a profile)`,
+          };
+          continue;
+        }
         try {
           const inserted = await insertOutboundCandidate({
             pc,
