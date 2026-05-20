@@ -6,7 +6,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col">
       <header className="bg-yellow">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center">
             <Image
               src="/logo.jpg"
               alt="Hotel Plus"
@@ -15,9 +15,6 @@ export default function Home() {
               priority
               className="h-10 w-10 object-contain"
             />
-            <span className="font-display text-lg font-bold tracking-tight text-black">
-              Acquisition Pipeline
-            </span>
           </Link>
           <Link
             href="/login"
@@ -30,16 +27,11 @@ export default function Home() {
 
       <main className="flex flex-1 items-center justify-center px-8 py-24">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray">
-            Recruiting pipeline
-          </p>
-          <h1 className="mt-6 font-display text-5xl font-black leading-[1.05] tracking-tight text-black sm:text-7xl">
-            Hire faster.
-            <br />
-            With every step recorded.
+          <h1 className="font-sans text-5xl font-bold leading-[1.05] tracking-tight text-black sm:text-7xl">
+            Acquisition Pipeline
           </h1>
           <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-gray">
-            Built for Hotel Plus.
+            H+ Hotel Plus Internal Tool
           </p>
           <div className="mt-12">
             <Link

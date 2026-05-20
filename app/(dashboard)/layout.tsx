@@ -28,8 +28,8 @@ export default async function DashboardLayout({
               priority
               className="h-10 w-10 object-contain"
             />
-            <span className="font-display text-lg font-bold tracking-tight text-black">
-              Acquisition
+            <span className="font-sans text-lg font-bold tracking-tight text-black">
+              Acquisition Pipeline
             </span>
           </Link>
           <nav className="flex items-center gap-1">
