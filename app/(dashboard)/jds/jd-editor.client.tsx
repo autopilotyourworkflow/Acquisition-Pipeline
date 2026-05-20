@@ -187,14 +187,47 @@ export function JdEditor({
               : "(uses global default)"}
           </span>
         </summary>
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
+          {/* 4a coming-soon affordance — the AI prompt-builder will turn
+              this power-user-only textarea into a guided conversation. */}
+          <div className="rounded-md border border-dashed border-terracotta/40 bg-terracotta-50/30 px-3 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 font-medium text-navy">
+                  <span aria-hidden>✨</span> AI-assisted: help me write this
+                  <span className="rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-warning">
+                    coming soon
+                  </span>
+                </p>
+                <p className="mt-1 text-[11px] text-charcoal">
+                  Instead of writing the scoring persona from scratch,
+                  Claude will interview you in 5–6 short questions
+                  (seniority bracket, what to weight most, anti-bias
+                  considerations, what 9/10 looks like, what 3/10
+                  looks like) and propose a tailored persona inheriting
+                  the global default&apos;s structure. You review, edit,
+                  save.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled
+                className="shrink-0 cursor-not-allowed rounded-md border border-sand-200 bg-warm-white px-3 py-1.5 text-xs font-medium text-slate-deep opacity-60"
+                title="Coming in Phase 4a — not shipped in the current submission."
+              >
+                Start interview
+              </button>
+            </div>
+          </div>
+
           <p className="text-[11px] text-slate-deep">
+            Until the AI wizard ships, edit the persona by hand below.
             Leave empty to use the org-wide default from{" "}
             <code className="font-mono">/settings/prompts</code>. Fill this in
             when this role needs different scoring guidance (e.g. for academic
             roles where credentials matter, or for sales roles where track
-            record outweighs technical depth). The override is stored on the JD
-            and used at scoring time only for THIS role.
+            record outweighs technical depth). The override is stored on the
+            JD and used at scoring time only for THIS role.
           </p>
           <Textarea
             id="scoring_persona_override"
