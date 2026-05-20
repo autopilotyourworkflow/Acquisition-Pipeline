@@ -14,16 +14,18 @@ Notable Next.js 16 specifics:
 ## What this project is
 Recruiting Pipeline Tool — a take-home assignment for **Hotel Plus** (hotelplus.asia), a Thai hotel-management consulting firm hiring a Full Stack Developer. The app runs HR's full recruiting workflow in one place: scrape candidates, score with Claude, track in a Kanban, schedule interviews via Google Calendar, draft cold-outreach emails via Gmail. Deadline is 5 days from 2026-05-18.
 
-## ⚠️ Heads-up for the next chat session — Beam is planning a redesign
+## ⚠️ Visual rebrand in progress — Hotel Plus look
 
-If you're loading into this project fresh and Beam mentions a redesign: **read `cowork-log.md` entry #45 first**. It's the honest inventory of what shipped, what's load-bearing, what's worth keeping, and what's worth a second pass. Saves the 30 minutes of reverse-engineering you'd otherwise spend.
+A full visual rebrand to mirror [hotelplus.asia](https://www.hotelplus.asia/) (yellow `#FFD52B` + black + white, Montserrat display, Inter body) is being rolled out in phases. **The source-of-truth spec lives at [docs/redesign/design.md](docs/redesign/design.md)**. Reference assets (Wix HTML + screenshots) are in `docs/redesign/`. A `/design-system` route renders the new tokens as a side-by-side reference against the Hotel Plus marketing screenshots.
 
-The short version:
-- **Keep:** the `withAudit` HOF + audit-log + any-age undo spine; the single Claude client (`lib/anthropic/client.ts`) with tool-use forcing; the scraper's single-normalize-path (`lib/scrape/normalize.ts`); zod-schema-as-contract tool defs; navy/cream/terracotta brand register.
-- **Re-litigate:** scoring persona stored as a free-text blob (vs. structured weight knobs + rubric); single `applied` enum with a "Applied / Contacted" dual label (corrupts funnel analytics — a real `contacted` stage between `sourced` and `applied` is probably right); 8-column wide-scroll Kanban (a list grouped by stage might be better UX); the cold-email dialog doing too much in one modal (could split into a real route).
-- **Drop:** HTML-vs-plain auto-detection on signature (make it a structured object); team-mode scoring UI surface (keep the infra, hide behind a power-user flag); the bookmarklet (replace with a real Chrome extension when there's time).
+Phase status is tracked in the Build progress table below. The brand register line further down (navy/cream/terracotta) will flip when Phase 1 actually swaps the tokens in `app/globals.css`; until then it reflects the current shipped look.
 
-When Beam starts the redesign, default to reading: (1) this file, (2) `cowork-log.md` entry #45 only — not the whole log, (3) the file inventory section below to see what currently exists, (4) the schema migration list. That's the full state-load.
+If you're loading into this project fresh and Beam mentions the redesign, default to reading: (1) this file, (2) `docs/redesign/design.md` for the locked spec, (3) the relevant phase row in the Build progress table below. **Do NOT re-read `cowork-log.md` cover-to-cover** — only open the specific entry referenced in your prompt.
+
+Pre-redesign architectural hold-outs to be aware of (from the redesign brief in cowork-log entry #45):
+- **Keep:** the `withAudit` HOF + audit-log + any-age undo spine; the single Claude client (`lib/anthropic/client.ts`) with tool-use forcing; the scraper's single-normalize-path (`lib/scrape/normalize.ts`); zod-schema-as-contract tool defs.
+- **Re-litigate later (not in this redesign):** scoring persona stored as a free-text blob; single `applied` enum with the "Applied / Contacted" dual label; 8-column wide-scroll Kanban; the cold-email dialog doing too much in one modal. **These are NOT in scope for the visual rebrand** — it's a styling pass, not an IA rework.
+- **Drop later:** HTML-vs-plain auto-detection on signature; team-mode scoring UI surface; the bookmarklet (replace with a real Chrome extension when there's time).
 
 ## How to use this file (READ ME FIRST — saves you hours)
 
@@ -296,8 +298,10 @@ components/emails/              ColdEmailDialog.client + ColdEmailLauncher.clien
 - Claude only: `claude-opus-4-7` for scoring/email/vision; `claude-haiku-4-5` for cheap normalization
 - Vercel deploy + Cloudflare DNS → `acq.autopilotyourworkflow.com`
 
-## Brand tokens (locked)
-Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + Inter (body) + JetBrains Mono. No gradients, max radius 8px, subtle shadows. See `app/globals.css` for the full token set.
+## Brand tokens
+**Currently shipped (will flip in redesign Phase 1):** Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + Inter (body) + JetBrains Mono. No gradients, max radius 8px, subtle shadows. See `app/globals.css` for the full token set.
+
+**Target spec (locked, not yet shipped):** Yellow `#FFD52B` + Black + White, Montserrat (display) + Inter (body) + JetBrains Mono, sharper radii (max 6px), black-tinted shadows. Full spec at [docs/redesign/design.md](docs/redesign/design.md). Visual baseline available at `/design-system` route.
 
 ## Architectural conventions
 - Every mutation goes through `lib/audit/wrap.ts:withAudit()` so the activity log + undo backbone gets every change.
@@ -331,7 +335,11 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 4 — AI assists for JD authoring + auto-email-reader (4a + 4c; 4b replaced by 3e) | Day 5 | 🟡 **UI PLACEHOLDERS SHIPPED, FEATURES DEFERRED.** Time-bound call before the redesign session. Roadmap is visible to the reviewer but the features themselves don't run. **4a** = AI prompt-builder questionnaire (Haiku) — terracotta callout inside the JD editor's "Advanced — custom scoring persona" section, "Start interview" button disabled with tooltip. **4c** = auto-email-reader via cron-job.org + Vercel endpoint — full "Auto-import from Gmail" section on `/settings/capture` with the planned form (enabled toggle, default JD picker, sender/subject filters) rendered at 70% opacity + disabled button + expandable "How it'll work" explainer. Both placeholders are explicitly labeled `coming soon`. Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4c-auto-reader.md`. |
 | 5 — Browser extension + polish + demo + deferred 4d/4e/4f | Day 5 | not started — bookmarklet covers the MVP capture path. |
 | 6 — Final Phase: secrets audit + handoff | end | not started — submission deadline 2026-05-22 13:00 Bangkok. |
-| **Next session — Full redesign** | TBD | 🔄 Beam is planning a full redesign in the next chat session. The spine (audit + undo + single Claude client + scraper normalize-path + brand register) is sound; the surface is up for a second pass. Read cowork-log entry #45 for the honest "what worked / what to redesign" inventory before starting. |
+| Redesign Phase 0 — spec + verification route | 2026-05-21 | ✅ **COMPLETE.** `docs/redesign/design.md` locked (tokens, fonts, radii, stage palette, nav treatment). Reference assets (Wix HTML + sc1–5 screenshots) relocated from `public/` to `docs/redesign/`. Compressed copies under `public/design-ref/` feed the new `/design-system` route, which renders the new brand inline (independent of `globals.css`) for side-by-side check against Hotel Plus reference screenshots. No app behavior change yet. |
+| Redesign Phase 1+2 — token + font swap + hardcoded-color cleanup | TBD | not started — flips `app/globals.css` HSL values, swaps Fraunces → Montserrat, then fixes `StageBadge` / `SourceBadge` / `ConflictWarning` / auth form CTAs. Plan at `~/.claude/plans/i-need-help-redesign-indexed-popcorn.md`. |
+| Redesign Phase 3 — chrome retheme (yellow nav) | TBD | not started — solid yellow top nav with black links, black footer on auth, prominent H+ logo block. |
+| Redesign Phase 4 — page-by-page polish | TBD | not started — visual sweep of all 16 dashboard routes + Schedule-X calendar alignment. |
+| Redesign Phase 5 — brand finish | TBD | not started — favicon, login hero, cowork-log entry. |
 
 Update this table at the end of each phase. Append a fresh entry to `cowork-log.md` after every major decision or successfully completed module.
 
