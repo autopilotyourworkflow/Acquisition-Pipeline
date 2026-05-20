@@ -807,6 +807,20 @@ The five days produced a working system. A redesign isn't admitting failure — 
 
 ---
 
-*45 cowork-log entries. Phase 3e cold-email is QA-stable. Phase 4a + 4c surfaced as "coming soon" placeholders so the reviewer sees the roadmap. Submission-ready. Next chat: full redesign.*
+## 46. The rebrand was a CSS swap until it wasn't
+
+The bet going into the redesign was that because everything went through tokens — `@theme inline` in `globals.css`, every shadcn primitive consuming semantic vars, zero hardcoded hex in any `.tsx` file — the bulk of the work would be a clean spine swap. Phase 1 vindicated that read: one `globals.css` edit + a `next/font/google` import flipped the whole app from navy/cream/terracotta to yellow/black/white in 30 minutes. Every Button, Card, Badge, Tabs, Dialog inherited the new register with no per-file touch. "Tokens, not values" paid for itself.
+
+The bet did *not* hold for chrome. Phase 3 was three sub-sessions, not one, because every iteration uncovered a judgment call that didn't have an obvious right answer. Inverted H+ block (`bg-black text-yellow`) or yellow square? Black hairline under the nav or none (the marketing site has none — confirmed only by zooming into sc1)? Sticky or static? Use the actual `public/logo.jpg` image or keep the typeset H+ block? Wordmark next to the logo, or just the image? Each call was small but each needed Beam's eye, which meant the loop was: ship, look, adjust. The cowork-log doesn't capture the dozens of tiny back-and-forths; the commits do.
+
+The unexpected win was perf, and it surfaced *because of* the chrome work. Threading the new layout through the dashboard made the redundant `supabase.auth.getUser()` round-trip visible — layout + page each made it on every nav. Wrap in React `cache()`, dedupe, done. Then `select *` on Tracker and JDs lit up as shipping 50-500KB of `raw_profile` JSON for views that don't render it. Trim. Then `reconcileWithGoogle` on the Schedule page was a synchronous block on a 1-2s Google API call — `after()` moved it post-response. None of these were redesign work strictly. But you can't re-touch every page's chrome without also re-reading what each page *does*, and the wasted work becomes legible the second time through.
+
+The marketing root itself went through three iterations in one chat — first the Phase-3 default ("Hire faster. With every step recorded.") with a hero H+ block, then stripped to logo-only chrome with the same headline, then collapsed further to just "Acquisition Pipeline" in Inter and "H+ Hotel Plus Internal Tool" as the sub. Each step felt like the answer until Beam saw it live. Premium minimal isn't a single design, it's the convergence point of cuts.
+
+**Visual rebrands aren't visual. The chrome is small, the polish is iterative, and the rendering path becomes legible when you re-touch every file — which is exactly when the perf wins show up.**
+
+---
+
+*46 cowork-log entries. Redesign Phases 0–3 shipped; landing page rewritten as premium minimal; auth round-trip deduped + tracker/JDs selects trimmed + Schedule google-sync deferred to `after()`. Phase 4 (page-by-page polish) and Phase 5 (favicon, brand finish) are nice-to-haves before tomorrow's 13:00 Bangkok submission; final-phase reviewer-access + secrets audit are the must-do items.*
 
 ---
