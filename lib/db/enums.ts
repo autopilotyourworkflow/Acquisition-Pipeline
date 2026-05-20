@@ -5,6 +5,7 @@
  */
 
 export const CANDIDATE_STAGES = [
+  "sourced",
   "applied",
   "screening",
   "prescreen_call",
@@ -64,6 +65,7 @@ export type EmailDraftStatus = (typeof EMAIL_DRAFT_STATUSES)[number];
  * synchronized.
  */
 export const STAGE_LABELS: Record<CandidateStage, string> = {
+  sourced: "Sourced",
   applied: "Applied",
   screening: "Screening",
   prescreen_call: "Prescreen Call",

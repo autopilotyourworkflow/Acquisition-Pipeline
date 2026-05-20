@@ -352,7 +352,10 @@ async function insertOutboundCandidate(args: {
       sourcing_provider: args.pc.platform,
       sourcing_run_id: args.runId,
     },
-    stage: "applied" as const,
+    // Outbound: candidate hasn't engaged with us yet. HR moves them to
+    // Applied (or further) once we get a response to the cold email or
+    // they confirm interest.
+    stage: "sourced" as const,
     created_by: args.userId,
   };
 
