@@ -48,6 +48,11 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/accept-invite") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/webhooks/") ||
+    // Bookmarklet capture: opened by /api/scrape/bookmarklet flow; the
+    // page itself reads its URL hash + posts to the API which is
+    // token-authed, so middleware-level auth isn't needed.
+    pathname === "/bookmarklet-capture" ||
+    pathname.startsWith("/api/scrape/bookmarklet") ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico";
 

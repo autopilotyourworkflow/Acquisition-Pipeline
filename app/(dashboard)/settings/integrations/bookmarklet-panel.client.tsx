@@ -10,13 +10,18 @@ import {
 } from "@/app/actions/bookmarklet";
 
 /**
- * The bookmarklet JS source. Embeds the per-user token, posts the page
- * text to /api/scrape/bookmarklet, and pops a toast on the source page.
- * Designed to be small enough that the encoded form stays well under
- * any browser's URL-length limits.
+ * The bookmarklet JS source.
+ *
+ * Why we open a new tab instead of fetching from the source page:
+ * LinkedIn, JobsDB, and most major sites ship strict CSP `connect-src`
+ * directives that block our cross-origin POST. So we encode the page
+ * text + user's token into the URL hash and open our own
+ * /bookmarklet-capture page in a new tab — same-origin from there,
+ * no CSP issue. The hash is never sent to the server.
  */
 function buildBookmarkletHref(token: string, apiBase: string): string {
-  const src = `(()=>{const T=${JSON.stringify(token)};const A=${JSON.stringify(apiBase + "/api/scrape/bookmarklet")};const N=(m,e)=>{const d=document.createElement('div');d.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:'+(e?'#dc2626':'#BD5B3C')+';color:#fff;padding:14px 18px;border-radius:8px;font:500 14px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:360px';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),4500)};const t=document.body.innerText;if(!t||t.length<100){N('Page is empty — open a candidate detail page first.',1);return}N('Sending to Acquisition…',0);fetch(A,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({text:t,sourceUrl:location.href})}).then(r=>r.json()).then(d=>N(d.ok?'Added: '+d.full_name:'Failed: '+(d.error||'Unknown'),!d.ok)).catch(e=>N('Network error: '+e.message,1))})()`;
+  const captureUrl = apiBase + "/bookmarklet-capture";
+  const src = `(()=>{const T=${JSON.stringify(token)};const C=${JSON.stringify(captureUrl)};const t=document.body.innerText;if(!t||t.length<100){alert('Page is empty — open a candidate detail page first.');return}try{const j=JSON.stringify({t:T,text:t,url:location.href});const b=new TextEncoder().encode(j);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);const e=btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=/g,'');window.open(C+'#d='+e,'_blank')}catch(e){alert('Bookmarklet error: '+e.message)}})()`;
   return "javascript:" + encodeURIComponent(src);
 }
 
@@ -174,16 +179,16 @@ export function BookmarkletPanel({
             you can see the candidate&apos;s rendered details.
           </li>
           <li>
-            Click the bookmarklet. A toast appears on that page confirming
-            the candidate was added.
+            Click the bookmarklet. A new tab opens on Acquisition that
+            confirms the capture, lets you click through to the new
+            candidate, and can be closed when done.
           </li>
           <li>
-            Open the Tracker — the new candidate is there with the source
-            tag matching where it came from (
+            The candidate lands in the Tracker with the source tag
+            auto-detected from the URL (
             <span className="font-mono">linkedin</span> /{" "}
             <span className="font-mono">jobsdb</span> /{" "}
-            <span className="font-mono">extension</span>). Run a score from
-            the Screener.
+            <span className="font-mono">extension</span>).
           </li>
         </ol>
         <p className="mt-2 text-slate-mid">
@@ -193,9 +198,11 @@ export function BookmarkletPanel({
           needing employer-side JobsDB access.
         </p>
         <p className="mt-1 text-slate-mid">
-          If a site&apos;s security policy blocks the request (rare, but
-          possible on stricter sites), the toast on that page will tell you
-          — fall back to the Scraper&apos;s paste tab.
+          The capture flow opens a new tab on this app (rather than
+          posting silently from the source page) because LinkedIn / JobsDB
+          block cross-origin POSTs from inline scripts. The new tab is
+          same-origin, so the API call works regardless of the source
+          site&apos;s security policy.
         </p>
       </details>
     </section>
