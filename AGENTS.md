@@ -96,6 +96,37 @@ saveScoringPrompt({ personaText })   activateScoringPrompt({ promptId })
 // All return: { ok: true, data: T } | { ok: false, error: string }
 ```
 
+**Scheduling helpers** (Pre-Phase 4):
+```ts
+// lib/google/calendar.ts
+checkBusy({ userId, startsAt, endsAt })
+  => Promise<{ conflicts: Array<{ start, end, summary? }> }>
+  // events.list-based overlap check on the booker's primary calendar.
+  // Auth-degrades silently to { conflicts: [] } for OTP-only users.
+reconcileWithGoogle({ userId })
+  => Promise<{ cancelled: number; checked: number }>
+  // Single events.list call → marks DB rows cancelled when their
+  // google_event_id is no longer on Google. Audit-wrapped + undo-able.
+  // Bails safely when >250 events in 90 days (avoids false cancellations).
+
+// lib/interviews/cv-link.ts
+getCandidateCvInviteUrl({ candidateId, userId, ttlSeconds })
+  => Promise<string | null>
+  // The ONE function that turns a candidate's latest cv_pdf attachment
+  // into the short /l/<slug> URL embedded in calendar invites. Both
+  // POST /api/interviews and PATCH /api/interviews/[id] go through this.
+  // Falls back to the long signed URL only if the shortener itself fails.
+
+// hooks/use-conflict-check.ts
+useConflictCheck({ whenAt, durationMin, enabled? })
+  => { conflicts: Conflict[]; checking: boolean }
+  // 150ms-debounced POST to /api/schedule/conflicts. AbortController
+  // cancels in-flight requests on input change. `enabled` flag for
+  // dialog-gated checks.
+formatConflictRange(startISO, endISO)
+  => string  // "May 20 · 17:00–17:30" / cross-day format
+```
+
 **Supabase clients** (`lib/supabase/`):
 ```ts
 createClient()       // server.ts — user-scoped, RLS-enforced, async
@@ -150,6 +181,8 @@ Every dashboard route has a `loading.tsx` sibling (skeleton via `components/ui/s
 /api/scrape/thirdparty         POST — Proxycurl (BYO key) + Haiku flatten
 /api/interviews                POST — create interview (Google event + Hotel Plus invite + prep link)
 /api/interviews/[id]           DELETE = cancel, PATCH = reschedule
+/api/schedule/conflicts        POST — warn-only conflict check (events.list overlap)
+/api/schedule/sync             POST — Google → DB reconcile (deletes detected from Google)
 ```
 
 **Libraries:**
@@ -162,11 +195,13 @@ lib/anthropic/prompts/manager.ts           team-mode manager prompt
 lib/anthropic/prompts/load.ts              DB-backed prompt loader
 lib/audit/wrap.ts                          withAudit HOF + crypto helpers
 lib/google/oauth.ts                        encrypt/decrypt + getGoogleAccessToken
-lib/google/calendar.ts                     create/cancel/reschedule + Hotel Plus invite template
+lib/google/calendar.ts                     create/cancel/reschedule + Hotel Plus invite template + checkBusy + reconcileWithGoogle
 lib/scrape/normalize.ts                    single funnel: rawText → extract_candidate tool
 lib/short-links.ts                         /l/<slug> shortener for CV + prep URLs in invites
+lib/interviews/cv-link.ts                  getCandidateCvInviteUrl — single CV-link path for create + reschedule
 lib/db/{constants,enums,types}.ts          shared
 lib/supabase/{server,browser,admin,middleware}.ts
+hooks/use-conflict-check.ts                shared FreeBusy-driven conflict hook + formatConflictRange
 ```
 
 **Schema (migrations applied — all 6):**
@@ -183,7 +218,8 @@ components/ui/                  shadcn primitives (button, dialog, dropdown-menu
                                 + skeleton.tsx + sonner.tsx (Toaster wrap)
 components/candidates/          StageBadge, SourceBadge
 components/screener/            ScoreCard, ScoreStream.client
-components/interviews/          InterviewActions.client (reschedule + cancel menu)
+components/interviews/          InterviewActions.client (reschedule + cancel menu, with conflict warning)
+components/schedule/            ConflictWarning (shared by booking + both reschedule dialogs)
 ```
 
 **Things that DON'T exist yet (build when phases get there):**
@@ -195,7 +231,7 @@ components/interviews/          InterviewActions.client (reschedule + cancel men
 - `app/api/emails/draft` — Gmail draft create (Phase 4b)
 - `app/api/cron/gmail-poll` — auto-email-reader (Phase 4c)
 - `gmail_watch_configs` table — per-user inbox watch config (Phase 4c)
-- FreeBusy multi-attendee picker (Phase 4d)
+- FreeBusy multi-attendee picker (Phase 4d) — *booker-only conflict check is done; multi-attendee panelist FreeBusy is the deferred piece*
 - `extension/` — Chrome MV3 (Phase 5)
 
 ## Files this project does NOT use
@@ -244,7 +280,7 @@ Navy `#17202E` + Cream `#FAF7F2` + Terracotta `#BD5B3C`. Fraunces (display) + In
 | 1 — Foundation (scaffold, DB schema, auth, deploy) | Day 1 | ✅ deployed to `acq.autopilotyourworkflow.com`, login verified end-to-end with both code + magic-link |
 | 2 — AI core (Resume Screener + Applicant Tracker) | Day 2 | ✅ **COMPLETE.** Foundation (`withAudit` HOF + Claude client w/ retry/cache/telemetry/tool-use forcing + `scoring.v1` prompt). Tracker (Kanban + Table + JD CRUD, click-through, score badges, drag w/ UndoToast). Screener (SSE stream, ScoreCard, unpdf upload + dedup, model picker, team-mode 3+1, score history). Editable prompts (`/settings/prompts`), per-JD overrides, `/activity` audit log, any-age Undo, candidate detail page, bundled OAuth scopes. 20 cowork-log entries. Migrations 0001-0004 applied. |
 | 3 — Scraper + Scheduler basics | Day 3-4 | ✅ **COMPLETE.** 3a (OAuth tokens) ✅, 3b (Scraper — all 5 tabs) ✅, 3c (Scheduler + Integrations) ✅. `/schedule` shows list + Schedule-X v2 calendar (month/week/day/agenda) with brand theme; form moved to `/schedule/new`. Cancel + reschedule via dropdown (Google `events.delete` / `events.patch`, `sendUpdates='all'`). Hotel Plus invite template — candidate-facing; prep questions stay internal on the detail page. Link shortener `/l/<slug>` (migration 0006) for clean CV URLs in invites. `/settings/integrations` shows per-scope status (Calendar / Gmail Compose / Gmail Send). SMTP via Resend through Supabase. Hardening pass: scraper SSE parser, URL fetch normalization + Jina Reader fallback, editable preview + source retention, PDF upload-before-parse (was writing 0-byte files), scoring loop runaway-fire fixed (stable React key + ref pattern on onDone), bytea hex encoding for OAuth refresh tokens, attachment View/Download signed URLs (24h preview, 30-day download), experience bullets in scraped profiles. Migrations 0001-0006 applied. |
-| Pre-Phase 4 — Scheduling conflict detection | Day 4 | not started — closes Module 4's "conflict detection" rubric item via Google FreeBusy on booker's calendar (warn-only). Prompt: `docs/pre-phase-4-conflict-detection.md`. |
+| Pre-Phase 4 — Scheduling conflict detection + Google→DB sync | Day 4 | ✅ **COMPLETE.** Warn-only conflict detection on `/schedule/new` and both reschedule dialogs via `events.list` (dropped FreeBusy after it broke title matching — FreeBusy clips intervals to the query window). Shared `useConflictCheck` hook + `ConflictWarning` component, 150ms debounce + "Checking…" indicator. Reschedule-CV-URL regression fixed by centralizing the link path in `lib/interviews/cv-link.ts` — both POST and PATCH go through one helper now. Google → DB reconciliation on `/schedule` page load + "Refresh from Google" button (`reconcileWithGoogle` in `lib/google/calendar.ts` + `/api/schedule/sync`). One cowork-log entry (#36). |
 | 4 — Overdelivery (split into 4a / 4b / 4c; 4d/4e/4f deferred to Phase 5) | Day 4 | not started. 4a = AI prompt-builder questionnaire (Haiku). 4b = cold-email drafter + send + signature + confirm (Opus, migration 0007). 4c = auto-email-reader via cron-job.org + Vercel endpoint (Opus + Haiku, migration 0008, new `CRON_SECRET` + `gmail.readonly` scope). Prompts: `docs/phase-4a-prompt-builder.md`, `docs/phase-4b-cold-email.md`, `docs/phase-4c-auto-reader.md`. Status index: `docs/phase-4-prompt.md`. |
 | 5 — Browser extension + polish + demo + deferred 4d/4e/4f | Day 5 | not started |
 | 6 — Final Phase: secrets audit + handoff | end | not started |

@@ -589,3 +589,23 @@ The auth-degrade path matters too: if the user signed in via email OTP and never
 **A warning informs the user. A block dictates to them. The right friction is the kind they can ignore when they have a reason to.**
 
 ---
+
+## 36. Six bugs, one chain — when a QA pass exposes the shape
+
+Ben deployed the conflict-detection build and immediately hit six things in one screenshot: reschedule had no warning, Google deletes didn't reflect on the web, the warning was slow, conflicting events at non-exact-start times showed without a title, CV URLs were back to the long form on reschedule, and the web showed three interviews while Google showed two. Six issues, surface-level different, and three of them ended up sharing root causes.
+
+The slow warning + missing title were the same bug. I'd reached for FreeBusy first because that's the API named after the question I was asking ("is the user busy?"). But FreeBusy returns intervals *clipped to your query window* — proposing 17:10–17:40 against a 17:00–17:30 standup returns a busy block of 17:10–17:30, which never matches the event's actual 17:00–17:30 start/end on the secondary `events.list` call I was using for titles. Two API calls, expensively coordinated, producing worse data than one. Dropped FreeBusy entirely, kept only `events.list`, ran overlap math directly on the returned events. Faster *and* correct. The lesson: the API with the on-point name isn't always the right shape — sometimes the more general endpoint gives you everything you need in fewer calls.
+
+The CV-URL regression was the kind of bug that only happens when the same logical operation lives in two places. The create path wrapped the signed Supabase URL with the link shortener; the reschedule path had its own inlined copy that just assigned the long URL directly. Both worked. One was wrong. The fix wasn't to patch the reschedule path — it was to extract `getCandidateCvInviteUrl()` into `lib/interviews/cv-link.ts` and have both routes call it. Now the long URL physically can't sneak back in because no caller chooses; there's exactly one function for "what CV link goes in an invite?" "Never let this happen again" is an architectural property, not a checklist item.
+
+The Google→DB sync was the architectural omission. We'd built three routes that pushed changes to Google (create / reschedule / cancel) and zero that pulled changes back. Ben deleting an event in his Google app left our DB blind. The fix added one function `reconcileWithGoogle()` plus a server-side reconcile on `/schedule` page load — one `events.list` call, build a set of live event IDs, anything in our DB whose `google_event_id` isn't in the set gets marked cancelled through `withAudit` so it's still undo-able. The defensive bail (if Google returns >250 events and indicates more pages, skip rather than risk false cancellations) cost three lines and removed a whole class of "wait, where did my interview go" incidents.
+
+The ghost interview at 17:30 in Ben's screenshot was just the first observable instance of the sync gap. Whether he created two and clicked submit three times, or created three and deleted one in Google, didn't matter — the right answer was to make our DB reflect Google's reality on every page load, and let the underlying cause stop mattering. The Refresh button is just there for the moment between "I deleted it" and "I'm about to navigate."
+
+**When a QA pass surfaces three bugs that share a root cause, the right deliverable isn't three fixes — it's a piece of architecture that makes the failure mode unrepresentable.**
+
+---
+
+*Pre-Phase 4 complete: conflict detection (booker-only, warn-only, 150ms debounced) + Google→DB sync + CV-link centralization. 36 cowork-log entries. Ready for Phase 4a / 4b / 4c.*
+
+---
