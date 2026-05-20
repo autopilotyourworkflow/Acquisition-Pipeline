@@ -79,7 +79,7 @@ export default async function IntegrationsPage() {
     admin
       .from("user_settings")
       .select(
-        "proxycurl_api_key_encrypted, serpapi_key_encrypted, bookmarklet_token, updated_at",
+        "proxycurl_api_key_encrypted, apify_api_token_encrypted, bookmarklet_token, updated_at",
       )
       .eq("user_id", user.id)
       .maybeSingle(),
@@ -95,8 +95,8 @@ export default async function IntegrationsPage() {
     proxycurlUpdatedAt: settingsRow?.updated_at
       ? (settingsRow.updated_at as string)
       : null,
-    serpapiSaved: Boolean(settingsRow?.serpapi_key_encrypted),
-    serpapiUpdatedAt: settingsRow?.updated_at
+    apifySaved: Boolean(settingsRow?.apify_api_token_encrypted),
+    apifyUpdatedAt: settingsRow?.updated_at
       ? (settingsRow.updated_at as string)
       : null,
   };

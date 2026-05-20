@@ -1,13 +1,17 @@
 /**
- * LinkedIn provider — Proxycurl Person Search + Person Profile.
+ * LinkedIn provider — Apify-backed.
  *
- * Two API calls per run:
- *   1. /proxycurl/api/v2/search/person  → list of profile URLs
- *   2. /proxycurl/api/v2/linkedin       → per profile, full details
+ * We use Apify's marketplace actors instead of Proxycurl: free $5/month
+ * credit, no payment-up-front friction, and same JSON-structured output.
  *
- * The Person Profile call is the same one /api/scrape/thirdparty uses for the
- * single-candidate scraper. We re-format its output as text and hand it to
- * `normalizeCandidate` (Haiku) for a single normalize path.
+ * Actor: harvestapi~linkedin-profile-search (default)
+ *   Override with env var APIFY_LINKEDIN_ACTOR_ID if you prefer a
+ *   different actor — input shape `{ queries, maxItems }` is consistent
+ *   across most LinkedIn search actors on Apify.
+ *
+ * Endpoint: POST /v2/acts/{actor}/run-sync-get-dataset-items
+ *   Returns the dataset items inline (no polling). Apify charges only
+ *   for the items actually returned.
  */
 
 import { normalizeCandidate } from "@/lib/scrape/normalize";
@@ -20,165 +24,200 @@ import type { DeriveSourcingQueryInput } from "@/lib/anthropic/tools/derive_sour
 
 const PLATFORM: SourcingPlatform = "linkedin";
 
-// Approximate per-call cost from Proxycurl pricing — recorded for the run's
-// cost_usd column. Tune later if the rate card shifts.
-const SEARCH_COST_USD = 0.01;
-const PROFILE_COST_USD = 0.10;
+const APIFY_ACTOR_ID =
+  process.env.APIFY_LINKEDIN_ACTOR_ID || "harvestapi~linkedin-profile-search";
+
+// Apify charges per item returned. The exact rate depends on the actor;
+// $0.02–$0.04 per profile is typical for LinkedIn search actors. We
+// record a conservative estimate so the sourcing_runs.cost_usd column
+// reflects approximate real spend.
+const APIFY_COST_PER_ITEM = 0.04;
+const NORMALIZE_COST_USD = 0.01; // Haiku per-call cost (input mostly cached)
 
 type LinkedInRunInput = {
   query: DeriveSourcingQueryInput;
   nTarget: number;
-  proxycurlKey: string;
+  /** Apify API token (passed by orchestrator after decrypting from user_settings). */
+  apifyToken: string;
 };
 
-type ProxycurlPersonSearchResult = {
-  results?: Array<{
-    linkedin_profile_url?: string;
-    last_updated?: string;
-  }>;
-  next_page?: string | null;
+/**
+ * Apify dataset items vary in shape across actors but most LinkedIn
+ * search actors return at least these fields. We're defensive about
+ * what we read and let Haiku do the heavy lifting of structuring it.
+ */
+type ApifySearchItem = {
+  url?: string;
+  linkedinUrl?: string;
+  profileUrl?: string;
+  fullName?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  headline?: string;
+  title?: string;
+  jobTitle?: string;
+  location?: string;
+  about?: string;
+  summary?: string;
+  experience?: unknown;
+  skills?: unknown;
+  [key: string]: unknown;
 };
 
 export async function runLinkedInSourcing(input: LinkedInRunInput): Promise<ProviderResult> {
-  if (!input.proxycurlKey) {
+  if (!input.apifyToken) {
     return {
       platform: PLATFORM,
       candidates: [],
       cost_usd: 0,
-      note: "no_proxycurl_key",
+      note: "no_apify_token",
     };
   }
 
-  // Build the search query. Proxycurl's /search/person endpoint supports
-  // typed filters; we pick keyword + current_role_title + location.
-  const params = new URLSearchParams();
-  params.set("page_size", String(Math.min(Math.max(input.nTarget, 1), 100)));
-  // Use keywords joined as the free-text search term.
-  if (input.query.keywords.length > 0) {
-    params.set("summary", input.query.keywords.join(" OR "));
-  }
-  if (input.query.titles.length > 0) {
-    // current_role_title supports a regex string. OR-join the titles.
-    params.set("current_role_title", input.query.titles.join("|"));
-  }
-  if (input.query.location) {
-    params.set("country", input.query.location);
-  }
-
-  let costAccumulated = 0;
   const candidates: ProviderCandidate[] = [];
+  let costAccumulated = 0;
 
+  // Compose the search query — Apify LinkedIn actors usually accept a
+  // plain free-text `queries` array. Splice in titles + location if we
+  // have them; the actor's own ranker handles the rest.
+  const queryString = [
+    ...input.query.keywords,
+    ...(input.query.titles.length > 0 ? [`(${input.query.titles.join(" OR ")})`] : []),
+    input.query.location ?? null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const actorInput = {
+    queries: [queryString],
+    keywords: queryString,
+    maxItems: input.nTarget,
+    maxResults: input.nTarget,
+  };
+
+  const apifyUrl =
+    `https://api.apify.com/v2/acts/${APIFY_ACTOR_ID}/run-sync-get-dataset-items` +
+    `?token=${encodeURIComponent(input.apifyToken)}`;
+
+  let items: ApifySearchItem[] = [];
   try {
-    const searchUrl = `https://nubela.co/proxycurl/api/v2/search/person?${params.toString()}`;
-    const searchRes = await fetch(searchUrl, {
-      headers: { Authorization: `Bearer ${input.proxycurlKey}` },
+    const res = await fetch(apifyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(actorInput),
     });
-    costAccumulated += SEARCH_COST_USD;
 
-    if (!searchRes.ok) {
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
       return {
         platform: PLATFORM,
         candidates: [],
-        cost_usd: costAccumulated,
-        error: `Proxycurl search failed: ${searchRes.status} ${searchRes.statusText}`,
+        cost_usd: 0,
+        error: `Apify error ${res.status}: ${errText.slice(0, 200) || res.statusText}`,
       };
     }
 
-    const searchData = (await searchRes.json()) as ProxycurlPersonSearchResult;
-    const profileUrls = (searchData.results ?? [])
-      .map((r) => r.linkedin_profile_url)
-      .filter((u): u is string => typeof u === "string" && u.length > 0)
-      .slice(0, input.nTarget);
-
-    // Fetch each profile sequentially — Proxycurl rate-limits aggressively
-    // on parallel calls and we don't want one failed profile to nuke the
-    // whole run.
-    for (const profileUrl of profileUrls) {
-      try {
-        const profileRes = await fetch(
-          `https://nubela.co/proxycurl/api/v2/linkedin?${new URLSearchParams({
-            url: profileUrl,
-            skills: "include",
-          }).toString()}`,
-          { headers: { Authorization: `Bearer ${input.proxycurlKey}` } },
-        );
-        costAccumulated += PROFILE_COST_USD;
-
-        if (!profileRes.ok) continue;
-        const profileData = await profileRes.json();
-        const text = formatProxycurlData(profileData, profileUrl);
-
-        const candidate = await normalizeCandidate({ text, model: "haiku" });
-        // Ensure source_url + linkedin_url get set to the discovery URL even
-        // if the normalize pass didn't carry it through.
-        candidate.linkedin_url = candidate.linkedin_url ?? profileUrl;
-        candidate.source_url = candidate.source_url ?? profileUrl;
-
-        candidates.push({
-          platform: PLATFORM,
-          candidate,
-          source_url: profileUrl,
-          cost_usd: PROFILE_COST_USD,
-          note: "proxycurl_profile",
-        });
-      } catch {
-        // Skip individual profile failures
-        continue;
-      }
+    const data = (await res.json()) as unknown;
+    if (Array.isArray(data)) {
+      items = data as ApifySearchItem[];
+    } else if (data && typeof data === "object" && Array.isArray((data as { items?: unknown[] }).items)) {
+      items = (data as { items: ApifySearchItem[] }).items;
+    } else {
+      items = [];
     }
-
-    return {
-      platform: PLATFORM,
-      candidates,
-      cost_usd: costAccumulated,
-      note: candidates.length === 0 ? "no_results" : undefined,
-    };
   } catch (err) {
     return {
       platform: PLATFORM,
-      candidates,
-      cost_usd: costAccumulated,
-      error: err instanceof Error ? err.message : "Unknown LinkedIn error",
+      candidates: [],
+      cost_usd: 0,
+      error: err instanceof Error ? err.message : "Apify request failed",
     };
   }
+
+  costAccumulated += items.length * APIFY_COST_PER_ITEM;
+
+  // Each item → normalize via Haiku → ProviderCandidate.
+  for (const item of items.slice(0, input.nTarget)) {
+    const profileUrl =
+      item.linkedinUrl ?? item.profileUrl ?? item.url ?? null;
+    const formattedText = formatApifyItem(item, profileUrl);
+
+    try {
+      const candidate = await normalizeCandidate({
+        text: formattedText,
+        model: "haiku",
+      });
+      // Carry the LinkedIn URL through even if the normalize pass missed it.
+      candidate.linkedin_url = candidate.linkedin_url ?? profileUrl;
+      candidate.source_url = candidate.source_url ?? profileUrl;
+      costAccumulated += NORMALIZE_COST_USD;
+
+      candidates.push({
+        platform: PLATFORM,
+        candidate,
+        source_url: profileUrl,
+        cost_usd: APIFY_COST_PER_ITEM + NORMALIZE_COST_USD,
+        note: "apify_search",
+      });
+    } catch {
+      // Skip individual normalize failures
+      continue;
+    }
+  }
+
+  return {
+    platform: PLATFORM,
+    candidates,
+    cost_usd: costAccumulated,
+    note: candidates.length === 0 ? "no_results" : "apify_search",
+  };
 }
 
-function formatProxycurlData(data: Record<string, unknown>, profileUrl: string): string {
+function formatApifyItem(item: ApifySearchItem, profileUrl: string | null): string {
   const lines: string[] = [];
-  lines.push(`LinkedIn profile URL: ${profileUrl}`);
-  if (data.full_name) lines.push(`Full Name: ${data.full_name}`);
-  if (data.headline) lines.push(`Current Title: ${data.headline}`);
-  if (data.location) lines.push(`Location: ${data.location}`);
-  if (Array.isArray(data.skills)) {
-    lines.push(
-      `\nSkills:\n${(data.skills as Array<{ name?: string } | string>)
-        .map((s) => (typeof s === "string" ? s : s.name ?? ""))
-        .filter(Boolean)
-        .map((s) => `- ${s}`)
-        .join("\n")}`,
-    );
+  lines.push("Source: LinkedIn (via Apify search)");
+  if (profileUrl) lines.push(`Profile URL: ${profileUrl}`);
+
+  const name =
+    item.fullName ??
+    item.name ??
+    ([item.firstName, item.lastName].filter(Boolean).join(" ") || null);
+  if (name) lines.push(`Full Name: ${name}`);
+
+  const title = item.headline ?? item.title ?? item.jobTitle ?? null;
+  if (title) lines.push(`Current Title: ${title}`);
+
+  if (item.location) lines.push(`Location: ${item.location}`);
+
+  const about = item.summary ?? item.about ?? null;
+  if (about && typeof about === "string") {
+    lines.push(`\nAbout:\n${about}`);
   }
-  if (Array.isArray(data.experiences)) {
-    lines.push("\nWork Experience:");
-    for (const exp of data.experiences as Array<Record<string, unknown>>) {
-      lines.push(`\nCompany: ${(exp.company as string) ?? "Unknown"}`);
-      if (exp.title) lines.push(`Title: ${exp.title}`);
-      if (exp.starts_at && typeof exp.starts_at === "object") {
-        lines.push(`Start: ${(exp.starts_at as { date?: string }).date ?? ""}`);
-      }
-      if (exp.ends_at && typeof exp.ends_at === "object") {
-        lines.push(`End: ${(exp.ends_at as { date?: string }).date ?? ""}`);
-      }
-      if (exp.description) lines.push(`Description: ${exp.description}`);
+
+  if (Array.isArray(item.experience)) {
+    lines.push("\nExperience:");
+    for (const exp of item.experience as Array<Record<string, unknown>>) {
+      const company = exp.company ?? exp.companyName ?? "Unknown";
+      const expTitle = exp.title ?? exp.position ?? "";
+      lines.push(`- ${expTitle} at ${company}${exp.duration ? ` (${exp.duration})` : ""}`);
+      if (exp.description) lines.push(`  ${exp.description}`);
     }
   }
-  if (Array.isArray(data.education)) {
-    lines.push("\nEducation:");
-    for (const edu of data.education as Array<Record<string, unknown>>) {
-      lines.push(`\nInstitution: ${(edu.school as string) ?? "Unknown"}`);
-      if (edu.degree_name) lines.push(`Degree: ${edu.degree_name}`);
-      if (edu.field_of_study) lines.push(`Field: ${edu.field_of_study}`);
+
+  if (Array.isArray(item.skills)) {
+    const skillNames = (item.skills as Array<unknown>)
+      .map((s) => (typeof s === "string" ? s : (s as { name?: string })?.name))
+      .filter(Boolean);
+    if (skillNames.length > 0) {
+      lines.push(`\nSkills: ${skillNames.join(", ")}`);
     }
   }
+
+  // As a last resort, drop the full item JSON so Haiku can extract anything
+  // the typed reads missed. Bounded to avoid massive payloads.
+  const raw = JSON.stringify(item).slice(0, 2000);
+  lines.push(`\nRaw item (truncated):\n${raw}`);
+
   return lines.join("\n");
 }

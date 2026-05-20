@@ -8,15 +8,15 @@ import { Input } from "@/components/ui/input";
 import {
   saveProxycurlKey,
   clearProxycurlKey,
-  saveSerpapiKey,
-  clearSerpapiKey,
+  saveApifyToken,
+  clearApifyToken,
 } from "@/app/actions/integrations";
 
 type KeyStatus = {
   proxycurlSaved: boolean;
   proxycurlUpdatedAt: string | null;
-  serpapiSaved: boolean;
-  serpapiUpdatedAt: string | null;
+  apifySaved: boolean;
+  apifyUpdatedAt: string | null;
 };
 
 export function ApiKeysPanel({ status }: { status: KeyStatus }) {
@@ -31,23 +31,23 @@ export function ApiKeysPanel({ status }: { status: KeyStatus }) {
       </div>
 
       <KeyRow
-        title="Proxycurl"
-        description="LinkedIn profile scraping (Scraper → Third-party tab, and outbound sourcing on JDs)."
+        title="Apify"
+        description="LinkedIn outbound sourcing (JD → 'Find candidates' dialog). Free $5/month credit covers most demos. Token from apify.com → Settings → Integrations → API."
+        saved={status.apifySaved}
+        updatedAt={status.apifyUpdatedAt}
+        getKeyHref="https://console.apify.com/account/integrations"
+        onSave={(v) => saveApifyToken({ value: v })}
+        onClear={() => clearApifyToken()}
+      />
+
+      <KeyRow
+        title="Proxycurl (optional)"
+        description="Used only by the Scraper → Third-party tab for one-off LinkedIn URL fetches. Outbound sourcing uses Apify above."
         saved={status.proxycurlSaved}
         updatedAt={status.proxycurlUpdatedAt}
         getKeyHref="https://nubela.co/proxycurl"
         onSave={(v) => saveProxycurlKey({ value: v })}
         onClear={() => clearProxycurlKey()}
-      />
-
-      <KeyRow
-        title="SerpAPI (optional)"
-        description="Google search backbone for JobsDB outbound sourcing. Without this, JobsDB falls back to direct Jina Reader and usually returns nothing."
-        saved={status.serpapiSaved}
-        updatedAt={status.serpapiUpdatedAt}
-        getKeyHref="https://serpapi.com"
-        onSave={(v) => saveSerpapiKey({ value: v })}
-        onClear={() => clearSerpapiKey()}
       />
     </section>
   );

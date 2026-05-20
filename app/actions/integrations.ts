@@ -24,7 +24,10 @@ async function getActor() {
   return { userId: user.id };
 }
 
-type KeyField = "proxycurl_api_key_encrypted" | "serpapi_key_encrypted";
+type KeyField =
+  | "proxycurl_api_key_encrypted"
+  | "serpapi_key_encrypted"
+  | "apify_api_token_encrypted";
 
 async function upsertEncrypted(userId: string, field: KeyField, value: string) {
   const admin = createAdminClient();
@@ -88,6 +91,32 @@ export async function clearSerpapiKey(): Promise<ActionResult> {
   try {
     const { userId } = await getActor();
     await clearField(userId, "serpapi_key_encrypted");
+    revalidatePath("/settings/integrations");
+    return { ok: true, data: undefined };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+export async function saveApifyToken(input: {
+  value: string;
+}): Promise<ActionResult> {
+  try {
+    const { userId } = await getActor();
+    const trimmed = input.value.trim();
+    if (!trimmed) return { ok: false, error: "Empty token" };
+    await upsertEncrypted(userId, "apify_api_token_encrypted", trimmed);
+    revalidatePath("/settings/integrations");
+    return { ok: true, data: undefined };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+export async function clearApifyToken(): Promise<ActionResult> {
+  try {
+    const { userId } = await getActor();
+    await clearField(userId, "apify_api_token_encrypted");
     revalidatePath("/settings/integrations");
     return { ok: true, data: undefined };
   } catch (err) {

@@ -109,11 +109,11 @@ export async function* runSourcing(
     // 3. Decrypt per-user keys (only what's needed)
     const { data: settings } = await admin
       .from("user_settings")
-      .select("proxycurl_api_key_encrypted, serpapi_key_encrypted")
+      .select("apify_api_token_encrypted, serpapi_key_encrypted")
       .eq("user_id", req.userId)
       .maybeSingle();
 
-    const proxycurlKey = decryptIfPresent(settings?.proxycurl_api_key_encrypted);
+    const apifyToken = decryptIfPresent(settings?.apify_api_token_encrypted);
     const serpapiKey = decryptIfPresent(settings?.serpapi_key_encrypted);
 
     // 4. Split N across enabled platforms (LinkedIn + JobsDB participate;
@@ -131,7 +131,7 @@ export async function* runSourcing(
         result = await runProvider(platform, {
           nTarget,
           query,
-          proxycurlKey,
+          apifyToken,
           serpapiKey,
         });
       } catch (err) {
@@ -293,7 +293,7 @@ async function runProvider(
   ctx: {
     nTarget: number;
     query: Awaited<ReturnType<typeof deriveSearchQuery>>["query"];
-    proxycurlKey: string | null;
+    apifyToken: string | null;
     serpapiKey: string | null;
   },
 ): Promise<ProviderResult> {
@@ -302,7 +302,7 @@ async function runProvider(
       return runLinkedInSourcing({
         query: ctx.query,
         nTarget: ctx.nTarget,
-        proxycurlKey: ctx.proxycurlKey ?? "",
+        apifyToken: ctx.apifyToken ?? "",
       });
     case "jobsdb":
       // JobsDB outbound was retired — there are no public candidate
