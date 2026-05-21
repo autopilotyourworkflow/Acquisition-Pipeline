@@ -52,7 +52,11 @@ const Body = z.object({
   startsAt: z.string().min(1),
   endsAt: z.string().min(1),
   description: z.string().optional(),
-  externalInvitees: z.array(z.string().email()).optional(),
+  // Loose validation — the client pre-validates email shape and surfaces a
+  // friendly inline toast before sending. Strict server-side .email() here
+  // would reject the whole booking on a single typo, hiding the rest of
+  // the (valid) request behind a generic "Invalid request body" toast.
+  externalInvitees: z.array(z.string().min(1)).optional(),
 });
 
 export async function POST(req: NextRequest) {

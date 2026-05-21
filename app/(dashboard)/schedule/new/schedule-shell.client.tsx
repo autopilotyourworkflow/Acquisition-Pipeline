@@ -107,6 +107,13 @@ export function ScheduleShell({
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Lightweight shape check — catches the common typos (missing @, missing
+  // TLD, embedded whitespace). Server schema is permissive, so any string
+  // that passes this gets through; Google Calendar will surface a clearer
+  // downstream error if an address still doesn't deliver.
+  const emailLike = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const invalidInvitees = externalInvitees.filter((e) => !emailLike.test(e));
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!candidate) {
@@ -119,6 +126,20 @@ export function ScheduleShell({
     }
     if (!Number.isFinite(durationMin) || durationMin <= 0) {
       toast.error("Pick a duration");
+      return;
+    }
+    if (invalidInvitees.length > 0) {
+      toast.error(
+        invalidInvitees.length === 1
+          ? `Fix invitee email: ${invalidInvitees[0]}`
+          : `Fix ${invalidInvitees.length} invitee emails`,
+        {
+          description:
+            invalidInvitees.length > 1
+              ? invalidInvitees.join(", ")
+              : "Must look like name@domain.com",
+        },
+      );
       return;
     }
     const startDate = new Date(whenAt);
@@ -149,9 +170,14 @@ export function ScheduleShell({
             description: json?.error ?? "Reconnect from Settings → Integrations.",
           });
         } else {
-          toast.error("Couldn't schedule", {
-            description: json?.error ?? `HTTP ${resp.status}`,
-          });
+          // Include `detail` (zod-level field path / message) when the server
+          // surfaces it. Without this the toast just shows "Invalid request
+          // body" and the user has to open DevTools to see what actually
+          // failed validation.
+          const description =
+            [json?.error, json?.detail].filter(Boolean).join(" — ") ||
+            `HTTP ${resp.status}`;
+          toast.error("Couldn't schedule", { description });
         }
         return;
       }
