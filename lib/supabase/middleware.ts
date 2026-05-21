@@ -53,6 +53,9 @@ export async function updateSession(request: NextRequest) {
     // token-authed, so middleware-level auth isn't needed.
     pathname === "/bookmarklet-capture" ||
     pathname.startsWith("/api/scrape/bookmarklet") ||
+    // HR-facing SOP / handbook — public so it can be shared as a link
+    // and dropped into an AI chat for ad-hoc Q&A.
+    pathname.startsWith("/sop") ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico";
 

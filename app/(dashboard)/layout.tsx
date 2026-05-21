@@ -40,6 +40,14 @@ export default async function DashboardLayout({
             <NavLink href="/schedule">Schedule</NavLink>
             <NavLink href="/activity">Activity</NavLink>
             <NavLink href="/settings">Settings</NavLink>
+            <a
+              href="/sop"
+              target="_blank"
+              rel="noopener"
+              className="rounded-sm px-3 py-1.5 font-sans text-sm font-semibold text-black transition-colors hover:bg-black hover:text-yellow"
+            >
+              Help
+            </a>
           </nav>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden text-black/75 sm:inline">{user.email}</span>
