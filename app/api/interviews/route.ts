@@ -30,9 +30,16 @@ function appBaseUrl(): string {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Note: candidateId / jdId are validated as non-empty strings rather than
+// strict UUIDs. Zod 4's `.uuid()` enforces full RFC-4122 v4 format (version
+// + variant digit), which rejects perfectly valid Postgres-stored ids that
+// happen to fall outside that bit pattern (e.g. demo seed rows). Since the
+// ids round-trip from our own DB through RLS-scoped queries, format
+// validation here adds no real safety — Postgres rejects malformed uuid
+// casts at the column boundary anyway.
 const Body = z.object({
-  candidateId: z.string().uuid(),
-  jdId: z.string().uuid().nullable().optional(),
+  candidateId: z.string().min(1),
+  jdId: z.string().min(1).nullable().optional(),
   stage: z.enum([
     "applied",
     "screening",
