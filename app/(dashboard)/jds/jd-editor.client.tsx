@@ -188,37 +188,15 @@ export function JdEditor({
           </span>
         </summary>
         <div className="mt-3 space-y-3">
-          {/* 4a coming-soon affordance — the AI prompt-builder will turn
-              this power-user-only textarea into a guided conversation. */}
-          <div className="rounded-md border border-dashed border-black/40 bg-yellow-pale/30 px-3 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 font-medium text-black">
-                  <span aria-hidden>✨</span> AI-assisted: help me write this
-                  <span className="rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-warning">
-                    coming soon
-                  </span>
-                </p>
-                <p className="mt-1 text-[11px] text-black">
-                  Instead of writing the scoring persona from scratch,
-                  Claude will interview you in 5–6 short questions
-                  (seniority bracket, what to weight most, anti-bias
-                  considerations, what 9/10 looks like, what 3/10
-                  looks like) and propose a tailored persona inheriting
-                  the global default&apos;s structure. You review, edit,
-                  save.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled
-                className="shrink-0 cursor-not-allowed rounded-md border border-soft-gray bg-white px-3 py-1.5 text-xs font-medium text-black opacity-60"
-                title="Coming in Phase 4a — not shipped in the current submission."
-              >
-                Start interview
-              </button>
-            </div>
-          </div>
+          {/* Phase 4a — AI prompt-builder. Trimmed to a single-line note so
+              the editor stays focused on the actual textarea below. */}
+          <p className="text-[11px] text-gray">
+            <span className="rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-warning">
+              Phase 4a
+            </span>{" "}
+            Planned: an AI wizard interviews you in 5-6 questions and drafts
+            this persona for you. Not shipped in the current submission.
+          </p>
 
           <p className="text-[11px] text-black">
             Until the AI wizard ships, edit the persona by hand below.

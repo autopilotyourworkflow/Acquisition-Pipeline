@@ -112,7 +112,10 @@ function KanbanColumn({
       ref={setNodeRef}
       data-stage={stage}
       className={cn(
-        "flex w-72 shrink-0 flex-col rounded-md border border-dashed p-2 transition-colors",
+        // w-60 (240px) so the 8-column wide board fits on a 1920×1080 monitor
+        // when the dashboard layout's max-w-7xl is removed for tracker (see
+        // app/(dashboard)/tracker/page.tsx). Cards still readable at this width.
+        "flex w-60 shrink-0 flex-col rounded-md border border-dashed p-2 transition-colors",
         isOver
           ? "border-black bg-yellow-pale/40"
           : "border-soft-gray bg-white/30",

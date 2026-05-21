@@ -15,6 +15,9 @@ export default function LoginPage() {
         <p className="mt-3 text-sm text-gray">
           Sign in to your recruiting workspace.
         </p>
+        <p className="mt-1 text-xs text-gray-dim" lang="th">
+          ทำให้การบริหารโรงแรมเป็นเรื่องง่าย
+        </p>
       </div>
       <div className="rounded-lg border border-soft-gray bg-white p-8 shadow-sm">
         <Suspense fallback={<LoginSkeleton />}>

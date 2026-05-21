@@ -47,7 +47,7 @@ export default async function DashboardLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-8 py-10">
+      <main className="mx-auto w-full max-w-[96rem] flex-1 px-8 py-10">
         {children}
       </main>
       <Toaster />

@@ -111,6 +111,8 @@ supabase db push
 
 The first user to sign in becomes `owner` automatically via the `handle_new_user()` trigger.
 
+**Optional — populate demo data:** paste [`supabase/seed_demo.sql`](supabase/seed_demo.sql) into the Supabase SQL Editor to get 2 sample JDs (Full Stack Developer + Hotel Operations Manager) and 8 candidates spread across the Kanban funnel. Idempotent — safe to re-run.
+
 ### 4. Run
 
 ```bash
@@ -190,6 +192,17 @@ Shipped as roadmap placeholders rather than half-implementations:
 These two are intentionally surfaced in the UI as `coming soon` so the reviewer sees the roadmap without the features misleading on functionality.
 
 The **bookmarklet** at `/settings/capture` is shipped and working — drag it to the bookmarks bar, sign in to LinkedIn / JobsDB / any other site, click the bookmarklet, and the page contents land in the scraper for normalize+save. A native Chrome MV3 extension is the eventual upgrade but isn't blocking — the bookmarklet covers the same capture path with the user's existing browser session.
+
+---
+
+## Repo files you'll see at the root (and what each is)
+
+| File | What it is |
+|---|---|
+| [`README.md`](README.md) | This file. |
+| [`ASSIGNMENT.md`](ASSIGNMENT.md) | The original Hotel Plus brief, kept verbatim for reference. |
+| [`cowork-log.md`](cowork-log.md) | The Cowork Log deliverable. 46 first-person entries on what got built, why, and what didn't. |
+| `AGENTS.md` + `CLAUDE.md` | **Not part of the application.** Internal docs for AI pair-programming (Claude Code). `CLAUDE.md` is auto-loaded by the AI tool; `AGENTS.md` holds the project context the AI needs to be useful inside this repo. Safe to ignore for review purposes. |
 
 ---
 

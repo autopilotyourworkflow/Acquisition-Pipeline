@@ -10,6 +10,8 @@ import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
 import { createShortLink } from "@/lib/short-links";
 import { getCandidateCvInviteUrl } from "@/lib/interviews/cv-link";
+import { rollbackCandidateStageForCancelledInterview } from "@/lib/interviews/candidate-stage-sync";
+import type { CandidateStage } from "@/lib/db/enums";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,6 +115,23 @@ export async function DELETE(
       (err as { message?: string })?.message ?? "Database update failed";
     console.error("[interviews/:id] mutate failed:", err);
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  // Roll the candidate's tracker stage back to `screening` IF they're still
+  // sitting at the stage this interview put them at. Conservative: don't
+  // demote anyone who's already at offer/hired or has been moved further.
+  try {
+    await rollbackCandidateStageForCancelledInterview({
+      supabase,
+      userId: user.id,
+      candidateId: interview.candidate_id as string,
+      cancelledInterviewStage: interview.stage as CandidateStage,
+    });
+  } catch (stageErr) {
+    console.error(
+      "[interviews/:id] candidate stage rollback failed:",
+      stageErr instanceof Error ? stageErr.message : stageErr,
+    );
   }
 
   return NextResponse.json({ ok: true });

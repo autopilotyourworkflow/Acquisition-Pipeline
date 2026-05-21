@@ -9,6 +9,7 @@ import { withAudit } from "@/lib/audit/wrap";
 import { ORG_ID } from "@/lib/db/constants";
 import { createShortLink } from "@/lib/short-links";
 import { getCandidateCvInviteUrl } from "@/lib/interviews/cv-link";
+import { advanceCandidateStageForInterview } from "@/lib/interviews/candidate-stage-sync";
 
 // 30-day TTL on CV signed URLs. The interview lifecycle (schedule → meet →
 // follow-up) typically completes inside a month, so the link stays valid
@@ -220,6 +221,23 @@ export async function POST(req: NextRequest) {
     console.error(
       "[interviews] audit insert failed:",
       auditErr instanceof Error ? auditErr.message : auditErr,
+    );
+  }
+
+  // Auto-advance the candidate's tracker stage to match the interview that
+  // was just scheduled (no-op if they're already at/past it, or terminal).
+  // Best-effort: a failure here shouldn't unwind the Google event + DB row.
+  try {
+    await advanceCandidateStageForInterview({
+      supabase,
+      userId: user.id,
+      candidateId: body.candidateId,
+      interviewStage: body.stage,
+    });
+  } catch (stageErr) {
+    console.error(
+      "[interviews] candidate stage advance failed:",
+      stageErr instanceof Error ? stageErr.message : stageErr,
     );
   }
 
