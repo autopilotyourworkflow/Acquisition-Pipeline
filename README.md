@@ -1,6 +1,6 @@
 # Acquisition Pipeline
 
-Recruiting workflow tool built for [Hotel Plus](https://www.hotelplus.asia) as a 5-day take-home for the Full Stack Developer role.
+Recruiting workflow tool built for [Hotel Plus](https://www.hotelplus.asia) as a 5-day take-home for the Senior AI Workflow & Automation role.
 
 **Live:** [acq.autopilotyourworkflow.com](https://acq.autopilotyourworkflow.com)
 **Assignment brief:** [`ASSIGNMENT.md`](./ASSIGNMENT.md) (Thai, verbatim from Hotel Plus)
