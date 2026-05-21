@@ -10,6 +10,7 @@ import { InterviewActions } from "@/components/interviews/InterviewActions.clien
 import { ScoreCard } from "@/components/screener/ScoreCard";
 import { ColdEmailLauncher } from "@/components/emails/ColdEmailLauncher.client";
 import { DeleteCandidateButton } from "./delete-candidate-button.client";
+import { EditCandidateLauncher } from "./edit-candidate-launcher.client";
 import type { PastEmail } from "@/components/emails/ColdEmailDialog.client";
 import type { CandidateRow, JdRow, ScoreRow, AttachmentRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
@@ -225,9 +226,25 @@ export default async function CandidatePage({
               {c.location ? ` · ${c.location}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StageBadge stage={c.stage} />
             <SourceBadge source={c.source} />
+            <EditCandidateLauncher
+              candidate={{
+                id: c.id,
+                full_name: c.full_name,
+                email: c.email,
+                phone: c.phone,
+                current_title: c.current_title,
+                location: c.location,
+                linkedin_url: c.linkedin_url,
+                source: c.source,
+                source_url: c.source_url,
+                jd_id: c.jd_id,
+                applied_at: c.applied_at,
+              }}
+              jds={allJds}
+            />
           </div>
         </div>
       </div>

@@ -61,11 +61,9 @@ type CandidateWithJd = CandidateRow & {
 export function KanbanBoard({
   candidates,
   onMove,
-  onEdit,
 }: {
   candidates: CandidateWithJd[];
   onMove: (candidateId: string, nextStage: CandidateStage) => void;
-  onEdit: (candidateId: string) => void;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -93,12 +91,7 @@ export function KanbanBoard({
     >
       <div className="flex gap-3 overflow-x-auto pb-2">
         {CANDIDATE_STAGES.map((stage) => (
-          <KanbanColumn
-            key={stage}
-            stage={stage}
-            cards={byStage[stage]}
-            onEdit={onEdit}
-          />
+          <KanbanColumn key={stage} stage={stage} cards={byStage[stage]} />
         ))}
       </div>
     </DndContext>
@@ -108,11 +101,9 @@ export function KanbanBoard({
 function KanbanColumn({
   stage,
   cards,
-  onEdit,
 }: {
   stage: CandidateStage;
   cards: CandidateWithJd[];
-  onEdit: (candidateId: string) => void;
 }) {
   // Make the ENTIRE column wrapper the droppable area (including the header)
   // so a drop on the badge / count counts as a drop on the column. Previous
@@ -141,7 +132,7 @@ function KanbanColumn({
       </div>
       <div className="flex min-h-[280px] flex-col gap-2">
         {cards.map((c) => (
-          <KanbanCard key={c.id} candidate={c} onEdit={onEdit} />
+          <KanbanCard key={c.id} candidate={c} />
         ))}
         {cards.length === 0 && (
           <p className="px-2 py-6 text-center text-xs text-gray">Empty</p>
@@ -151,13 +142,7 @@ function KanbanColumn({
   );
 }
 
-function KanbanCard({
-  candidate,
-  onEdit,
-}: {
-  candidate: CandidateWithJd;
-  onEdit: (candidateId: string) => void;
-}) {
+function KanbanCard({ candidate }: { candidate: CandidateWithJd }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: candidate.id,
@@ -214,42 +199,9 @@ function KanbanCard({
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium text-black">{candidate.full_name}</p>
-        <div className="flex items-center gap-1">
-          {candidate.latest_score !== null && (
-            <ScoreBadge score={candidate.latest_score} />
-          )}
-          <button
-            type="button"
-            // Stop both the synthetic click and the pointer-down so the
-            // surrounding card doesn't (a) navigate to the detail page or
-            // (b) start a drag when the user just wanted to edit.
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(candidate.id);
-            }}
-            title="Edit candidate"
-            aria-label={`Edit ${candidate.full_name}`}
-            className="cursor-pointer rounded-sm p-1 text-gray transition-colors hover:bg-off-white hover:text-black"
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M11.5 1.5L14.5 4.5M2 14L5.5 13L13.5 5L11 2.5L3 10.5L2 14Z"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
+        {candidate.latest_score !== null && (
+          <ScoreBadge score={candidate.latest_score} />
+        )}
       </div>
       {candidate.current_title && (
         <p className="mt-0.5 text-xs text-black">{candidate.current_title}</p>

@@ -33,10 +33,12 @@ import { updateCandidateStage } from "@/app/actions/candidates";
  *    inserting a duplicate.
  *
  * Behavior decisions:
- *  - On open with NO past history → auto-fires the stream with defaults.
- *  - On open WITH past history → shows the history panel first; user
- *    picks a past draft or clicks "Draft new". Avoids spending tokens
- *    when the user just wanted to re-send a previous draft.
+ *  - Dialog always opens in `awaiting` mode — the user must pick model +
+ *    language and click "Draft a new email" before any tokens are spent.
+ *    Earlier versions auto-fired on open with defaults, which silently
+ *    locked in Opus + Thai before the user could choose.
+ *  - When past drafts exist, the history panel surfaces so the user can
+ *    load a previous draft instead of paying for a fresh AI run.
  *  - Regenerate aborts the current stream and fires a new one with
  *    the latest picker selections.
  */
@@ -141,11 +143,10 @@ export function ColdEmailDialog(props: Props) {
   const { open, onOpenChange, candidate, jdId, jdTitle, initialPastEmails, signature } = props;
   const router = useRouter();
   const [pastEmails, setPastEmails] = useState<PastEmail[]>(initialPastEmails);
-  const [mode, setMode] = useState<Mode>(
-    initialPastEmails.length === 0
-      ? { kind: "streaming", partialSubject: "", partialBody: "" }
-      : { kind: "awaiting" },
-  );
+  // Always open in `awaiting` so the user gets a chance to choose model +
+  // language before any tokens spend. The "Draft a new email" CTA in the
+  // awaiting pane is what kicks off the stream.
+  const [mode, setMode] = useState<Mode>({ kind: "awaiting" });
   const [model, setModel] = useState<ModelChoice>("claude-opus-4-7");
   const [language, setLanguage] = useState<LanguageChoice>("th");
   const [subject, setSubject] = useState("");
@@ -278,19 +279,19 @@ export function ColdEmailDialog(props: Props) {
     [candidate.id, jdId],
   );
 
-  // Initial auto-fire when the dialog opens with no history.
+  // Abort any in-flight stream when the dialog closes or unmounts. The
+  // earlier "auto-fire when opened with no history" effect was removed —
+  // the awaiting pane's "Draft a new email" CTA is now the only entry
+  // point into the stream, so model + language always reflect user intent.
   useEffect(() => {
-    if (!open) return;
-    if (mode.kind !== "streaming") return;
-    // Only auto-fire if we haven't started yet (controllerRef empty)
-    if (controllerRef.current) return;
-    fireDraftStream(model, language);
-    // Cleanup on unmount: abort any in-flight stream.
+    if (!open) {
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+    }
     return () => {
       controllerRef.current?.abort();
       controllerRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Load a past draft/send into the editor (no streaming).
