@@ -21,8 +21,8 @@ INSERT INTO job_descriptions (
   'Engineering',
   'Bangkok, Thailand (Hybrid)',
   E'We''re looking for a full-stack developer to join Hotel Plus and own the engineering side of our hotel-management consulting products.\n\nYou''ll work across our web app (TypeScript / Next.js / Postgres), build internal tools that our consulting team uses with clients, and integrate with a growing list of third-party APIs (booking engines, channel managers, POS systems).\n\nThis is a small team — your code ships fast and the impact on the business is direct.',
-  ARRAY['TypeScript', 'React', 'Node.js', 'SQL / Postgres', '3+ years building production web apps'],
-  ARRAY['Next.js App Router', 'Supabase / RLS', 'Hospitality industry experience', 'Thai/English bilingual'],
+  '["TypeScript", "React", "Node.js", "SQL / Postgres", "3+ years building production web apps"]'::jsonb,
+  '["Next.js App Router", "Supabase / RLS", "Hospitality industry experience", "Thai/English bilingual"]'::jsonb,
   '{"skills": 0.4, "experience": 0.4, "culture": 0.2}'::jsonb,
   7.0
 )
@@ -38,8 +38,8 @@ INSERT INTO job_descriptions (
   'Operations',
   'Bangkok, Thailand (On-site)',
   E'Hotel Plus partners with independent hotels across Thailand to run their operations end-to-end. We''re hiring an Operations Manager to be the day-to-day owner of 2-3 hotel accounts in our portfolio.\n\nYou''ll be the bridge between hotel owners and our team — building the ops playbook, training their staff, monitoring KPIs (occupancy, ADR, guest satisfaction), and reporting back to ownership monthly.\n\nThe right person is hands-on, comfortable in both back-of-house and front-of-house, and obsessed with making numbers move.',
-  ARRAY['5+ years hotel operations experience', 'Thai/English fluent', 'P&L ownership at department or property level', 'Excel / spreadsheets'],
-  ARRAY['Multi-property experience', 'Boutique hotel background', 'Familiar with PMS systems (Opera, Cloudbeds)'],
+  '["5+ years hotel operations experience", "Thai/English fluent", "P&L ownership at department or property level", "Excel / spreadsheets"]'::jsonb,
+  '["Multi-property experience", "Boutique hotel background", "Familiar with PMS systems (Opera, Cloudbeds)"]'::jsonb,
   '{"skills": 0.3, "experience": 0.5, "culture": 0.2}'::jsonb,
   7.5
 )

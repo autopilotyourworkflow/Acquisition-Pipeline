@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { InterviewActions } from "@/components/interviews/InterviewActions.client";
 import { ScoreCard } from "@/components/screener/ScoreCard";
 import { ColdEmailLauncher } from "@/components/emails/ColdEmailLauncher.client";
+import { DeleteCandidateButton } from "./delete-candidate-button.client";
 import type { PastEmail } from "@/components/emails/ColdEmailDialog.client";
 import type { CandidateRow, JdRow, ScoreRow, AttachmentRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
@@ -480,6 +481,19 @@ export default async function CandidatePage({
             );
           })
         )}
+      </section>
+
+      <section className="flex items-center justify-between rounded-md border border-soft-gray bg-off-white/50 px-4 py-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray">
+            Danger zone
+          </p>
+          <p className="mt-0.5 text-xs text-gray">
+            Removes the candidate from the tracker. Reversible from the
+            activity log.
+          </p>
+        </div>
+        <DeleteCandidateButton candidateId={c.id} candidateName={c.full_name} />
       </section>
     </div>
   );
