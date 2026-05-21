@@ -30,7 +30,7 @@ export function ScoreCard({ data }: { data: ScoreCardData }) {
                 "rounded-sm px-2 py-0.5 text-[11px] font-medium",
                 data.passes_threshold
                   ? "bg-success/15 text-success"
-                  : "bg-charcoal/15 text-black",
+                  : "bg-soft-gray text-black",
               )}
             >
               {data.passes_threshold ? "Passes threshold" : "Below threshold"}
