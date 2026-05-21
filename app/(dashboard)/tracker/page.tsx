@@ -1,6 +1,8 @@
 ﻿import { createClient } from "@/lib/supabase/server";
 import { TrackerViews } from "./tracker-views.client";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
+import type { InterviewStatus } from "@/lib/db/enums";
+import type { LatestInterview } from "@/components/candidates/InterviewIndicator";
 
 export const metadata = {
   title: "Tracker · Acquisition",
@@ -13,6 +15,7 @@ export default async function TrackerPage() {
     { data: candidates, error: cErr },
     { data: jds, error: jErr },
     { data: scores },
+    { data: interviews },
   ] = await Promise.all([
     // Trim the select to only the columns the Kanban + Table views actually
     // render. Dropping raw_profile alone can cut 50-500KB off the response
@@ -31,6 +34,13 @@ export default async function TrackerPage() {
     supabase
       .from("scores")
       .select("candidate_id, weighted_total, created_at")
+      .order("created_at", { ascending: false }),
+    // Latest-per-candidate interview status surfaces on every card / row so
+    // HR can see "scheduled · Tue 14:00" or "cancelled" at a glance without
+    // drilling into the detail page.
+    supabase
+      .from("interviews")
+      .select("candidate_id, starts_at, status, created_at")
       .order("created_at", { ascending: false }),
   ]);
 
@@ -56,6 +66,20 @@ export default async function TrackerPage() {
     }
   }
 
+  // Same pattern for interviews — latest row per candidate by created_at.
+  // Reschedules UPDATE the same row (status stays 'scheduled'), cancels
+  // flip status to 'cancelled', so this captures the current real state.
+  const latestInterviewByCandidate: Record<string, LatestInterview> = {};
+  for (const i of interviews ?? []) {
+    const cid = i.candidate_id as string;
+    if (latestInterviewByCandidate[cid] === undefined) {
+      latestInterviewByCandidate[cid] = {
+        startsAt: i.starts_at as string,
+        status: i.status as InterviewStatus,
+      };
+    }
+  }
+
   const flattened = (candidates ?? []).map((row) => {
     // Cast through unknown because we deliberately trimmed the select to
     // omit raw_profile / notes / row_hash / created_by (perf win).
@@ -66,6 +90,7 @@ export default async function TrackerPage() {
       ...(rest as CandidateRow),
       jd_title: job_descriptions?.title ?? null,
       latest_score: latestScoreByCandidate[row.id] ?? null,
+      latest_interview: latestInterviewByCandidate[row.id] ?? null,
     };
   });
 

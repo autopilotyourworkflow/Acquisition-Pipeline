@@ -20,9 +20,12 @@ import { cn } from "@/lib/utils";
 type ViewKey = "kanban" | "table";
 const LS_KEY = "tracker.view";
 
+import type { LatestInterview } from "@/components/candidates/InterviewIndicator";
+
 type CandidateWithJd = CandidateRow & {
   jd_title: string | null;
   latest_score: number | null;
+  latest_interview: LatestInterview | null;
 };
 
 /**

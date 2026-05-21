@@ -18,6 +18,10 @@ import {
 import { CANDIDATE_STAGES, type CandidateStage } from "@/lib/db/enums";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
+import {
+  InterviewIndicator,
+  type LatestInterview,
+} from "@/components/candidates/InterviewIndicator";
 import type { CandidateRow } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +50,7 @@ const collisionDetection: CollisionDetection = (args) => {
 type CandidateWithJd = CandidateRow & {
   jd_title: string | null;
   latest_score: number | null;
+  latest_interview: LatestInterview | null;
 };
 
 /**
@@ -207,6 +212,11 @@ function KanbanCard({ candidate }: { candidate: CandidateWithJd }) {
           <span className="text-[10px] text-gray">{candidate.jd_title}</span>
         )}
       </div>
+      {candidate.latest_interview && (
+        <div className="mt-1.5">
+          <InterviewIndicator interview={candidate.latest_interview} compact />
+        </div>
+      )}
     </div>
   );
 }

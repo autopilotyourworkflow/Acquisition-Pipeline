@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { StageBadge } from "@/components/candidates/StageBadge";
 import { SourceBadge } from "@/components/candidates/SourceBadge";
 import {
+  InterviewIndicator,
+  type LatestInterview,
+} from "@/components/candidates/InterviewIndicator";
+import {
   CANDIDATE_SOURCES,
   CANDIDATE_STAGES,
   SOURCE_LABELS,
@@ -18,6 +22,7 @@ import { cn } from "@/lib/utils";
 type CandidateWithJd = CandidateRow & {
   jd_title: string | null;
   latest_score: number | null;
+  latest_interview: LatestInterview | null;
 };
 
 export function CandidateTable({
@@ -84,6 +89,7 @@ export function CandidateTable({
               <th className="px-3 py-2.5 font-medium">Score</th>
               <th className="px-3 py-2.5 font-medium">Source</th>
               <th className="px-3 py-2.5 font-medium">JD</th>
+              <th className="px-3 py-2.5 font-medium">Interview</th>
               <th className="px-3 py-2.5 font-medium">Applied</th>
             </tr>
           </thead>
@@ -106,12 +112,19 @@ export function CandidateTable({
                   <SourceBadge source={c.source} />
                 </td>
                 <td className="px-3 py-2.5 text-black">{c.jd_title ?? "—"}</td>
+                <td className="px-3 py-2.5">
+                  {c.latest_interview ? (
+                    <InterviewIndicator interview={c.latest_interview} />
+                  ) : (
+                    <span className="text-gray">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5 text-black">{c.applied_at}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-sm text-gray">
+                <td colSpan={8} className="px-3 py-10 text-center text-sm text-gray">
                   No candidates match the current filters.
                 </td>
               </tr>
