@@ -186,9 +186,10 @@ Shipped as roadmap placeholders rather than half-implementations:
 
 - **AI prompt-builder interview** (`/jds/[id]` → "Advanced — custom scoring persona") — a Haiku-driven Q&A that drafts a tailored scoring persona for the JD. UI exists; the SSE chat endpoint is the Phase 4a work item.
 - **Auto-import from Gmail** (`/settings/capture` → "Auto-import from Gmail") — Vercel Cron polls a user's inbox for resume attachments and auto-creates+scores candidates. UI exists; the cron handler + Gmail watch config table is Phase 4c.
-- **Browser extension** — the bookmarklet at `/settings/capture` covers the MVP capture path. A proper Chrome MV3 extension is the eventual upgrade.
 
-These are intentionally surfaced in the UI as `coming soon` so the reviewer sees the roadmap without the features misleading on functionality.
+These two are intentionally surfaced in the UI as `coming soon` so the reviewer sees the roadmap without the features misleading on functionality.
+
+The **bookmarklet** at `/settings/capture` is shipped and working — drag it to the bookmarks bar, sign in to LinkedIn / JobsDB / any other site, click the bookmarklet, and the page contents land in the scraper for normalize+save. A native Chrome MV3 extension is the eventual upgrade but isn't blocking — the bookmarklet covers the same capture path with the user's existing browser session.
 
 ---
 
