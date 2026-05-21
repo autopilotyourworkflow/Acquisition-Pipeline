@@ -28,9 +28,11 @@ type CandidateWithJd = CandidateRow & {
 export function CandidateTable({
   candidates,
   jds,
+  onEdit,
 }: {
   candidates: CandidateWithJd[];
   jds: JdRow[];
+  onEdit: (candidateId: string) => void;
 }) {
   const router = useRouter();
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
@@ -91,6 +93,7 @@ export function CandidateTable({
               <th className="px-3 py-2.5 font-medium">JD</th>
               <th className="px-3 py-2.5 font-medium">Interview</th>
               <th className="px-3 py-2.5 font-medium">Applied</th>
+              <th className="px-3 py-2.5 font-medium text-right">Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -120,11 +123,23 @@ export function CandidateTable({
                   )}
                 </td>
                 <td className="px-3 py-2.5 text-black">{c.applied_at}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(c.id);
+                    }}
+                    className="rounded-sm border border-soft-gray bg-white px-2 py-1 text-[11px] font-medium text-black transition-colors hover:bg-off-white"
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-10 text-center text-sm text-gray">
+                <td colSpan={9} className="px-3 py-10 text-center text-sm text-gray">
                   No candidates match the current filters.
                 </td>
               </tr>

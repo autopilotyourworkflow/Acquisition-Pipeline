@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { KanbanBoard } from "./kanban-board.client";
 import { CandidateTable } from "./candidate-table.client";
 import { NewCandidateDialog } from "./new-candidate-dialog.client";
+import { EditCandidateDialog } from "./edit-candidate-dialog.client";
 import { updateCandidateStage } from "@/app/actions/candidates";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 import { STAGE_LABELS, type CandidateStage } from "@/lib/db/enums";
@@ -102,6 +103,14 @@ export function TrackerViews({
 
   const [, startTransition] = useTransition();
 
+  // Edit dialog state. Lifted here so the dialog mounts once and both views
+  // can open it for any candidate without remounting per-card.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingCandidate =
+    editingId !== null
+      ? candidates.find((c) => c.id === editingId) ?? null
+      : null;
+
   const moveCandidateStage = useCallback(
     (candidateId: string, nextStage: CandidateStage) => {
       const before = candidates;
@@ -175,10 +184,24 @@ export function TrackerViews({
         <KanbanBoard
           candidates={candidates}
           onMove={moveCandidateStage}
+          onEdit={setEditingId}
         />
       ) : (
-        <CandidateTable candidates={candidates} jds={jds} />
+        <CandidateTable
+          candidates={candidates}
+          jds={jds}
+          onEdit={setEditingId}
+        />
       )}
+
+      <EditCandidateDialog
+        candidate={editingCandidate}
+        jds={jds}
+        open={editingId !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditingId(null);
+        }}
+      />
     </div>
   );
 }
