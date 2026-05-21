@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -94,7 +94,7 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
         return (
           <li
             key={row.id}
-            className="flex items-center justify-between rounded-md border border-sand-200 bg-warm-white px-4 py-2.5 text-sm"
+            className="flex items-center justify-between rounded-md border border-soft-gray bg-white px-4 py-2.5 text-sm"
           >
             <div className="flex items-center gap-3">
               <span
@@ -102,12 +102,12 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
               >
                 {ACTION_LABEL[row.action]}
               </span>
-              <span className="font-mono text-[11px] text-slate-mid">
+              <span className="font-mono text-[11px] text-gray">
                 {row.target_table}
               </span>
-              <span className="text-navy">{summarize(row)}</span>
+              <span className="text-black">{summarize(row)}</span>
               {state === "already-undone" && (
-                <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 text-[10px] text-charcoal">
+                <span className="rounded-sm bg-off-white px-1.5 py-0.5 text-[10px] text-black">
                   undone
                 </span>
               )}
@@ -117,9 +117,9 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 text-[11px] text-slate-deep">
+            <div className="flex items-center gap-3 text-[11px] text-black">
               <span>{row.users?.email ?? row.actor_id.slice(0, 8)}</span>
-              <span className="font-mono text-slate-mid">
+              <span className="font-mono text-gray">
                 {new Date(row.created_at).toLocaleString("en-GB", {
                   timeZone: "Asia/Bangkok",
                   hour12: false,

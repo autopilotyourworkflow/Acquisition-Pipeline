@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -92,9 +92,9 @@ export function ScheduleShell({
 
   if (candidates.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-10 text-center">
-        <p className="font-display text-xl text-navy">No candidates yet</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+      <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-10 text-center">
+        <p className="font-display text-xl text-black">No candidates yet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-black">
           Add a candidate from the Tracker or Scraper before scheduling
           interviews.
         </p>
@@ -177,16 +177,16 @@ export function ScheduleShell({
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      <div className="grid gap-4 rounded-lg border border-sand-200 bg-warm-white p-5 md:grid-cols-2">
+      <div className="grid gap-4 rounded-lg border border-soft-gray bg-white p-5 md:grid-cols-2">
         <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="candidate" className="text-xs text-slate-deep">
+          <Label htmlFor="candidate" className="text-xs text-black">
             Candidate
           </Label>
           <select
             id="candidate"
             value={candidateId}
             onChange={(e) => setCandidateId(e.target.value)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
@@ -205,14 +205,14 @@ export function ScheduleShell({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="stage" className="text-xs text-slate-deep">
+          <Label htmlFor="stage" className="text-xs text-black">
             Stage
           </Label>
           <select
             id="stage"
             value={stage}
             onChange={(e) => setStage(e.target.value as CandidateStage)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {STAGE_CHOICES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -223,7 +223,7 @@ export function ScheduleShell({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="when" className="text-xs text-slate-deep">
+          <Label htmlFor="when" className="text-xs text-black">
             Date &amp; time
           </Label>
           <input
@@ -232,19 +232,19 @@ export function ScheduleShell({
             step={900}
             value={whenAt}
             onChange={(e) => setWhenAt(e.target.value)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="duration" className="text-xs text-slate-deep">
+          <Label htmlFor="duration" className="text-xs text-black">
             Duration
           </Label>
           <select
             id="duration"
             value={durationMin}
             onChange={(e) => setDurationMin(Number(e.target.value))}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {DURATION_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -252,7 +252,7 @@ export function ScheduleShell({
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-slate-mid">
+          <p className="text-[11px] text-gray">
             Defaults to 30 min, starting from the next 15-min mark ~30 min
             from now.
           </p>
@@ -265,7 +265,7 @@ export function ScheduleShell({
         />
 
         <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="invitees" className="text-xs text-slate-deep">
+          <Label htmlFor="invitees" className="text-xs text-black">
             Additional invitees (optional)
           </Label>
           <input
@@ -274,16 +274,16 @@ export function ScheduleShell({
             value={externalInviteesText}
             onChange={(e) => setExternalInviteesText(e.target.value)}
             placeholder="hiring.manager@hotelplus.asia, panelist@hotelplus.asia"
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           />
-          <p className="text-[11px] text-slate-mid">
+          <p className="text-[11px] text-gray">
             Comma-separated emails. All attendees (candidate + invitees) get the
             invite via Google Calendar.
           </p>
         </div>
 
         <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="notes" className="text-xs text-slate-deep">
+          <Label htmlFor="notes" className="text-xs text-black">
             Extra notes (optional)
           </Label>
           <textarea
@@ -292,9 +292,9 @@ export function ScheduleShell({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Logistics, panel agenda, anything else…"
             rows={2}
-            className="w-full rounded-md border border-sand-200 bg-cream px-3 py-2 text-sm text-navy"
+            className="w-full rounded-md border border-soft-gray bg-white px-3 py-2 text-sm text-black"
           />
-          <p className="text-[11px] text-slate-mid">
+          <p className="text-[11px] text-gray">
             Appended to the candidate-facing description after the standard
             Hotel Plus invitation template.
           </p>
@@ -302,17 +302,17 @@ export function ScheduleShell({
       </div>
 
       {candidate && candidate.prep_questions.length > 0 && (
-        <details className="rounded-md border border-sand-200 bg-warm-white">
-          <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
+        <details className="rounded-md border border-soft-gray bg-white">
+          <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-black">
             Prep questions ({candidate.prep_questions.length}) — interviewer-only,
             not sent to candidate
           </summary>
-          <div className="border-t border-sand-100 px-4 py-3 text-[11px] text-slate-mid">
+          <div className="border-t border-off-white px-4 py-3 text-[11px] text-gray">
             Review these before the meeting. They live on the candidate detail
             page and are NOT included in the calendar invite the candidate
             receives.
           </div>
-          <ul className="list-disc space-y-1 border-t border-sand-100 px-8 py-3 text-sm text-charcoal marker:text-terracotta">
+          <ul className="list-disc space-y-1 border-t border-off-white px-8 py-3 text-sm text-black marker:text-black">
             {candidate.prep_questions.map((q, i) => (
               <li key={i}>{q}</li>
             ))}

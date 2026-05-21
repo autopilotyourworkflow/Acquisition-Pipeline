@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -94,25 +94,25 @@ export default async function IntegrationsPage() {
       <div>
         <Link
           href="/settings"
-          className="text-xs text-slate-deep underline-offset-4 hover:underline"
+          className="text-xs text-black underline-offset-4 hover:underline"
         >
           ← Back to settings
         </Link>
-        <h1 className="mt-2 font-display text-3xl font-medium text-navy">
+        <h1 className="mt-2 font-display text-3xl font-medium text-black">
           Integrations
         </h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <p className="mt-1 text-sm text-black">
           Connect this app to Google (Calendar, Gmail) and the paid services
           that power outbound sourcing.
         </p>
       </div>
 
       {everythingMissing && (
-        <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-6">
-          <p className="font-display text-lg text-navy">
+        <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-6">
+          <p className="font-display text-lg text-black">
             No Google account connected
           </p>
-          <p className="mt-1 max-w-2xl text-sm text-charcoal">
+          <p className="mt-1 max-w-2xl text-sm text-black">
             You&apos;re currently signed in with email — we don&apos;t hold any
             Google tokens for you. To grant Calendar + Gmail access, sign out
             and sign back in with Google. The OAuth consent screen lets you
@@ -127,18 +127,18 @@ export default async function IntegrationsPage() {
       )}
 
       <section className="space-y-2">
-        <h2 className="font-display text-xl text-navy">Google APIs</h2>
+        <h2 className="font-display text-xl text-black">Google APIs</h2>
         <ul className="space-y-2">
           {ROWS.map((row) => {
             const hasAll = row.scopes.every((s) => granted.has(s));
             return (
               <li
                 key={row.key}
-                className="flex flex-col gap-2 rounded-md border border-sand-200 bg-warm-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-md border border-soft-gray bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="font-medium text-navy">{row.title}</p>
-                  <p className="mt-1 text-xs text-charcoal">{row.description}</p>
+                  <p className="font-medium text-black">{row.title}</p>
+                  <p className="mt-1 text-xs text-black">{row.description}</p>
                 </div>
                 <div>
                   {hasAll ? (
@@ -157,9 +157,9 @@ export default async function IntegrationsPage() {
         </ul>
 
         {tokenRow && (
-          <div className="rounded-md border border-sand-200 bg-cream/40 px-4 py-3 text-xs text-charcoal">
+          <div className="rounded-md border border-soft-gray bg-white/40 px-4 py-3 text-xs text-black">
             <p>
-              <span className="text-slate-deep">Token last refreshed:</span>{" "}
+              <span className="text-black">Token last refreshed:</span>{" "}
               <span className="font-mono">
                 {new Date(
                   (tokenRow.updated_at as string) ??
@@ -170,7 +170,7 @@ export default async function IntegrationsPage() {
                 })}
               </span>
             </p>
-            <p className="mt-1 text-slate-mid">
+            <p className="mt-1 text-gray">
               Missing a scope? Sign out + sign back in with Google to
               re-trigger the consent screen. We never store more than what
               you grant.

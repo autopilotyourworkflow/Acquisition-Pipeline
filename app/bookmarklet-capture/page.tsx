@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -109,15 +109,15 @@ export default function BookmarkletCapturePage() {
   const isDone = status === "success" || status === "error";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-cream p-6">
-      <div className="w-full max-w-md rounded-lg border border-sand-200 bg-warm-white p-8 text-center shadow-sm">
+    <div className="min-h-screen flex items-center justify-center bg-white p-6">
+      <div className="w-full max-w-md rounded-lg border border-soft-gray bg-white p-8 text-center shadow-sm">
         <div
           className={`mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full ${
             status === "success"
               ? "bg-success/10 text-success"
               : isError
                 ? "bg-danger/10 text-danger"
-                : "bg-terracotta/10 text-terracotta"
+                : "bg-yellow/10 text-black"
           }`}
         >
           {status === "success" ? (
@@ -129,18 +129,18 @@ export default function BookmarkletCapturePage() {
               ✕
             </span>
           ) : (
-            <span className="block h-3 w-3 animate-pulse rounded-full bg-terracotta" />
+            <span className="block h-3 w-3 animate-pulse rounded-full bg-yellow" />
           )}
         </div>
 
-        <h1 className="font-display text-2xl font-medium text-navy">
+        <h1 className="font-display text-2xl font-medium text-black">
           {status === "success"
             ? "Candidate captured"
             : isError
               ? "Capture failed"
               : "Capturing candidate…"}
         </h1>
-        <p className="mt-2 text-sm text-charcoal">{message}</p>
+        <p className="mt-2 text-sm text-black">{message}</p>
 
         {isDone && (
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -157,7 +157,7 @@ export default function BookmarkletCapturePage() {
             <Button
               variant="outline"
               onClick={() => window.close()}
-              className="text-slate-deep"
+              className="text-black"
             >
               Close tab
             </Button>
@@ -165,12 +165,12 @@ export default function BookmarkletCapturePage() {
         )}
 
         {isError && (
-          <p className="mt-4 text-[11px] text-slate-mid">
+          <p className="mt-4 text-[11px] text-gray">
             If this keeps failing, the source page&apos;s text may not look
             like a candidate profile. Fall back to{" "}
             <Link
               href="/scraper"
-              className="underline underline-offset-2 hover:text-terracotta"
+              className="underline underline-offset-2 hover:text-black"
             >
               Scraper → Paste
             </Link>{" "}

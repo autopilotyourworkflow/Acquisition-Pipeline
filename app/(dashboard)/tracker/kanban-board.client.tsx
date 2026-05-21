@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -114,20 +114,20 @@ function KanbanColumn({
       className={cn(
         "flex w-72 shrink-0 flex-col rounded-md border border-dashed p-2 transition-colors",
         isOver
-          ? "border-terracotta bg-terracotta-50/40"
-          : "border-sand-200 bg-cream/30",
+          ? "border-black bg-yellow-pale/40"
+          : "border-soft-gray bg-white/30",
       )}
     >
       <div className="mb-2 flex items-center justify-between px-1">
         <StageBadge stage={stage} />
-        <span className="text-xs text-slate-mid">{cards.length}</span>
+        <span className="text-xs text-gray">{cards.length}</span>
       </div>
       <div className="flex min-h-[280px] flex-col gap-2">
         {cards.map((c) => (
           <KanbanCard key={c.id} candidate={c} />
         ))}
         {cards.length === 0 && (
-          <p className="px-2 py-6 text-center text-xs text-slate-mid">Empty</p>
+          <p className="px-2 py-6 text-center text-xs text-gray">Empty</p>
         )}
       </div>
     </div>
@@ -184,24 +184,24 @@ function KanbanCard({ candidate }: { candidate: CandidateWithJd }) {
       onPointerMoveCapture={onPointerMove}
       onPointerUpCapture={onPointerUp}
       className={cn(
-        "cursor-grab rounded-md border border-sand-200 bg-warm-white p-3 text-left shadow-xs transition-shadow",
-        "hover:shadow-sm focus-visible:outline-2 focus-visible:outline-terracotta",
+        "cursor-grab rounded-md border border-soft-gray bg-white p-3 text-left shadow-xs transition-shadow",
+        "hover:shadow-sm focus-visible:outline-2 focus-visible:outline-yellow",
         isDragging && "opacity-50 shadow-md cursor-grabbing",
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-navy">{candidate.full_name}</p>
+        <p className="text-sm font-medium text-black">{candidate.full_name}</p>
         {candidate.latest_score !== null && (
           <ScoreBadge score={candidate.latest_score} />
         )}
       </div>
       {candidate.current_title && (
-        <p className="mt-0.5 text-xs text-charcoal">{candidate.current_title}</p>
+        <p className="mt-0.5 text-xs text-black">{candidate.current_title}</p>
       )}
       <div className="mt-2 flex items-center gap-1.5">
         <SourceBadge source={candidate.source} />
         {candidate.jd_title && (
-          <span className="text-[10px] text-slate-mid">{candidate.jd_title}</span>
+          <span className="text-[10px] text-gray">{candidate.jd_title}</span>
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { ScreenerShell, type PastScore } from "./screener-shell.client";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
@@ -41,8 +41,8 @@ export default async function ScreenerPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-medium text-navy">Resume Screener</h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <h1 className="font-display text-3xl font-medium text-black">Resume Screener</h1>
+        <p className="mt-1 text-sm text-black">
           Pick a candidate + JD, run a score. Every run is saved — the latest is
           shown below, past runs are kept for comparison.
         </p>

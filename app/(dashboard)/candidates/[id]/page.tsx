@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -210,16 +210,16 @@ export default async function CandidatePage({
       <div>
         <Link
           href="/tracker"
-          className="text-xs text-slate-deep underline-offset-4 hover:underline"
+          className="text-xs text-black underline-offset-4 hover:underline"
         >
           ← Back to tracker
         </Link>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl font-medium text-navy">
+            <h1 className="font-display text-3xl font-medium text-black">
               {c.full_name}
             </h1>
-            <p className="mt-1 text-sm text-charcoal">
+            <p className="mt-1 text-sm text-black">
               {c.current_title ?? "No title on file"}
               {c.location ? ` · ${c.location}` : ""}
             </p>
@@ -231,9 +231,9 @@ export default async function CandidatePage({
         </div>
       </div>
 
-      <section className="rounded-lg border border-sand-200 bg-warm-white p-5">
+      <section className="rounded-lg border border-soft-gray bg-white p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs uppercase tracking-wide text-slate-deep">
+          <p className="text-xs uppercase tracking-wide text-black">
             Contact
           </p>
           <ColdEmailLauncher
@@ -276,11 +276,11 @@ export default async function CandidatePage({
           />
         </dl>
         {c.notes && (
-          <div className="mt-4 border-t border-sand-100 pt-4">
-            <p className="mb-1 text-xs uppercase tracking-wide text-slate-deep">
+          <div className="mt-4 border-t border-off-white pt-4">
+            <p className="mb-1 text-xs uppercase tracking-wide text-black">
               Notes
             </p>
-            <p className="whitespace-pre-wrap text-sm text-charcoal">{c.notes}</p>
+            <p className="whitespace-pre-wrap text-sm text-black">{c.notes}</p>
           </div>
         )}
       </section>
@@ -295,13 +295,13 @@ export default async function CandidatePage({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl text-navy">Source &amp; attachments</h2>
-          <Link href="/screener" className="text-xs text-terracotta-700 underline-offset-4 hover:underline">
+          <h2 className="font-display text-xl text-black">Source &amp; attachments</h2>
+          <Link href="/screener" className="text-xs text-black underline-offset-4 hover:underline">
             Upload from Screener →
           </Link>
         </div>
         {allAttachments.length === 0 && !c.raw_profile?.scraper_source ? (
-          <p className="rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-6 text-center text-sm text-slate-mid">
+          <p className="rounded-md border border-dashed border-soft-gray bg-white/40 px-4 py-6 text-center text-sm text-gray">
             No CV, screenshot, or scraper source on file.
           </p>
         ) : allAttachments.length === 0 ? null : (
@@ -312,15 +312,15 @@ export default async function CandidatePage({
               return (
                 <li
                   key={a.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sand-200 bg-warm-white px-4 py-2.5 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-soft-gray bg-white px-4 py-2.5 text-sm"
                 >
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono text-[10px] text-charcoal">
+                    <span className="rounded-sm bg-off-white px-1.5 py-0.5 font-mono text-[10px] text-black">
                       {a.kind}
                     </span>
-                    <span className="text-navy">{friendlyName}</span>
+                    <span className="text-black">{friendlyName}</span>
                     {a.parsed_text && (
-                      <span className="text-[11px] text-slate-mid">
+                      <span className="text-[11px] text-gray">
                         {a.parsed_text.length.toLocaleString()} chars cached
                       </span>
                     )}
@@ -331,7 +331,7 @@ export default async function CandidatePage({
                         href={links.viewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+                        className="text-[11px] font-medium text-black underline-offset-4 hover:underline"
                       >
                         View
                       </a>
@@ -339,17 +339,17 @@ export default async function CandidatePage({
                     {links?.downloadUrl ? (
                       <a
                         href={links.downloadUrl}
-                        className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+                        className="text-[11px] font-medium text-black underline-offset-4 hover:underline"
                       >
                         Download
                       </a>
                     ) : null}
                     {!links?.viewUrl && !links?.downloadUrl && (
-                      <span className="text-[11px] text-slate-mid">
+                      <span className="text-[11px] text-gray">
                         link unavailable
                       </span>
                     )}
-                    <span className="font-mono text-[11px] text-slate-deep">
+                    <span className="font-mono text-[11px] text-black">
                       {new Date(a.created_at).toLocaleString("en-GB", {
                         timeZone: "Asia/Bangkok",
                         hour12: false,
@@ -366,16 +366,16 @@ export default async function CandidatePage({
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl text-navy">Scoring history</h2>
+          <h2 className="font-display text-xl text-black">Scoring history</h2>
           <Button asChild>
             <Link href={`/screener?candidate=${c.id}`}>Run a new score</Link>
           </Button>
         </div>
 
         {scoresByJd.size === 0 ? (
-          <p className="rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-8 text-center text-sm text-charcoal">
+          <p className="rounded-md border border-dashed border-soft-gray bg-white/40 px-4 py-8 text-center text-sm text-black">
             No scores yet. Run one from the{" "}
-            <Link href="/screener" className="text-terracotta-700 underline">
+            <Link href="/screener" className="text-black underline">
               Screener
             </Link>
             .
@@ -387,15 +387,15 @@ export default async function CandidatePage({
             return (
               <div key={jdId} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-navy">
+                  <h3 className="text-sm font-medium text-black">
                     {jdTitle}
                     {threshold !== null && (
-                      <span className="ml-2 text-[11px] text-slate-mid">
+                      <span className="ml-2 text-[11px] text-gray">
                         threshold {threshold}
                       </span>
                     )}
                   </h3>
-                  <span className="text-[11px] text-slate-deep">
+                  <span className="text-[11px] text-black">
                     {jdScores.length} run{jdScores.length === 1 ? "" : "s"}
                   </span>
                 </div>
@@ -407,22 +407,22 @@ export default async function CandidatePage({
                     return (
                       <li key={r.id}>
                         <details
-                          className="group rounded-md border border-sand-200 bg-warm-white"
+                          className="group rounded-md border border-soft-gray bg-white"
                           open={isLatest}
                         >
                           <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm">
                             <div className="flex items-center gap-3">
-                              <span className="font-mono text-base font-medium text-navy">
+                              <span className="font-mono text-base font-medium text-black">
                                 {r.weighted_total.toFixed(2)}
                               </span>
-                              <span className="text-[11px] text-slate-deep">
+                              <span className="text-[11px] text-black">
                                 {new Date(r.created_at).toLocaleString("en-GB", {
                                   timeZone: "Asia/Bangkok",
                                   hour12: false,
                                 })}
                               </span>
                               {isLatest && (
-                                <span className="rounded-sm bg-terracotta-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-terracotta-700">
+                                <span className="rounded-sm bg-yellow-pale px-1.5 py-0.5 font-mono text-[10px] font-medium text-black">
                                   latest
                                 </span>
                               )}
@@ -439,21 +439,21 @@ export default async function CandidatePage({
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] text-slate-mid">
+                            <div className="flex items-center gap-2 text-[10px] text-gray">
                               <span className="font-mono">{r.model}</span>
                               <span
                                 className={cn(
                                   "rounded-sm px-1.5 py-0.5",
                                   r.scoring_mode === "team"
-                                    ? "bg-terracotta-50 text-terracotta-700"
-                                    : "bg-sand-100",
+                                    ? "bg-yellow-pale text-black"
+                                    : "bg-off-white",
                                 )}
                               >
                                 {r.scoring_mode}
                               </span>
                             </div>
                           </summary>
-                          <div className="border-t border-sand-100 p-4">
+                          <div className="border-t border-off-white p-4">
                             <ScoreCard
                               data={{
                                 scoreId: r.id,
@@ -540,12 +540,12 @@ function InterviewsSection({
     return (
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl text-navy">Interviews</h2>
+          <h2 className="font-display text-xl text-black">Interviews</h2>
           <Button asChild>
             <Link href={`/schedule/new?candidate=${candidateId}`}>Schedule interview</Link>
           </Button>
         </div>
-        <p className="rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-6 text-center text-sm text-slate-mid">
+        <p className="rounded-md border border-dashed border-soft-gray bg-white/40 px-4 py-6 text-center text-sm text-gray">
           No interviews scheduled yet.
         </p>
       </section>
@@ -562,7 +562,7 @@ function InterviewsSection({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-xl text-navy">Interviews</h2>
+        <h2 className="font-display text-xl text-black">Interviews</h2>
         <Button asChild>
           <Link href={`/schedule?candidate=${candidateId}`}>Schedule interview</Link>
         </Button>
@@ -586,9 +586,9 @@ function InterviewRow({ interview, now }: { interview: InterviewWithJd; now: num
   const statusStyles: Record<InterviewWithJd["status"], string> = {
     scheduled: isUpcoming
       ? "bg-success/10 text-success"
-      : "bg-sand-100 text-charcoal",
+      : "bg-off-white text-black",
     rescheduled: "bg-info/10 text-info",
-    completed: "bg-sand-100 text-charcoal",
+    completed: "bg-off-white text-black",
     cancelled: "bg-warning/15 text-warning",
     no_show: "bg-danger/15 text-danger",
   };
@@ -604,7 +604,7 @@ function InterviewRow({ interview, now }: { interview: InterviewWithJd; now: num
   };
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sand-200 bg-warm-white px-4 py-3 text-sm">
+    <li className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-soft-gray bg-white px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center gap-3">
         <span
           className={cn(
@@ -614,17 +614,17 @@ function InterviewRow({ interview, now }: { interview: InterviewWithJd; now: num
         >
           {interview.status.replace("_", " ")}
         </span>
-        <span className="font-medium text-navy">
+        <span className="font-medium text-black">
           {stageLabels[interview.stage] ?? interview.stage}
         </span>
         {interview.job_descriptions?.title && (
-          <span className="text-[11px] text-slate-deep">
+          <span className="text-[11px] text-black">
             for {interview.job_descriptions.title}
           </span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-mono text-[11px] text-slate-deep">
+        <span className="font-mono text-[11px] text-black">
           {start.toLocaleString("en-GB", {
             timeZone: "Asia/Bangkok",
             hour12: false,
@@ -635,13 +635,13 @@ function InterviewRow({ interview, now }: { interview: InterviewWithJd; now: num
             minute: "2-digit",
           })}
         </span>
-        <span className="text-[11px] text-slate-mid">{durationMin} min</span>
+        <span className="text-[11px] text-gray">{durationMin} min</span>
         {interview.meet_url && (
           <a
             href={interview.meet_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+            className="text-[11px] font-medium text-black underline-offset-4 hover:underline"
           >
             Meet link
           </a>
@@ -678,13 +678,13 @@ function ScraperSourceDropdown({
   if (source.kind === "pdf") return null;
 
   return (
-    <details className="rounded-md border border-sand-200 bg-cream/40">
-      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
+    <details className="rounded-md border border-soft-gray bg-white/40">
+      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-black">
         Source content ({source.kind})
       </summary>
-      <div className="border-t border-sand-200 px-4 py-3 text-xs">
+      <div className="border-t border-soft-gray px-4 py-3 text-xs">
         {source.kind === "paste" && source.text && (
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap font-mono text-charcoal">
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap font-mono text-black">
             {source.text}
           </pre>
         )}
@@ -693,7 +693,7 @@ function ScraperSourceDropdown({
             href={source.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-all text-terracotta-700 underline-offset-4 hover:underline"
+            className="break-all text-black underline-offset-4 hover:underline"
           >
             {source.url}
           </a>
@@ -703,13 +703,13 @@ function ScraperSourceDropdown({
             href={source.linkedinUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-all text-terracotta-700 underline-offset-4 hover:underline"
+            className="break-all text-black underline-offset-4 hover:underline"
           >
             {source.linkedinUrl}
           </a>
         )}
         {source.kind === "screenshot" && source.filename && (
-          <p className="font-mono text-charcoal">{source.filename}</p>
+          <p className="font-mono text-black">{source.filename}</p>
         )}
       </div>
     </details>
@@ -746,11 +746,11 @@ function ExtractedProfileSection({
   if (!hasAnything) return null;
 
   return (
-    <section className="space-y-4 rounded-lg border border-sand-200 bg-warm-white p-5">
+    <section className="space-y-4 rounded-lg border border-soft-gray bg-white p-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-xl text-navy">Extracted profile</h2>
+        <h2 className="font-display text-xl text-black">Extracted profile</h2>
         {detectedLanguage && (
-          <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono text-[10px] text-charcoal">
+          <span className="rounded-sm bg-off-white px-1.5 py-0.5 font-mono text-[10px] text-black">
             lang: {detectedLanguage}
           </span>
         )}
@@ -758,14 +758,14 @@ function ExtractedProfileSection({
 
       {skills.length > 0 && (
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+          <p className="mb-2 text-xs uppercase tracking-wide text-black">
             Skills
           </p>
           <div className="flex flex-wrap gap-1.5">
             {skills.map((s, i) => (
               <span
                 key={`${s}-${i}`}
-                className="rounded-sm bg-sand-100 px-2 py-0.5 text-xs text-charcoal"
+                className="rounded-sm bg-off-white px-2 py-0.5 text-xs text-black"
               >
                 {s}
               </span>
@@ -776,7 +776,7 @@ function ExtractedProfileSection({
 
       {experience.length > 0 && (
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+          <p className="mb-2 text-xs uppercase tracking-wide text-black">
             Experience
           </p>
           <ul className="space-y-2">
@@ -795,28 +795,28 @@ function ExtractedProfileSection({
               return (
                 <li
                   key={i}
-                  className="rounded-md border border-sand-200 bg-cream/40 p-3 text-sm"
+                  className="rounded-md border border-soft-gray bg-white/40 p-3 text-sm"
                 >
-                  <p className="font-medium text-navy">
+                  <p className="font-medium text-black">
                     {e.title ?? "—"}
                     {e.company ? (
-                      <span className="text-slate-deep"> @ {e.company}</span>
+                      <span className="text-black"> @ {e.company}</span>
                     ) : null}
                   </p>
                   {(e.start_date || e.end_date) && (
-                    <p className="mt-0.5 font-mono text-[11px] text-slate-mid">
+                    <p className="mt-0.5 font-mono text-[11px] text-gray">
                       {e.start_date ?? "?"} → {e.end_date ?? "present"}
                     </p>
                   )}
                   {hasBullets && (
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-charcoal marker:text-terracotta">
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-black marker:text-black">
                       {bullets.map((b, j) => (
                         <li key={j}>{b}</li>
                       ))}
                     </ul>
                   )}
                   {fallbackSummary && (
-                    <p className="mt-1 whitespace-pre-wrap text-charcoal">
+                    <p className="mt-1 whitespace-pre-wrap text-black">
                       {fallbackSummary}
                     </p>
                   )}
@@ -829,23 +829,23 @@ function ExtractedProfileSection({
 
       {education.length > 0 && (
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+          <p className="mb-2 text-xs uppercase tracking-wide text-black">
             Education
           </p>
           <ul className="space-y-2">
             {education.map((e, i) => (
               <li
                 key={i}
-                className="rounded-md border border-sand-200 bg-cream/40 p-3 text-sm"
+                className="rounded-md border border-soft-gray bg-white/40 p-3 text-sm"
               >
-                <p className="font-medium text-navy">
+                <p className="font-medium text-black">
                   {e.institution ?? "—"}
                 </p>
                 {(e.degree || e.field || e.end_year) && (
-                  <p className="mt-0.5 text-charcoal">
+                  <p className="mt-0.5 text-black">
                     {[e.degree, e.field].filter(Boolean).join(" · ")}
                     {e.end_year ? (
-                      <span className="ml-1 font-mono text-[11px] text-slate-mid">
+                      <span className="ml-1 font-mono text-[11px] text-gray">
                         {e.end_year}
                       </span>
                     ) : null}
@@ -871,8 +871,8 @@ function ContactRow({
 }) {
   return (
     <div className="flex gap-3">
-      <dt className="w-20 shrink-0 text-xs text-slate-deep">{label}</dt>
-      <dd className="text-sm text-navy">
+      <dt className="w-20 shrink-0 text-xs text-black">{label}</dt>
+      <dd className="text-sm text-black">
         {value ? (
           href ? (
             <a
@@ -887,7 +887,7 @@ function ContactRow({
             value
           )
         ) : (
-          <span className="text-slate-mid">—</span>
+          <span className="text-gray">—</span>
         )}
       </dd>
     </div>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import type { JdRow } from "@/lib/db/types";
@@ -19,8 +19,8 @@ export default async function JdsPage() {
     <div className="space-y-6">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="font-display text-3xl font-medium text-navy">Job descriptions</h1>
-          <p className="mt-1 text-sm text-charcoal">
+          <h1 className="font-display text-3xl font-medium text-black">Job descriptions</h1>
+          <p className="mt-1 text-sm text-black">
             Define the role, the must-haves, and the threshold. The Resume
             Screener scores candidates against this.
           </p>
@@ -35,9 +35,9 @@ export default async function JdsPage() {
           <p className="font-mono">{error.message}</p>
         </div>
       ) : !jds || jds.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-          <p className="font-display text-xl text-navy">No JDs yet</p>
-          <p className="mt-2 text-sm text-charcoal">
+        <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-12 text-center">
+          <p className="font-display text-xl text-black">No JDs yet</p>
+          <p className="mt-2 text-sm text-black">
             Create one to start scoring candidates.
           </p>
         </div>
@@ -47,19 +47,19 @@ export default async function JdsPage() {
             <li key={jd.id}>
               <Link
                 href={`/jds/${jd.id}`}
-                className="flex items-center justify-between rounded-md border border-sand-200 bg-warm-white px-4 py-3 transition-colors hover:bg-cream"
+                className="flex items-center justify-between rounded-md border border-soft-gray bg-white px-4 py-3 transition-colors hover:bg-white"
               >
                 <div>
-                  <p className="font-medium text-navy">{jd.title}</p>
-                  <p className="text-xs text-slate-deep">
+                  <p className="font-medium text-black">{jd.title}</p>
+                  <p className="text-xs text-black">
                     {[jd.department, jd.location].filter(Boolean).join(" · ") || "—"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-[11px]">
-                  <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 text-charcoal">
+                  <span className="rounded-sm bg-off-white px-1.5 py-0.5 text-black">
                     {jd.must_have.length} must-have
                   </span>
-                  <span className="rounded-sm bg-terracotta-50 px-1.5 py-0.5 font-medium text-terracotta-700">
+                  <span className="rounded-sm bg-yellow-pale px-1.5 py-0.5 font-medium text-black">
                     threshold {jd.threshold}
                   </span>
                 </div>

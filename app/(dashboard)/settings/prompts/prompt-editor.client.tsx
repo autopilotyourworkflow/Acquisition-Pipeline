@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -42,11 +42,11 @@ export function PromptEditor({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-sand-200 bg-warm-white p-5">
+    <div className="space-y-3 rounded-lg border border-soft-gray bg-white p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-navy">Active version</p>
-          <p className="font-mono text-[11px] text-slate-deep">{activeVersion}</p>
+          <p className="text-sm font-medium text-black">Active version</p>
+          <p className="font-mono text-[11px] text-black">{activeVersion}</p>
         </div>
         <div className="flex items-center gap-2">
           {dirty && (
@@ -76,7 +76,7 @@ export function PromptEditor({
         className="font-mono text-xs leading-relaxed"
         disabled={disabled}
       />
-      <p className="text-[11px] text-slate-mid">
+      <p className="text-[11px] text-gray">
         This text becomes Claude&apos;s system prompt at scoring time. Keep the
         instruction to output via the <code className="font-mono">submit_score</code>{" "}
         tool — without it the model may respond in free text and validation will fail.

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -117,7 +117,7 @@ export function JdEditor({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-sand-200 bg-warm-white p-6">
+    <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-soft-gray bg-white p-6">
       <div className="grid grid-cols-2 gap-3">
         <Field id="title" label="Title *">
           <Input
@@ -178,10 +178,10 @@ export function JdEditor({
         />
       </Field>
 
-      <details className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-sm">
-        <summary className="cursor-pointer text-charcoal">
+      <details className="rounded-md border border-soft-gray bg-white/40 px-3 py-2 text-sm">
+        <summary className="cursor-pointer text-black">
           Advanced — custom scoring persona for this role{" "}
-          <span className="ml-1 text-[11px] text-slate-mid">
+          <span className="ml-1 text-[11px] text-gray">
             {form.scoring_persona_override.trim().length > 0
               ? "(override active)"
               : "(uses global default)"}
@@ -190,16 +190,16 @@ export function JdEditor({
         <div className="mt-3 space-y-3">
           {/* 4a coming-soon affordance — the AI prompt-builder will turn
               this power-user-only textarea into a guided conversation. */}
-          <div className="rounded-md border border-dashed border-terracotta/40 bg-terracotta-50/30 px-3 py-3">
+          <div className="rounded-md border border-dashed border-black/40 bg-yellow-pale/30 px-3 py-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 font-medium text-navy">
+                <p className="flex items-center gap-2 font-medium text-black">
                   <span aria-hidden>✨</span> AI-assisted: help me write this
                   <span className="rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-warning">
                     coming soon
                   </span>
                 </p>
-                <p className="mt-1 text-[11px] text-charcoal">
+                <p className="mt-1 text-[11px] text-black">
                   Instead of writing the scoring persona from scratch,
                   Claude will interview you in 5–6 short questions
                   (seniority bracket, what to weight most, anti-bias
@@ -212,7 +212,7 @@ export function JdEditor({
               <button
                 type="button"
                 disabled
-                className="shrink-0 cursor-not-allowed rounded-md border border-sand-200 bg-warm-white px-3 py-1.5 text-xs font-medium text-slate-deep opacity-60"
+                className="shrink-0 cursor-not-allowed rounded-md border border-soft-gray bg-white px-3 py-1.5 text-xs font-medium text-black opacity-60"
                 title="Coming in Phase 4a — not shipped in the current submission."
               >
                 Start interview
@@ -220,7 +220,7 @@ export function JdEditor({
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-deep">
+          <p className="text-[11px] text-black">
             Until the AI wizard ships, edit the persona by hand below.
             Leave empty to use the org-wide default from{" "}
             <code className="font-mono">/settings/prompts</code>. Fill this in
@@ -239,14 +239,14 @@ export function JdEditor({
             placeholder="Empty = use global. Otherwise this overrides the system prompt for scoring runs against this JD."
             className="font-mono text-xs"
           />
-          <p className="text-[11px] text-slate-mid">
+          <p className="text-[11px] text-gray">
             Reminder: keep the &quot;output via the submit_score tool&quot;
             instruction — without it scoring will fail validation.
           </p>
         </div>
       </details>
 
-      <div className="flex items-center justify-between border-t border-sand-100 pt-3">
+      <div className="flex items-center justify-between border-t border-off-white pt-3">
         <div>
           {mode === "edit" && (
             <Button
@@ -279,7 +279,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs text-slate-deep">
+      <Label htmlFor={id} className="text-xs text-black">
         {label}
       </Label>
       {children}

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { TrackerViews } from "./tracker-views.client";
 import type { CandidateRow, JdRow } from "@/lib/db/types";
 
@@ -37,7 +37,7 @@ export default async function TrackerPage() {
   if (cErr || jErr) {
     return (
       <div className="space-y-3">
-        <h1 className="font-display text-3xl font-medium text-navy">Tracker</h1>
+        <h1 className="font-display text-3xl font-medium text-black">Tracker</h1>
         <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
           <p className="font-medium">Failed to load tracker data.</p>
           <p className="mt-1 font-mono">{cErr?.message ?? jErr?.message}</p>
@@ -72,8 +72,8 @@ export default async function TrackerPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-medium text-navy">Tracker</h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <h1 className="font-display text-3xl font-medium text-black">Tracker</h1>
+        <p className="mt-1 text-sm text-black">
           Your recruiting pipeline. Drag candidates between stages — every move
           is captured in the activity log. Click a card to see candidate detail.
         </p>

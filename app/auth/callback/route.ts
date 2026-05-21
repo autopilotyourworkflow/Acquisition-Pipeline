@@ -41,20 +41,6 @@ export async function GET(request: NextRequest) {
       const providerToken = session.provider_token;
       const providerRefreshToken = session.provider_refresh_token;
 
-      console.log("[auth/callback] user.id:", data.session.user.id);
-      console.log("[auth/callback] provider_token present:", !!providerToken);
-      console.log("[auth/callback] provider_refresh_token present:", !!providerRefreshToken);
-      console.log(
-        "[auth/callback] env: OAUTH_ENCRYPTION_SECRET set =",
-        !!process.env.OAUTH_ENCRYPTION_SECRET,
-        "len =",
-        process.env.OAUTH_ENCRYPTION_SECRET?.length,
-      );
-      console.log(
-        "[auth/callback] env: SUPABASE_SERVICE_ROLE_KEY set =",
-        !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      );
-
       if (providerToken && providerRefreshToken) {
         const GOOGLE_SCOPES = [
           "openid",
@@ -74,11 +60,10 @@ export async function GET(request: NextRequest) {
           expiresIn: 3600,
           scopes: GOOGLE_SCOPES,
         });
-        console.log("[auth/callback] upsertOAuthTokens succeeded");
       } else {
-        console.warn(
-          "[auth/callback] Skipping OAuth token upsert — Supabase did not return provider tokens.",
-        );
+        // Email-OTP signin or a Google flow that didn't request offline
+        // access — fine, the user just can't use Calendar/Gmail features
+        // until they connect from /settings/integrations.
       }
     } catch (err) {
       console.error(

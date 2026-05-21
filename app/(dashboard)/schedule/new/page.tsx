@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -108,14 +108,14 @@ function PageHeader() {
     <div>
       <Link
         href="/schedule"
-        className="text-xs text-slate-deep underline-offset-4 hover:underline"
+        className="text-xs text-black underline-offset-4 hover:underline"
       >
         ← Back to schedule
       </Link>
-      <h1 className="mt-2 font-display text-3xl font-medium text-navy">
+      <h1 className="mt-2 font-display text-3xl font-medium text-black">
         Schedule an interview
       </h1>
-      <p className="mt-1 text-sm text-charcoal">
+      <p className="mt-1 text-sm text-black">
         Drop an interview into Google Calendar with a Meet link. The candidate
         and any added invitees receive the calendar invite automatically.
       </p>
@@ -129,11 +129,11 @@ function NotConnectedEmptyState({
   reason: "no_oauth" | "no_scope";
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-10 text-center">
-      <p className="font-display text-xl text-navy">
+    <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-10 text-center">
+      <p className="font-display text-xl text-black">
         Google Calendar isn&apos;t connected
       </p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+      <p className="mx-auto mt-2 max-w-md text-sm text-black">
         {reason === "no_oauth"
           ? "You signed in with email, so we don't have access to your Google account. Sign out and sign back in with Google to grant Calendar permissions."
           : "Your Google session is missing the Calendar Events scope. Sign out and sign back in with Google to grant it."}

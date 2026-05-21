@@ -1,4 +1,4 @@
-import { Skeleton, PageHeaderSkeleton } from "@/components/ui/skeleton";
+﻿import { Skeleton, PageHeaderSkeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
@@ -12,7 +12,7 @@ export default function Loading() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="w-72 shrink-0 space-y-2">
             <Skeleton className="h-5 w-24" />
-            <div className="space-y-2 rounded-md border border-sand-200 bg-cream/30 p-2">
+            <div className="space-y-2 rounded-md border border-soft-gray bg-white/30 p-2">
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>

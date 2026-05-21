@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { ScoreCard, type ScoreCardData } from "./ScoreCard";
@@ -207,8 +207,8 @@ export function ScoreStream({
           <p className="mt-1 text-sm text-danger/90">{error.message}</p>
         </div>
         {error.telemetry && (
-          <div className="rounded-md border border-danger/20 bg-warm-white px-3 py-2 text-[11px] text-charcoal">
-            <p className="mb-1 font-medium text-navy">
+          <div className="rounded-md border border-danger/20 bg-white px-3 py-2 text-[11px] text-black">
+            <p className="mb-1 font-medium text-black">
               Tokens were spent — here&apos;s what it cost:
             </p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono">
@@ -222,8 +222,8 @@ export function ScoreStream({
               <span>{error.telemetry.cache_read_input_tokens.toLocaleString()}</span>
               <span>cache write</span>
               <span>{error.telemetry.cache_creation_input_tokens.toLocaleString()}</span>
-              <span className="font-medium text-terracotta-700">cost</span>
-              <span className="font-medium text-terracotta-700">
+              <span className="font-medium text-black">cost</span>
+              <span className="font-medium text-black">
                 ${error.telemetry.cost_usd.toFixed(4)}
               </span>
             </div>
@@ -231,10 +231,10 @@ export function ScoreStream({
         )}
         {error.raw !== undefined && (
           <details className="text-[11px]">
-            <summary className="cursor-pointer text-slate-deep">
+            <summary className="cursor-pointer text-black">
               Show what Claude actually returned
             </summary>
-            <pre className="mt-2 max-h-48 overflow-y-auto rounded-md bg-warm-white p-3 font-mono text-charcoal">
+            <pre className="mt-2 max-h-48 overflow-y-auto rounded-md bg-white p-3 font-mono text-black">
               {JSON.stringify(error.raw, null, 2)}
             </pre>
           </details>
@@ -249,12 +249,12 @@ export function ScoreStream({
 
   if (mode === "team") {
     return (
-      <div className="space-y-3 rounded-lg border border-dashed border-sand-200 bg-cream/40 p-5">
+      <div className="space-y-3 rounded-lg border border-dashed border-soft-gray bg-white/40 p-5">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-navy">
-            Team scoring… <span className="text-xs text-slate-mid">({model})</span>
+          <p className="text-sm font-medium text-black">
+            Team scoring… <span className="text-xs text-gray">({model})</span>
           </p>
-          <span className="font-mono text-xs text-slate-mid">
+          <span className="font-mono text-xs text-gray">
             {(elapsedMs / 1000).toFixed(1)}s
           </span>
         </div>
@@ -270,23 +270,23 @@ export function ScoreStream({
                     ? "border-danger/30 bg-danger/5"
                     : a.status === "running"
                       ? "border-info/30 bg-info/5"
-                      : "border-sand-200 bg-warm-white",
+                      : "border-soft-gray bg-white",
               )}
             >
               <div className="flex items-center gap-2">
                 <StatusDot status={a.status} />
-                <span className="text-navy">
+                <span className="text-black">
                   {a.agent === "manager"
                     ? "Manager (consolidates the 3 scorers)"
                     : `Scorer ${a.agent}`}
                 </span>
                 {typeof a.temperature === "number" && (
-                  <span className="font-mono text-[10px] text-slate-mid">
+                  <span className="font-mono text-[10px] text-gray">
                     temp {a.temperature}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 font-mono text-[11px] text-slate-deep">
+              <div className="flex items-center gap-2 font-mono text-[11px] text-black">
                 {typeof a.cost_usd === "number" && (
                   <span>${a.cost_usd.toFixed(4)}</span>
                 )}
@@ -303,7 +303,7 @@ export function ScoreStream({
             </li>
           ))}
         </ul>
-        <p className="text-[11px] text-slate-mid">
+        <p className="text-[11px] text-gray">
           3 scorers run in parallel at different temperatures. Manager consolidates
           into one final assessment.
         </p>
@@ -312,19 +312,19 @@ export function ScoreStream({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed border-sand-200 bg-cream/40 p-5">
+    <div className="space-y-3 rounded-lg border border-dashed border-soft-gray bg-white/40 p-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-navy">
-          Claude is scoring… <span className="text-xs text-slate-mid">({model})</span>
+        <p className="text-sm font-medium text-black">
+          Claude is scoring… <span className="text-xs text-gray">({model})</span>
         </p>
-        <span className="font-mono text-xs text-slate-mid">
+        <span className="font-mono text-xs text-gray">
           {(elapsedMs / 1000).toFixed(1)}s
         </span>
       </div>
-      <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-md bg-warm-white p-3 font-mono text-[11px] text-charcoal">
+      <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-md bg-white p-3 font-mono text-[11px] text-black">
         {partialText || "Waiting for first token…"}
       </pre>
-      <p className="text-[11px] text-slate-mid">
+      <p className="text-[11px] text-gray">
         Streaming the tool input live so you can see what the model is thinking.
         Final scores will render here when the stream closes.
       </p>
@@ -340,6 +340,6 @@ function StatusDot({ status }: { status: AgentState["status"] }) {
         ? "bg-danger"
         : status === "running"
           ? "bg-info animate-pulse"
-          : "bg-sand-200";
+          : "bg-soft-gray";
   return <span className={cn("inline-block h-2 w-2 rounded-full", cls)} />;
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -85,7 +85,7 @@ export function ColdEmailLauncher({
       <Button onClick={() => setOpen(true)}>
         Draft cold email
         {pastEmails.length > 0 && (
-          <span className="ml-1.5 rounded-sm bg-warm-white/20 px-1 font-mono text-[10px]">
+          <span className="ml-1.5 rounded-sm bg-white/20 px-1 font-mono text-[10px]">
             {pastEmails.length}
           </span>
         )}

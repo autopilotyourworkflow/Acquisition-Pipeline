@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -258,7 +258,7 @@ export function SourceCandidatesDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-xs text-slate-deep">Platforms</Label>
+            <Label className="text-xs text-black">Platforms</Label>
             <div className="flex flex-wrap gap-3">
               <PlatformBox
                 platform="linkedin"
@@ -292,7 +292,7 @@ export function SourceCandidatesDialog({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="n" className="text-xs text-slate-deep">
+              <Label htmlFor="n" className="text-xs text-black">
                 Candidates (5–50)
               </Label>
               <Input
@@ -308,7 +308,7 @@ export function SourceCandidatesDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="mode" className="text-xs text-slate-deep">
+              <Label htmlFor="mode" className="text-xs text-black">
                 Scraper mode
               </Label>
               <select
@@ -316,7 +316,7 @@ export function SourceCandidatesDialog({
                 value={mode}
                 onChange={(e) => setMode(e.target.value as ApifyMode)}
                 disabled={running}
-                className="w-full h-9 rounded-md border border-sand-200 bg-warm-white px-2 text-sm text-navy focus:border-terracotta focus:outline-none"
+                className="w-full h-9 rounded-md border border-soft-gray bg-white px-2 text-sm text-black focus:border-black focus:outline-none"
               >
                 <option value="Short">Short — name + headline (cheapest)</option>
                 <option value="Full">Full — + experience / education</option>
@@ -324,8 +324,8 @@ export function SourceCandidatesDialog({
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-slate-deep">Est. cost</Label>
-              <div className="rounded-md border border-sand-200 bg-cream/40 px-3 py-1.5 text-sm font-mono text-navy">
+              <Label className="text-xs text-black">Est. cost</Label>
+              <div className="rounded-md border border-soft-gray bg-white/40 px-3 py-1.5 text-sm font-mono text-black">
                 ${estCost.toFixed(2)}
               </div>
             </div>
@@ -334,13 +334,13 @@ export function SourceCandidatesDialog({
           {(log.length > 0 || running) && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-slate-deep">Progress</Label>
-                <div className="text-[11px] text-slate-mid font-mono">
+                <Label className="text-xs text-black">Progress</Label>
+                <div className="text-[11px] text-gray font-mono">
                   found: {stats.found} · scored: {stats.scored} · spent: $
                   {stats.cost.toFixed(2)}
                 </div>
               </div>
-              <div className="h-48 overflow-y-auto rounded-md border border-sand-200 bg-cream/30 p-3 font-mono text-[11px]">
+              <div className="h-48 overflow-y-auto rounded-md border border-soft-gray bg-white/30 p-3 font-mono text-[11px]">
                 {log.map((l, i) => (
                   <div
                     key={i}
@@ -351,7 +351,7 @@ export function SourceCandidatesDialog({
                           ? "text-warning"
                           : l.kind === "ok"
                             ? "text-success"
-                            : "text-charcoal"
+                            : "text-black"
                     }
                   >
                     {l.text}
@@ -410,10 +410,10 @@ function PlatformBox({
       title={title}
       className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${
         disabled
-          ? "cursor-not-allowed border-sand-200 bg-sand-200/30 text-slate-mid"
+          ? "cursor-not-allowed border-soft-gray bg-soft-gray/30 text-gray"
           : checked
-            ? "border-terracotta bg-terracotta/5 text-navy"
-            : "border-sand-200 bg-warm-white text-charcoal hover:border-terracotta/50"
+            ? "border-black bg-yellow/5 text-black"
+            : "border-soft-gray bg-white text-black hover:border-black/50"
       }`}
     >
       <input
@@ -421,16 +421,16 @@ function PlatformBox({
         checked={checked}
         onChange={onToggle}
         disabled={disabled}
-        className="accent-terracotta"
+        className="accent-yellow"
       />
       <span>{SOURCING_PLATFORM_LABELS[platform]}</span>
       {note && (
-        <span className="text-[10px] uppercase tracking-wider text-slate-mid">
+        <span className="text-[10px] uppercase tracking-wider text-gray">
           {note}
         </span>
       )}
       {disabled && !note && (
-        <span className="text-[10px] uppercase tracking-wider text-slate-mid">
+        <span className="text-[10px] uppercase tracking-wider text-gray">
           soon
         </span>
       )}

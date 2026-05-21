@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -71,13 +71,13 @@ export function CandidateTable({
             ...jds.map((j) => ({ value: j.id, label: j.title })),
           ]}
         />
-        <span className="ml-auto text-xs text-slate-mid">{filtered.length} shown</span>
+        <span className="ml-auto text-xs text-gray">{filtered.length} shown</span>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-sand-200 bg-warm-white">
+      <div className="overflow-x-auto rounded-md border border-soft-gray bg-white">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-cream text-left">
-            <tr className="border-b border-sand-200 text-xs uppercase tracking-wide text-slate-deep">
+          <thead className="sticky top-0 z-10 bg-white text-left">
+            <tr className="border-b border-soft-gray text-xs uppercase tracking-wide text-black">
               <th className="px-3 py-2.5 font-medium">Name</th>
               <th className="px-3 py-2.5 font-medium">Title</th>
               <th className="px-3 py-2.5 font-medium">Stage</th>
@@ -92,26 +92,26 @@ export function CandidateTable({
               <tr
                 key={c.id}
                 onClick={() => router.push(`/candidates/${c.id}`)}
-                className="cursor-pointer border-b border-sand-100 last:border-0 hover:bg-cream/50"
+                className="cursor-pointer border-b border-off-white last:border-0 hover:bg-white/50"
               >
-                <td className="px-3 py-2.5 font-medium text-navy">{c.full_name}</td>
-                <td className="px-3 py-2.5 text-charcoal">{c.current_title ?? "—"}</td>
+                <td className="px-3 py-2.5 font-medium text-black">{c.full_name}</td>
+                <td className="px-3 py-2.5 text-black">{c.current_title ?? "—"}</td>
                 <td className="px-3 py-2.5">
                   <StageBadge stage={c.stage} />
                 </td>
                 <td className="px-3 py-2.5">
-                  {c.latest_score !== null ? <ScoreCell score={c.latest_score} /> : <span className="text-slate-mid">—</span>}
+                  {c.latest_score !== null ? <ScoreCell score={c.latest_score} /> : <span className="text-gray">—</span>}
                 </td>
                 <td className="px-3 py-2.5">
                   <SourceBadge source={c.source} />
                 </td>
-                <td className="px-3 py-2.5 text-charcoal">{c.jd_title ?? "—"}</td>
-                <td className="px-3 py-2.5 text-charcoal">{c.applied_at}</td>
+                <td className="px-3 py-2.5 text-black">{c.jd_title ?? "—"}</td>
+                <td className="px-3 py-2.5 text-black">{c.applied_at}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-mid">
+                <td colSpan={7} className="px-3 py-10 text-center text-sm text-gray">
                   No candidates match the current filters.
                 </td>
               </tr>
@@ -150,12 +150,12 @@ function FilterSelect<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 text-xs text-charcoal">
-      <span className="text-slate-deep">{label}:</span>
+    <label className="inline-flex items-center gap-1.5 text-xs text-black">
+      <span className="text-black">{label}:</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className="rounded-md border border-sand-200 bg-warm-white px-2 py-1 text-xs text-navy focus-visible:outline-2 focus-visible:outline-terracotta"
+        className="rounded-md border border-soft-gray bg-white px-2 py-1 text-xs text-black focus-visible:outline-2 focus-visible:outline-yellow"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

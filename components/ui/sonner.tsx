@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Toaster as SonnerToaster } from "sonner";
 
@@ -13,10 +13,10 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            "border-sand-200 bg-warm-white text-navy font-sans rounded-md shadow-md",
-          description: "text-charcoal",
-          actionButton: "bg-terracotta text-cream",
-          cancelButton: "bg-sand-100 text-charcoal",
+            "border-soft-gray bg-white text-black font-sans rounded-md shadow-md",
+          description: "text-black",
+          actionButton: "bg-yellow text-black",
+          cancelButton: "bg-off-white text-black",
         },
       }}
     />

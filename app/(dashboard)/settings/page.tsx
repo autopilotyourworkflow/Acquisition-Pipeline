@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 export const metadata = { title: "Settings · Acquisition" };
 
@@ -39,8 +39,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-medium text-navy">Settings</h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <h1 className="font-display text-3xl font-medium text-black">Settings</h1>
+        <p className="mt-1 text-sm text-black">
           Configure how the system behaves on your behalf.
         </p>
       </div>
@@ -51,15 +51,15 @@ export default function SettingsPage() {
             {s.ready ? (
               <Link
                 href={s.href}
-                className="block rounded-md border border-sand-200 bg-warm-white px-4 py-3 transition-colors hover:bg-cream"
+                className="block rounded-md border border-soft-gray bg-white px-4 py-3 transition-colors hover:bg-white"
               >
-                <p className="font-medium text-navy">{s.title}</p>
-                <p className="mt-1 text-xs text-charcoal">{s.desc}</p>
+                <p className="font-medium text-black">{s.title}</p>
+                <p className="mt-1 text-xs text-black">{s.desc}</p>
               </Link>
             ) : (
-              <div className="block rounded-md border border-dashed border-sand-200 bg-cream/30 px-4 py-3 opacity-60">
-                <p className="font-medium text-navy">{s.title}</p>
-                <p className="mt-1 text-xs text-charcoal">{s.desc}</p>
+              <div className="block rounded-md border border-dashed border-soft-gray bg-white/30 px-4 py-3 opacity-60">
+                <p className="font-medium text-black">{s.title}</p>
+                <p className="mt-1 text-xs text-black">{s.desc}</p>
               </div>
             )}
           </li>

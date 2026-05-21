@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useCallback,
@@ -155,7 +155,7 @@ export function TrackerViews({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="inline-flex rounded-md border border-sand-200 bg-warm-white p-0.5 text-sm">
+        <div className="inline-flex rounded-md border border-soft-gray bg-white p-0.5 text-sm">
           <ViewTab active={view === "table"} onClick={() => setView("table")}>
             Table
           </ViewTab>
@@ -195,7 +195,7 @@ function ViewTab({
       onClick={onClick}
       className={cn(
         "rounded-sm px-3 py-1 text-xs font-medium transition-colors",
-        active ? "bg-navy text-cream" : "text-charcoal hover:bg-sand-100",
+        active ? "bg-black text-white" : "text-black hover:bg-off-white",
       )}
     >
       {children}
@@ -205,11 +205,11 @@ function ViewTab({
 
 function EmptyState() {
   return (
-    <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-      <p className="font-display text-xl text-navy">Empty pipeline</p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+    <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-12 text-center">
+      <p className="font-display text-xl text-black">Empty pipeline</p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-black">
         Use{" "}
-        <span className="rounded-sm bg-terracotta-50 px-1.5 py-0.5 font-medium text-terracotta-700">
+        <span className="rounded-sm bg-yellow-pale px-1.5 py-0.5 font-medium text-black">
           + New candidate
         </span>{" "}
         to add someone manually. Bulk import from LinkedIn, paste, PDF, and

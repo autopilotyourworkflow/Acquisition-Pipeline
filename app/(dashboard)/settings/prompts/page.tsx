@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+﻿import { createAdminClient } from "@/lib/supabase/admin";
 import { ORG_ID } from "@/lib/db/constants";
 import {
   PROMPT_VERSION as FALLBACK_VERSION,
@@ -34,8 +34,8 @@ export default async function PromptsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-medium text-navy">Scoring prompt</h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <h1 className="font-display text-3xl font-medium text-black">Scoring prompt</h1>
+        <p className="mt-1 text-sm text-black">
           The persona text that goes into Claude&apos;s system prompt at score time. Changes
           take effect on the next <code className="font-mono text-xs">Run score</code>.
           Saving creates a new version (e.g. <code className="font-mono text-xs">scoring.v2</code>);
@@ -46,7 +46,7 @@ export default async function PromptsPage() {
       {!migrationApplied && (
         <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-xs text-warning">
           <p className="font-medium">Migration not applied</p>
-          <p className="mt-1 text-charcoal">
+          <p className="mt-1 text-black">
             Run <code className="font-mono">supabase/migrations/0002_phase2_fixes.sql</code> in the
             Supabase SQL editor to enable editable prompts. Until then, scoring uses the
             hardcoded <code className="font-mono">scoring.v1</code> fallback.
@@ -61,22 +61,22 @@ export default async function PromptsPage() {
       />
 
       {rows.length > 1 && (
-        <div className="rounded-lg border border-sand-200 bg-warm-white">
-          <div className="border-b border-sand-200 px-4 py-2.5">
-            <p className="text-xs uppercase tracking-wide text-slate-deep">Version history</p>
+        <div className="rounded-lg border border-soft-gray bg-white">
+          <div className="border-b border-soft-gray px-4 py-2.5">
+            <p className="text-xs uppercase tracking-wide text-black">Version history</p>
           </div>
-          <ul className="divide-y divide-sand-100">
+          <ul className="divide-y divide-off-white">
             {rows.map((r) => (
               <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <div>
-                  <span className="font-mono text-navy">{r.version}</span>
+                  <span className="font-mono text-black">{r.version}</span>
                   {r.is_active && (
                     <span className="ml-2 rounded-sm bg-success/15 px-1.5 py-0.5 text-[10px] font-medium text-success">
                       active
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] text-slate-deep">
+                <span className="text-[11px] text-black">
                   {new Date(r.created_at).toLocaleString("en-GB", {
                     timeZone: "Asia/Bangkok",
                     hour12: false,

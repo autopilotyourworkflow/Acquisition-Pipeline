@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
@@ -208,9 +208,9 @@ export function ScreenerShell({
 
   if (candidates.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-        <p className="font-display text-xl text-navy">Nobody to score yet</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+      <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-12 text-center">
+        <p className="font-display text-xl text-black">Nobody to score yet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-black">
           The Screener needs a candidate to evaluate. Add one from the Tracker first.
         </p>
         <Button asChild className="mt-4">
@@ -221,9 +221,9 @@ export function ScreenerShell({
   }
   if (jds.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-        <p className="font-display text-xl text-navy">No job descriptions yet</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+      <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-12 text-center">
+        <p className="font-display text-xl text-black">No job descriptions yet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-black">
           Scoring is candidate-against-JD. Create your first JD to define the role.
         </p>
         <Button asChild className="mt-4">
@@ -235,16 +235,16 @@ export function ScreenerShell({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 rounded-lg border border-sand-200 bg-warm-white p-5 md:grid-cols-2">
+      <div className="grid gap-4 rounded-lg border border-soft-gray bg-white p-5 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="candidate" className="text-xs text-slate-deep">
+          <Label htmlFor="candidate" className="text-xs text-black">
             Candidate
           </Label>
           <select
             id="candidate"
             value={candidateId}
             onChange={(e) => onPickCandidate(e.target.value)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
@@ -256,14 +256,14 @@ export function ScreenerShell({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="jd" className="text-xs text-slate-deep">
+          <Label htmlFor="jd" className="text-xs text-black">
             Job description
           </Label>
           <select
             id="jd"
             value={jdId}
             onChange={(e) => onPickJd(e.target.value)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {jds.map((j) => (
               <option key={j.id} value={j.id}>
@@ -272,21 +272,21 @@ export function ScreenerShell({
             ))}
           </select>
           {jd?.scoring_persona_override && (
-            <p className="text-[11px] text-terracotta-700">
+            <p className="text-[11px] text-black">
               ✱ This JD uses a custom scoring persona override.
             </p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="model" className="text-xs text-slate-deep">
+          <Label htmlFor="model" className="text-xs text-black">
             Model
           </Label>
           <select
             id="model"
             value={model}
             onChange={(e) => setModel(e.target.value as ModelChoice)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {MODEL_OPTIONS.map((m) => (
               <option key={m.value} value={m.value}>
@@ -294,20 +294,20 @@ export function ScreenerShell({
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-slate-mid">
+          <p className="text-[11px] text-gray">
             {MODEL_OPTIONS.find((m) => m.value === model)?.hint}
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="mode" className="text-xs text-slate-deep">
+          <Label htmlFor="mode" className="text-xs text-black">
             Scoring mode
           </Label>
           <select
             id="mode"
             value={mode}
             onChange={(e) => setMode(e.target.value as ScoringMode)}
-            className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+            className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
           >
             {MODE_OPTIONS.map((m) => (
               <option key={m.value} value={m.value}>
@@ -315,13 +315,13 @@ export function ScreenerShell({
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-slate-mid">
+          <p className="text-[11px] text-gray">
             {MODE_OPTIONS.find((m) => m.value === mode)?.hint}
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-slate-deep">CV PDF</Label>
+          <Label className="text-xs text-black">CV PDF</Label>
           <div className="flex items-center gap-2">
             <input
               ref={fileInputRef}
@@ -343,7 +343,7 @@ export function ScreenerShell({
             >
               {uploading ? "Parsing…" : parsedLen > 0 ? "Replace PDF" : "Upload PDF"}
             </Button>
-            <span className="text-[11px] text-slate-mid">
+            <span className="text-[11px] text-gray">
               {parsedLen > 0
                 ? `${parsedLen.toLocaleString()} chars cached (dedup'd on re-upload)`
                 : "No CV uploaded"}
@@ -352,14 +352,14 @@ export function ScreenerShell({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-sand-200 bg-cream p-4">
-        <div className="text-xs text-charcoal">
+      <div className="flex items-center justify-between rounded-lg border border-soft-gray bg-white p-4">
+        <div className="text-xs text-black">
           {candidate && jd && (
             <>
               Scoring{" "}
-              <span className="font-medium text-navy">{candidate.full_name}</span>
+              <span className="font-medium text-black">{candidate.full_name}</span>
               {" against "}
-              <span className="font-medium text-navy">{jd.title}</span>
+              <span className="font-medium text-black">{jd.title}</span>
               {parsedLen === 0 && (
                 <span className="ml-2 rounded-sm bg-warning/15 px-1.5 py-0.5 text-warning">
                   No CV — using profile data only
@@ -400,7 +400,7 @@ export function ScreenerShell({
           )}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-8 text-center text-sm text-charcoal">
+        <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-8 text-center text-sm text-black">
           No previous scores for this candidate + JD. Click <span className="font-medium">Run score</span> to start.
         </div>
       )}
@@ -416,34 +416,34 @@ function PastRunBadge({
   isLatest: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-sand-200 bg-warm-white px-3 py-2 text-[11px] text-charcoal">
-      <span className="font-medium text-navy">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-soft-gray bg-white px-3 py-2 text-[11px] text-black">
+      <span className="font-medium text-black">
         {isLatest ? "Latest score" : "Past score"}
       </span>
-      <span className="font-mono text-slate-deep">
+      <span className="font-mono text-black">
         {new Date(score.created_at).toLocaleString("en-GB", {
           timeZone: "Asia/Bangkok",
           hour12: false,
         })}
       </span>
-      <span className="rounded-sm bg-sand-100 px-1.5 py-0.5 font-mono">
+      <span className="rounded-sm bg-off-white px-1.5 py-0.5 font-mono">
         {score.model}
       </span>
       <span
         className={cn(
           "rounded-sm px-1.5 py-0.5",
           score.scoring_mode === "team"
-            ? "bg-terracotta-50 text-terracotta-700"
-            : "bg-sand-100",
+            ? "bg-yellow-pale text-black"
+            : "bg-off-white",
         )}
       >
         {score.scoring_mode === "team" ? "team (3+1)" : "single"}
       </span>
-      <span className="font-mono text-slate-mid">
+      <span className="font-mono text-gray">
         prompt: {score.prompt_version}
       </span>
       {score.cost_usd !== null && (
-        <span className="ml-auto font-mono text-slate-deep">
+        <span className="ml-auto font-mono text-black">
           ${score.cost_usd.toFixed(4)}
         </span>
       )}
@@ -461,11 +461,11 @@ function PastRunsList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <details className="rounded-md border border-sand-200 bg-warm-white">
-      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-navy">
+    <details className="rounded-md border border-soft-gray bg-white">
+      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-black">
         Previous runs ({runs.length - 1} more)
       </summary>
-      <ul className="divide-y divide-sand-100 border-t border-sand-100">
+      <ul className="divide-y divide-off-white border-t border-off-white">
         {runs.map((r) => {
           const isSelected = r.id === selectedId;
           return (
@@ -475,34 +475,34 @@ function PastRunsList({
                 onClick={() => onSelect(r.id)}
                 className={cn(
                   "flex w-full items-center justify-between px-4 py-2 text-left text-sm",
-                  isSelected ? "bg-terracotta-50/50" : "hover:bg-cream",
+                  isSelected ? "bg-yellow-pale/50" : "hover:bg-white",
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-base font-medium text-navy">
+                  <span className="font-mono text-base font-medium text-black">
                     {r.weighted_total.toFixed(2)}
                   </span>
-                  <span className="text-[11px] text-slate-deep">
+                  <span className="text-[11px] text-black">
                     {new Date(r.created_at).toLocaleString("en-GB", {
                       timeZone: "Asia/Bangkok",
                       hour12: false,
                     })}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-slate-mid">
+                <div className="flex items-center gap-2 text-[10px] text-gray">
                   <span className="font-mono">{r.model}</span>
                   <span
                     className={cn(
                       "rounded-sm px-1.5 py-0.5",
                       r.scoring_mode === "team"
-                        ? "bg-terracotta-50 text-terracotta-700"
-                        : "bg-sand-100",
+                        ? "bg-yellow-pale text-black"
+                        : "bg-off-white",
                     )}
                   >
                     {r.scoring_mode}
                   </span>
                   {isSelected && (
-                    <span className="font-medium text-terracotta-700">viewing</span>
+                    <span className="font-medium text-black">viewing</span>
                   )}
                 </div>
               </button>

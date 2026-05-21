@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -20,26 +20,26 @@ export type ScoreCardData = {
 
 export function ScoreCard({ data }: { data: ScoreCardData }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-sand-200 bg-warm-white">
-      <div className="border-b border-sand-200 bg-cream/50 px-5 py-4">
+    <div className="overflow-hidden rounded-lg border border-soft-gray bg-white">
+      <div className="border-b border-soft-gray bg-white/50 px-5 py-4">
         <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-wide text-slate-deep">Weighted total</p>
+          <p className="text-xs uppercase tracking-wide text-black">Weighted total</p>
           {data.passes_threshold !== null && (
             <span
               className={cn(
                 "rounded-sm px-2 py-0.5 text-[11px] font-medium",
                 data.passes_threshold
                   ? "bg-success/15 text-success"
-                  : "bg-charcoal/15 text-charcoal",
+                  : "bg-charcoal/15 text-black",
               )}
             >
               {data.passes_threshold ? "Passes threshold" : "Below threshold"}
             </span>
           )}
         </div>
-        <p className="mt-1 font-display text-4xl font-medium text-navy">
+        <p className="mt-1 font-display text-4xl font-medium text-black">
           {data.weighted_total.toFixed(2)}
-          <span className="ml-1 text-sm text-slate-mid">/10</span>
+          <span className="ml-1 text-sm text-gray">/10</span>
         </p>
       </div>
 
@@ -64,36 +64,36 @@ export function ScoreCard({ data }: { data: ScoreCardData }) {
         />
       </div>
 
-      <div className="grid gap-5 border-t border-sand-100 px-5 py-5 md:grid-cols-2">
+      <div className="grid gap-5 border-t border-off-white px-5 py-5 md:grid-cols-2">
         <ListPanel title="Strengths" items={data.strengths} variant="success" />
         <ListPanel title="Gaps" items={data.gaps} variant="warning" />
       </div>
 
-      <div className="border-t border-sand-100 px-5 py-5">
-        <p className="mb-2 text-xs uppercase tracking-wide text-slate-deep">
+      <div className="border-t border-off-white px-5 py-5">
+        <p className="mb-2 text-xs uppercase tracking-wide text-black">
           Interview prep questions
         </p>
-        <ol className="space-y-1.5 text-sm text-charcoal">
+        <ol className="space-y-1.5 text-sm text-black">
           {data.prep_questions.map((q, i) => (
             <li key={i} className="flex gap-2">
-              <span className="font-mono text-xs text-slate-mid">{i + 1}.</span>
+              <span className="font-mono text-xs text-gray">{i + 1}.</span>
               <span>{q}</span>
             </li>
           ))}
         </ol>
       </div>
 
-      <details className="border-t border-sand-100 px-5 py-4">
-        <summary className="cursor-pointer text-xs uppercase tracking-wide text-slate-deep">
+      <details className="border-t border-off-white px-5 py-4">
+        <summary className="cursor-pointer text-xs uppercase tracking-wide text-black">
           Hiring report
         </summary>
-        <div className="mt-3 whitespace-pre-wrap text-sm text-charcoal">
+        <div className="mt-3 whitespace-pre-wrap text-sm text-black">
           {data.hiring_report}
         </div>
       </details>
 
       {typeof data.cost_usd === "number" && (
-        <div className="border-t border-sand-100 bg-cream/40 px-5 py-2 text-[11px] text-slate-mid">
+        <div className="border-t border-off-white bg-white/40 px-5 py-2 text-[11px] text-gray">
           Cost: ${data.cost_usd.toFixed(4)} · score id {data.scoreId.slice(0, 8)}…
         </div>
       )}
@@ -121,16 +121,16 @@ function ScoreBar({
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-navy">{label}</span>
-        <span className="font-mono text-sm text-charcoal">{value.toFixed(1)} / 10</span>
+        <span className="text-sm font-medium text-black">{label}</span>
+        <span className="font-mono text-sm text-black">{value.toFixed(1)} / 10</span>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-sm bg-sand-100">
+      <div className="mt-1.5 h-2 overflow-hidden rounded-sm bg-off-white">
         <div
-          className="h-full rounded-sm bg-terracotta transition-[width] duration-500 ease-out"
+          className="h-full rounded-sm bg-yellow transition-[width] duration-500 ease-out"
           style={{ width: `${width}%` }}
         />
       </div>
-      <p className="mt-1.5 text-xs text-slate-deep">{reasoning}</p>
+      <p className="mt-1.5 text-xs text-black">{reasoning}</p>
     </div>
   );
 }
@@ -151,10 +151,10 @@ function ListPanel({
       <p className={cn("mb-2 inline-block border-b px-1 pb-1 text-xs uppercase tracking-wide", tone)}>
         {title}
       </p>
-      <ul className="space-y-1 text-sm text-charcoal">
+      <ul className="space-y-1 text-sm text-black">
         {items.map((item, i) => (
           <li key={i} className="flex gap-1.5">
-            <span className="text-slate-mid">•</span>
+            <span className="text-gray">•</span>
             <span>{item}</span>
           </li>
         ))}

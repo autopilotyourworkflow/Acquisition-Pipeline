@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -93,12 +93,12 @@ export function BookmarkletPanel({
   }
 
   return (
-    <section className="rounded-md border border-sand-200 bg-warm-white px-4 py-4 space-y-4">
+    <section className="rounded-md border border-soft-gray bg-white px-4 py-4 space-y-4">
       <div>
-        <h2 className="font-display text-xl text-navy">
+        <h2 className="font-display text-xl text-black">
           JobsDB / LinkedIn bookmarklet
         </h2>
-        <p className="mt-1 text-sm text-charcoal">
+        <p className="mt-1 text-sm text-black">
           One-click candidate capture from any page where you&apos;re logged
           in — JobsDB applicant detail, LinkedIn profile, etc. Drag the
           button below to your browser&apos;s bookmarks bar, then click it
@@ -107,7 +107,7 @@ export function BookmarkletPanel({
       </div>
 
       {hasToken && !token && (
-        <div className="rounded-md border border-sand-200 bg-cream/40 px-3 py-2 text-xs text-charcoal">
+        <div className="rounded-md border border-soft-gray bg-white/40 px-3 py-2 text-xs text-black">
           You already generated a bookmarklet (the saved bookmark in your
           browser still works). To see the draggable button again, regenerate
           below — that invalidates the existing bookmark.
@@ -115,8 +115,8 @@ export function BookmarkletPanel({
       )}
 
       {token && (
-        <div className="rounded-md border border-terracotta/40 bg-terracotta/5 px-4 py-4 space-y-3">
-          <p className="text-xs font-medium text-navy">
+        <div className="rounded-md border border-black/40 bg-yellow/5 px-4 py-4 space-y-3">
+          <p className="text-xs font-medium text-black">
             ↓ Drag this button to your bookmarks bar:
           </p>
           {/* href is set via useEffect/ref — React blocks javascript: URLs
@@ -135,11 +135,11 @@ export function BookmarkletPanel({
                 "Drag this button to your bookmarks bar instead of clicking.",
               );
             }}
-            className="inline-block rounded-md bg-terracotta px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-terracotta/90 cursor-grab"
+            className="inline-block rounded-md bg-yellow px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-yellow/90 cursor-grab"
           >
             ➜ Send to Acquisition
           </a>
-          <p className="text-[11px] text-slate-deep">
+          <p className="text-[11px] text-black">
             Once dragged, the bookmark contains your private token. Anyone
             with that bookmark can post candidates as you — clear or
             regenerate below if it leaks.
@@ -167,11 +167,11 @@ export function BookmarkletPanel({
         )}
       </div>
 
-      <details className="rounded-md border border-sand-200 bg-cream/30 px-3 py-2 text-xs">
-        <summary className="cursor-pointer text-slate-deep">
+      <details className="rounded-md border border-soft-gray bg-white/30 px-3 py-2 text-xs">
+        <summary className="cursor-pointer text-black">
           How it works
         </summary>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-charcoal">
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-black">
           <li>
             Generate the bookmarklet and drag the button to your browser&apos;s
             bookmarks bar. (View → Show Bookmarks Bar if it&apos;s hidden.)
@@ -203,13 +203,13 @@ export function BookmarkletPanel({
             <span className="font-mono">extension</span>).
           </li>
         </ol>
-        <p className="mt-2 text-slate-mid">
+        <p className="mt-2 text-gray">
           <strong>For demos / first test:</strong> use any public LinkedIn
           profile (yours, or anyone you&apos;re connected to). It works
           identically to a JobsDB page and proves the round-trip without
           needing employer-side JobsDB access.
         </p>
-        <p className="mt-1 text-slate-mid">
+        <p className="mt-1 text-gray">
           The capture flow opens a new tab on this app (rather than
           posting silently from the source page) because LinkedIn / JobsDB
           block cross-origin POSTs from inline scripts. The new tab is

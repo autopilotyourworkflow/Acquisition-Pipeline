@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+﻿import { cn } from "@/lib/utils";
 
 export function Skeleton({
   className,
@@ -7,7 +7,7 @@ export function Skeleton({
   return (
     <div
       data-slot="skeleton"
-      className={cn("animate-pulse rounded-md bg-sand-100", className)}
+      className={cn("animate-pulse rounded-md bg-off-white", className)}
       {...props}
     />
   );

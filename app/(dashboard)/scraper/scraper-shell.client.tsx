@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -228,7 +228,7 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-display font-bold text-navy">Add Candidates</h1>
+        <h1 className="text-2xl font-display font-bold text-black">Add Candidates</h1>
         <p className="text-sm text-gray-600">Import candidates from multiple sources</p>
       </div>
 
@@ -280,18 +280,18 @@ export function ScraperShell({ initialJds }: ScraperShellProps) {
       )}
 
       {extractState.status === "loading" && (
-        <div className="flex items-center gap-3 rounded-lg border border-sand-200 bg-cream/40 p-4 text-sm text-charcoal">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-terracotta" />
+        <div className="flex items-center gap-3 rounded-lg border border-soft-gray bg-white/40 p-4 text-sm text-black">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-yellow" />
           <span>{extractState.stage}</span>
         </div>
       )}
 
       {extractState.status === "saved" && (
         <div className="rounded-lg border border-success/30 bg-success/5 p-5">
-          <p className="font-display text-lg text-navy">
+          <p className="font-display text-lg text-black">
             Saved: <span className="font-medium">{extractState.name}</span>
           </p>
-          <p className="mt-1 text-sm text-charcoal/80">
+          <p className="mt-1 text-sm text-black/80">
             Candidate added to the tracker. The original source is preserved on
             their detail page.
           </p>
@@ -333,7 +333,7 @@ function PasteTab({ onExtract }: { onExtract: ExtractFn }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Paste resume or profile text here..."
-        className="w-full h-64 rounded-lg border border-sand-200 bg-warm-white p-3 font-mono text-sm"
+        className="w-full h-64 rounded-lg border border-soft-gray bg-white p-3 font-mono text-sm"
       />
       <Button
         onClick={() => onExtract("/api/scrape/paste", { text }, { kind: "paste", text })}
@@ -362,12 +362,12 @@ function UrlTab({ onExtract }: { onExtract: ExtractFn }) {
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="Paste any profile, bio, or article URL…"
-        className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
+        className="w-full rounded-lg border border-soft-gray bg-white px-3 py-2"
       />
       <Button onClick={handleSubmit} disabled={!url.trim()}>
         Fetch &amp; Extract
       </Button>
-      <p className="text-xs text-slate-mid">
+      <p className="text-xs text-gray">
         Works on most public pages. If a site blocks direct access (LinkedIn,
         paywalled sites), we fall back to Jina Reader automatically.
       </p>
@@ -395,17 +395,17 @@ function PdfTab({ onExtract }: { onExtract: ExtractFn }) {
         type="file"
         accept=".pdf"
         onChange={handleFileChange}
-        className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
+        className="w-full rounded-lg border border-soft-gray bg-white px-3 py-2"
       />
-      <p className="text-xs text-slate-mid">PDF files up to 8MB</p>
+      <p className="text-xs text-gray">PDF files up to 8MB</p>
     </>
   );
 }
 
 function ScreenshotTab() {
   return (
-    <div className="rounded-lg border-2 border-dashed border-sand-200 p-8 text-center">
-      <p className="text-sm text-slate-deep">Screenshot extraction coming soon</p>
+    <div className="rounded-lg border-2 border-dashed border-soft-gray p-8 text-center">
+      <p className="text-sm text-black">Screenshot extraction coming soon</p>
     </div>
   );
 }
@@ -421,14 +421,14 @@ function ThirdPartyTab({ onExtract }: { onExtract: ExtractFn }) {
         value={linkedinUrl}
         onChange={(e) => setLinkedinUrl(e.target.value)}
         placeholder="LinkedIn profile URL..."
-        className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
+        className="w-full rounded-lg border border-soft-gray bg-white px-3 py-2"
       />
       <input
         type="password"
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
         placeholder="Proxycurl API key (optional, uses default if configured)..."
-        className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
+        className="w-full rounded-lg border border-soft-gray bg-white px-3 py-2"
       />
       <Button
         onClick={() =>
@@ -442,7 +442,7 @@ function ThirdPartyTab({ onExtract }: { onExtract: ExtractFn }) {
       >
         Fetch Profile
       </Button>
-      <p className="text-xs text-slate-mid">
+      <p className="text-xs text-gray">
         Uses Proxycurl API. Set your API key in Settings → Integrations for auto-use.
       </p>
     </div>
@@ -479,8 +479,8 @@ function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-terracotta/40 bg-terracotta/5 px-3 py-3 text-xs text-charcoal space-y-2">
-        <p className="font-medium text-navy">
+      <div className="rounded-md border border-black/40 bg-yellow/5 px-3 py-3 text-xs text-black space-y-2">
+        <p className="font-medium text-black">
           The fastest JobsDB capture is the bookmarklet, not this tab.
         </p>
         <p>
@@ -488,7 +488,7 @@ function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
           nor Jina Reader can bypass it. Go to{" "}
           <Link
             href="/settings/integrations"
-            className="text-terracotta underline-offset-2 underline hover:text-terracotta/80"
+            className="text-black underline-offset-2 underline hover:text-black/80"
           >
             Settings → Integrations
           </Link>{" "}
@@ -505,18 +505,18 @@ function JobsDbTab({ onExtract }: { onExtract: ExtractFn }) {
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="https://th.jobsdb.com/…"
-        className="w-full rounded-lg border border-sand-200 bg-warm-white px-3 py-2"
+        className="w-full rounded-lg border border-soft-gray bg-white px-3 py-2"
       />
       <textarea
         value={pasted}
         onChange={(e) => setPasted(e.target.value)}
         placeholder="…or paste the rendered page text here (login-walled pages — Ctrl/Cmd+A in your browser)"
-        className="w-full h-40 rounded-lg border border-sand-200 bg-warm-white p-3 font-mono text-sm"
+        className="w-full h-40 rounded-lg border border-soft-gray bg-white p-3 font-mono text-sm"
       />
       <Button onClick={handleSubmit} disabled={!canSubmit}>
         Fetch &amp; Extract
       </Button>
-      <p className="text-xs text-slate-mid">
+      <p className="text-xs text-gray">
         The candidate will be saved with{" "}
         <span className="font-mono">source: jobsdb</span>. If both fields are
         filled, the URL wins.
@@ -562,10 +562,10 @@ function PreviewPanel({
   const canSave = draft.full_name.trim().length > 0;
 
   return (
-    <div className="space-y-4 rounded-lg border border-sand-200 bg-warm-white p-6">
+    <div className="space-y-4 rounded-lg border border-soft-gray bg-white p-6">
       <div>
-        <h2 className="font-display text-lg text-navy">Preview &amp; confirm</h2>
-        <p className="mt-1 text-xs text-slate-deep">
+        <h2 className="font-display text-lg text-black">Preview &amp; confirm</h2>
+        <p className="mt-1 text-xs text-black">
           Edit anything that looks wrong before saving. Skills are
           comma-separated.
         </p>
@@ -641,14 +641,14 @@ function PreviewPanel({
       </Field>
 
       {(draft.experience.length > 0 || draft.education.length > 0) && (
-        <details className="rounded-md border border-sand-200 bg-cream/40 p-3">
-          <summary className="cursor-pointer text-xs font-medium text-slate-deep">
+        <details className="rounded-md border border-soft-gray bg-white/40 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-black">
             Experience &amp; education extracted ({draft.experience.length} role
             {draft.experience.length === 1 ? "" : "s"},{" "}
             {draft.education.length} school
             {draft.education.length === 1 ? "" : "s"}) — read-only
           </summary>
-          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-warm-white p-3 font-mono text-[11px] text-charcoal">
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-white p-3 font-mono text-[11px] text-black">
             {JSON.stringify(
               { experience: draft.experience, education: draft.education },
               null,
@@ -688,7 +688,7 @@ function PreviewPanel({
 }
 
 const fieldCls =
-  "w-full rounded-md border border-sand-200 bg-warm-white px-3 py-1.5 text-sm text-navy focus:border-terracotta focus:outline-none";
+  "w-full rounded-md border border-soft-gray bg-white px-3 py-1.5 text-sm text-black focus:border-black focus:outline-none";
 
 function Field({
   label,
@@ -701,7 +701,7 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-medium uppercase tracking-wider text-slate-deep">
+      <label className="block text-xs font-medium uppercase tracking-wider text-black">
         {label}
       </label>
       <div className="mt-1">{children}</div>

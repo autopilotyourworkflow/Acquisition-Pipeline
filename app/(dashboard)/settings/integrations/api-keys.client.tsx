@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -23,8 +23,8 @@ export function ApiKeysPanel({ status }: { status: KeyStatus }) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="font-display text-xl text-navy">API keys</h2>
-        <p className="mt-1 text-sm text-charcoal">
+        <h2 className="font-display text-xl text-black">API keys</h2>
+        <p className="mt-1 text-sm text-black">
           Personal third-party API keys. Stored encrypted (AES-256-GCM) and
           never echoed back to you. Clear and re-paste to rotate.
         </p>
@@ -105,18 +105,18 @@ function KeyRow({
   }
 
   return (
-    <div className="rounded-md border border-sand-200 bg-warm-white px-4 py-3">
+    <div className="rounded-md border border-soft-gray bg-white px-4 py-3">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <p className="font-medium text-navy">{title}</p>
-          <p className="mt-1 text-xs text-charcoal">{description}</p>
+          <p className="font-medium text-black">{title}</p>
+          <p className="mt-1 text-xs text-black">{description}</p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] text-slate-deep">
+        <div className="flex items-center gap-2 text-[11px] text-black">
           <a
             href={getKeyHref}
             target="_blank"
             rel="noreferrer"
-            className="underline underline-offset-2 hover:text-terracotta"
+            className="underline underline-offset-2 hover:text-black"
           >
             Get a key ↗
           </a>
@@ -137,7 +137,7 @@ function KeyRow({
             )}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-sm bg-sand-200/40 px-2 py-1 text-xs font-medium text-slate-deep">
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-soft-gray/40 px-2 py-1 text-xs font-medium text-black">
             Not configured
           </span>
         )}
@@ -170,7 +170,7 @@ function KeyRow({
         </div>
       </div>
       {!saved && (
-        <p className="mt-2 text-[11px] text-slate-mid">
+        <p className="mt-2 text-[11px] text-gray">
           After saving, the field clears (we never echo the key back). The
           badge above will flip to <span className="font-mono">Saved</span>.
         </p>

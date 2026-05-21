@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -38,14 +38,14 @@ export default async function CapturePage() {
       <div>
         <Link
           href="/settings"
-          className="text-xs text-slate-deep underline-offset-4 hover:underline"
+          className="text-xs text-black underline-offset-4 hover:underline"
         >
           ← Back to settings
         </Link>
-        <h1 className="mt-2 font-display text-3xl font-medium text-navy">
+        <h1 className="mt-2 font-display text-3xl font-medium text-black">
           Capture
         </h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <p className="mt-1 text-sm text-black">
           Tools for getting candidates INTO the system from sources we
           can&apos;t scrape headlessly.
         </p>
@@ -62,56 +62,56 @@ export default async function CapturePage() {
           + Gmail-readonly scope + filter UI ships as a follow-up. */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="font-display text-xl text-navy">
+          <h2 className="font-display text-xl text-black">
             Auto-import from Gmail
           </h2>
           <span className="rounded-sm bg-warning/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-warning">
             coming soon
           </span>
         </div>
-        <p className="text-sm text-charcoal">
+        <p className="text-sm text-black">
           Watch your Gmail inbox every 15 minutes for incoming applications,
           extract any attached resumes, and auto-score them against a default
           JD. Opt-in, per user, fully revocable.
         </p>
 
-        <div className="space-y-4 rounded-md border border-dashed border-sand-200 bg-cream/40 px-4 py-4 opacity-70">
+        <div className="space-y-4 rounded-md border border-dashed border-soft-gray bg-white/40 px-4 py-4 opacity-70">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
                 Enabled
               </label>
-              <div className="flex h-9 items-center rounded-md border border-sand-200 bg-warm-white px-3 text-sm text-slate-mid">
+              <div className="flex h-9 items-center rounded-md border border-soft-gray bg-white px-3 text-sm text-gray">
                 <span aria-hidden className="mr-2">○</span> Off
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
                 Default JD (for auto-scoring)
               </label>
-              <div className="flex h-9 items-center rounded-md border border-sand-200 bg-warm-white px-3 text-sm text-slate-mid">
+              <div className="flex h-9 items-center rounded-md border border-soft-gray bg-white px-3 text-sm text-gray">
                 — pick a JD —
               </div>
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
               Sender filter (optional)
             </label>
-            <div className="flex h-9 items-center rounded-md border border-sand-200 bg-warm-white px-3 text-xs text-slate-mid">
+            <div className="flex h-9 items-center rounded-md border border-soft-gray bg-white px-3 text-xs text-gray">
               jobs@example.com, careers@example.com…
             </div>
-            <p className="mt-1 text-[11px] text-slate-mid">
+            <p className="mt-1 text-[11px] text-gray">
               Comma-separated list of allowed senders. Leave blank to match
               any sender whose subject contains &quot;resume&quot;,
               &quot;CV&quot;, or &quot;application&quot;.
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
               Subject filter
             </label>
-            <div className="flex h-9 items-center rounded-md border border-sand-200 bg-warm-white px-3 text-xs text-slate-mid">
+            <div className="flex h-9 items-center rounded-md border border-soft-gray bg-white px-3 text-xs text-gray">
               resume OR CV OR &quot;cover letter&quot; OR application
             </div>
           </div>
@@ -119,7 +119,7 @@ export default async function CapturePage() {
             <button
               type="button"
               disabled
-              className="cursor-not-allowed rounded-md border border-sand-200 bg-warm-white px-3 py-1.5 text-xs font-medium text-slate-deep opacity-60"
+              className="cursor-not-allowed rounded-md border border-soft-gray bg-white px-3 py-1.5 text-xs font-medium text-black opacity-60"
               title="Coming in Phase 4c — needs gmail.readonly scope + cron secret + migration 0012."
             >
               Enable auto-import
@@ -127,11 +127,11 @@ export default async function CapturePage() {
           </div>
         </div>
 
-        <details className="rounded-md border border-sand-200 bg-cream/30 px-3 py-2 text-xs">
-          <summary className="cursor-pointer text-slate-deep">
+        <details className="rounded-md border border-soft-gray bg-white/30 px-3 py-2 text-xs">
+          <summary className="cursor-pointer text-black">
             How it&apos;ll work
           </summary>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-charcoal">
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-black">
             <li>
               Grant the <span className="font-mono">gmail.readonly</span> scope
               (the existing Gmail OAuth flow extends to add it).

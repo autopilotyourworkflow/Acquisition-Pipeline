@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useCallback,
@@ -308,9 +308,9 @@ export function ScheduleOverview({
 
 function EmptyState() {
   return (
-    <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-10 text-center">
-      <p className="font-display text-xl text-navy">No interviews yet</p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-charcoal">
+    <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-10 text-center">
+      <p className="font-display text-xl text-black">No interviews yet</p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-black">
         Click <span className="font-medium">Schedule interview</span> above to
         drop the first one onto your calendar.
       </p>
@@ -360,9 +360,9 @@ function InterviewsList({
         const statusStyles: Record<OverviewInterview["status"], string> = {
           scheduled: isUpcoming
             ? "bg-success/10 text-success"
-            : "bg-sand-100 text-charcoal",
+            : "bg-off-white text-black",
           rescheduled: "bg-info/10 text-info",
-          completed: "bg-sand-100 text-charcoal",
+          completed: "bg-off-white text-black",
           cancelled: "bg-warning/15 text-warning",
           no_show: "bg-danger/15 text-danger",
         };
@@ -372,7 +372,7 @@ function InterviewsList({
             <button
               type="button"
               onClick={() => router.push(`/candidates/${i.candidateId}`)}
-              className="flex w-full flex-wrap items-center justify-between gap-3 rounded-md border border-sand-200 bg-warm-white px-4 py-3 text-left text-sm transition-colors hover:bg-cream"
+              className="flex w-full flex-wrap items-center justify-between gap-3 rounded-md border border-soft-gray bg-white px-4 py-3 text-left text-sm transition-colors hover:bg-white"
             >
               <div className="flex flex-wrap items-center gap-3">
                 <span
@@ -383,18 +383,18 @@ function InterviewsList({
                 >
                   {i.status.replace("_", " ")}
                 </span>
-                <span className="font-medium text-navy">{i.candidateName}</span>
-                <span className="text-[11px] text-slate-deep">
+                <span className="font-medium text-black">{i.candidateName}</span>
+                <span className="text-[11px] text-black">
                   {STAGE_LABELS[i.stage] ?? i.stage}
                 </span>
                 {i.jdTitle && (
-                  <span className="text-[11px] text-slate-mid">
+                  <span className="text-[11px] text-gray">
                     · {i.jdTitle}
                   </span>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="font-mono text-[11px] text-slate-deep">
+                <span className="font-mono text-[11px] text-black">
                   {start.toLocaleString("en-GB", {
                     timeZone: "Asia/Bangkok",
                     hour12: false,
@@ -405,7 +405,7 @@ function InterviewsList({
                     minute: "2-digit",
                   })}
                 </span>
-                <span className="text-[11px] text-slate-mid">
+                <span className="text-[11px] text-gray">
                   {durationMin} min
                 </span>
                 {i.meetUrl && (
@@ -414,7 +414,7 @@ function InterviewsList({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[11px] font-medium text-terracotta-700 underline-offset-4 hover:underline"
+                    className="text-[11px] font-medium text-black underline-offset-4 hover:underline"
                   >
                     Meet
                   </a>
@@ -689,7 +689,7 @@ function CalendarWithContextMenu({
       <div
         ref={wrapperRef}
         data-view={currentView}
-        className="overflow-hidden rounded-lg border border-sand-200 bg-warm-white"
+        className="overflow-hidden rounded-lg border border-soft-gray bg-white"
       >
         <ScheduleXCalendar calendarApp={calendarApp} />
       </div>
@@ -706,9 +706,9 @@ function CalendarWithContextMenu({
             top: Math.min(menu.y, window.innerHeight - 100),
             zIndex: 50,
           }}
-          className="overflow-hidden rounded-md border border-sand-200 bg-warm-white shadow-md"
+          className="overflow-hidden rounded-md border border-soft-gray bg-white shadow-md"
         >
-          <div className="border-b border-sand-100 px-3 py-2 text-[11px] text-slate-mid">
+          <div className="border-b border-off-white px-3 py-2 text-[11px] text-gray">
             {menu.interview.candidateName}
           </div>
           <button
@@ -718,7 +718,7 @@ function CalendarWithContextMenu({
               setMenu(null);
             }}
             disabled={menu.interview.status === "cancelled"}
-            className="block w-full px-3 py-2 text-left text-sm text-navy hover:bg-cream disabled:cursor-not-allowed disabled:opacity-50"
+            className="block w-full px-3 py-2 text-left text-sm text-black hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Reschedule…
           </button>
@@ -745,7 +745,7 @@ function CalendarWithContextMenu({
             <DialogTitle>Reschedule interview</DialogTitle>
             <DialogDescription>
               Updates the Google Calendar event for{" "}
-              <span className="font-medium text-navy">
+              <span className="font-medium text-black">
                 {reschedule?.candidateName}
               </span>
               . Attendees receive an &ldquo;Event updated&rdquo; email.
@@ -755,7 +755,7 @@ function CalendarWithContextMenu({
             <div className="space-y-1.5">
               <Label
                 htmlFor="cal-resched-when"
-                className="text-xs text-slate-deep"
+                className="text-xs text-black"
               >
                 New date &amp; time
               </Label>
@@ -765,13 +765,13 @@ function CalendarWithContextMenu({
                 step={900}
                 value={whenAt}
                 onChange={(e) => setWhenAt(e.target.value)}
-                className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+                className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
               />
             </div>
             <div className="space-y-1.5">
               <Label
                 htmlFor="cal-resched-duration"
-                className="text-xs text-slate-deep"
+                className="text-xs text-black"
               >
                 Duration
               </Label>
@@ -779,7 +779,7 @@ function CalendarWithContextMenu({
                 id="cal-resched-duration"
                 value={durationMin}
                 onChange={(e) => setDurationMin(Number(e.target.value))}
-                className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+                className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
               >
                 {DURATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -818,7 +818,7 @@ function CalendarWithContextMenu({
             <DialogTitle>Cancel this interview?</DialogTitle>
             <DialogDescription>
               The Google Calendar event will be cancelled and{" "}
-              <span className="font-medium text-navy">
+              <span className="font-medium text-black">
                 {cancelling?.candidateName}
               </span>{" "}
               will receive the standard cancellation email.

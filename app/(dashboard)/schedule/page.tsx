@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -69,10 +69,10 @@ export default async function SchedulePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-medium text-navy">
+          <h1 className="font-display text-3xl font-medium text-black">
             Schedule
           </h1>
-          <p className="mt-1 text-sm text-charcoal">
+          <p className="mt-1 text-sm text-black">
             All scheduled interviews. Toggle between calendar and list to scan
             availability or drill into details.
           </p>

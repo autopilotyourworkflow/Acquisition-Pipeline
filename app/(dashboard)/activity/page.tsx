@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { ActivityList, type ActivityRow } from "./activity-list.client";
 
 export const metadata = { title: "Activity · Acquisition" };
@@ -17,8 +17,8 @@ export default async function ActivityPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-medium text-navy">Activity</h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <h1 className="font-display text-3xl font-medium text-black">Activity</h1>
+        <p className="mt-1 text-sm text-black">
           Every mutation that flows through <code className="font-mono text-xs">withAudit()</code> lands here.
           Undo reverts the row to its <code className="font-mono text-xs">before</code> state, any age.
           Conflict detection (warn before clobbering downstream edits) lands in Day 4.
@@ -30,9 +30,9 @@ export default async function ActivityPage() {
           <p className="font-mono">{error.message}</p>
         </div>
       ) : !data || data.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-sand-200 bg-cream/40 p-12 text-center">
-          <p className="font-display text-xl text-navy">No activity yet</p>
-          <p className="mt-2 text-sm text-charcoal">
+        <div className="rounded-lg border border-dashed border-soft-gray bg-white/40 p-12 text-center">
+          <p className="font-display text-xl text-black">No activity yet</p>
+          <p className="mt-2 text-sm text-black">
             Add a candidate or drag a card — the action will appear here.
           </p>
         </div>

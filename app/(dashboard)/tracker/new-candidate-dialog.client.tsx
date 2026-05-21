@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -75,10 +75,10 @@ export function NewCandidateDialog({ jds }: { jds: JdRow[] }) {
       <DialogTrigger asChild>
         <Button>+ New candidate</Button>
       </DialogTrigger>
-      <DialogContent className="bg-warm-white sm:max-w-lg">
+      <DialogContent className="bg-white sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-navy">New candidate</DialogTitle>
-          <DialogDescription className="text-charcoal">
+          <DialogTitle className="font-display text-black">New candidate</DialogTitle>
+          <DialogDescription className="text-black">
             Manual entry. For Day 3, the Scraper module will populate this
             automatically from LinkedIn / paste / PDF / screenshot.
           </DialogDescription>
@@ -132,7 +132,7 @@ export function NewCandidateDialog({ jds }: { jds: JdRow[] }) {
               id="jd_id"
               value={form.jd_id}
               onChange={(e) => setForm({ ...form, jd_id: e.target.value })}
-              className="h-9 w-full rounded-md border border-sand-200 bg-warm-white px-3 text-sm text-navy"
+              className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
             >
               <option value="">— Unassigned —</option>
               {jds.map((j) => (
@@ -181,7 +181,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs text-slate-deep">
+      <Label htmlFor={id} className="text-xs text-black">
         {label}
       </Label>
       {children}

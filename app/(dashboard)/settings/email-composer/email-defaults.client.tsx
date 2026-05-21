@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -107,8 +107,8 @@ export function EmailDefaultsPanel({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="font-display text-xl text-navy">Email defaults</h2>
-        <p className="mt-1 text-sm text-charcoal">
+        <h2 className="font-display text-xl text-black">Email defaults</h2>
+        <p className="mt-1 text-sm text-black">
           Used by the &quot;Draft cold email&quot; button on candidate pages.
           Your signature is appended automatically when a draft is sent.
           Gmail uses your account&apos;s real email as the sender — the From
@@ -116,9 +116,9 @@ export function EmailDefaultsPanel({
         </p>
       </div>
 
-      <div className="space-y-4 rounded-md border border-sand-200 bg-warm-white px-4 py-3">
+      <div className="space-y-4 rounded-md border border-soft-gray bg-white px-4 py-3">
         <div>
-          <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+          <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
             From name
           </label>
           <Input
@@ -128,7 +128,7 @@ export function EmailDefaultsPanel({
             disabled={pending}
             maxLength={120}
           />
-          <p className="mt-1 text-[11px] text-slate-mid">
+          <p className="mt-1 text-[11px] text-gray">
             Shown in the recipient&apos;s inbox as the sender name. Leave blank
             to use whatever name Gmail has for your account.
           </p>
@@ -136,7 +136,7 @@ export function EmailDefaultsPanel({
 
         <div>
           <div className="mb-1 flex items-baseline justify-between gap-2">
-            <label className="block text-[11px] uppercase tracking-wide text-slate-deep">
+            <label className="block text-[11px] uppercase tracking-wide text-black">
               Signature{" "}
               {signatureIsHtml && (
                 <span className="rounded-sm bg-info/10 px-1 py-0.5 font-mono text-[9px] text-info">
@@ -151,7 +151,7 @@ export function EmailDefaultsPanel({
                 if (!fromName.trim()) setFromName(HOTEL_PLUS_FROM_NAME_PRESET);
               }}
               disabled={pending}
-              className="text-[11px] text-terracotta-700 underline-offset-2 hover:underline disabled:opacity-50"
+              className="text-[11px] text-black underline-offset-2 hover:underline disabled:opacity-50"
             >
               Insert Hotel Plus default →
             </button>
@@ -165,7 +165,7 @@ export function EmailDefaultsPanel({
             maxLength={6000}
             className="font-mono text-xs leading-relaxed"
           />
-          <p className="mt-1 text-[11px] text-slate-mid">
+          <p className="mt-1 text-[11px] text-gray">
             Accepts plain text OR HTML. The &quot;Insert Hotel Plus
             default&quot; preset is HTML — gives you the H+ logo block + orange
             divider + linked contact info. Plain text also works (newlines
@@ -174,11 +174,11 @@ export function EmailDefaultsPanel({
         </div>
 
         {signatureIsHtml && (
-          <div className="rounded-md border border-sand-200 bg-cream/40">
+          <div className="rounded-md border border-soft-gray bg-white/40">
             <button
               type="button"
               onClick={() => setPreviewOpen((v) => !v)}
-              className="flex w-full items-center justify-between border-b border-sand-200 px-3 py-2 text-left text-[11px] uppercase tracking-wide text-slate-deep hover:bg-cream/60"
+              className="flex w-full items-center justify-between border-b border-soft-gray px-3 py-2 text-left text-[11px] uppercase tracking-wide text-black hover:bg-white/60"
             >
               <span>Preview</span>
               <span>{previewOpen ? "Hide ▴" : "Show ▾"}</span>
@@ -197,13 +197,13 @@ export function EmailDefaultsPanel({
         )}
 
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[11px] text-slate-mid">
+          <div className="text-[11px] text-gray">
             {hasSavedSignature || hasSavedFromName ? (
               <span className="inline-flex items-center gap-1.5 rounded-sm bg-success/10 px-2 py-1 font-medium text-success">
                 <span aria-hidden>✓</span> Saved
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-sm bg-sand-200/40 px-2 py-1 font-medium text-slate-deep">
+              <span className="inline-flex items-center gap-1.5 rounded-sm bg-soft-gray/40 px-2 py-1 font-medium text-black">
                 Not configured
               </span>
             )}

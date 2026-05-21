@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -382,12 +382,12 @@ export function ColdEmailDialog(props: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-2xl">
         {/* Sticky header */}
-        <DialogHeader className="shrink-0 border-b border-sand-200 px-6 pb-4 pt-6 text-left">
+        <DialogHeader className="shrink-0 border-b border-soft-gray px-6 pb-4 pt-6 text-left">
           <DialogTitle>Draft cold email</DialogTitle>
           <DialogDescription>
-            To <span className="font-medium text-navy">{candidate.full_name}</span>{" "}
+            To <span className="font-medium text-black">{candidate.full_name}</span>{" "}
             &lt;{candidate.email}&gt; · for{" "}
-            <span className="font-medium text-navy">{jdTitle}</span>
+            <span className="font-medium text-black">{jdTitle}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -398,7 +398,7 @@ export function ColdEmailDialog(props: Props) {
         {/* Model + Language pickers */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
               Model
             </label>
             <select
@@ -415,7 +415,7 @@ export function ColdEmailDialog(props: Props) {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
               Language
             </label>
             <select
@@ -435,44 +435,44 @@ export function ColdEmailDialog(props: Props) {
 
         {/* History panel — only visible if there's history */}
         {pastEmails.length > 0 && (
-          <div className="rounded-md border border-sand-200 bg-cream/40">
+          <div className="rounded-md border border-soft-gray bg-white/40">
             <button
               type="button"
               onClick={() => setShowHistory((v) => !v)}
-              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-navy hover:bg-cream/60"
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-black hover:bg-white/60"
             >
               <span>
                 Past drafts &amp; sends{" "}
-                <span className="font-mono text-[10px] text-slate-deep">
+                <span className="font-mono text-[10px] text-black">
                   ({pastEmails.length})
                 </span>
               </span>
-              <span className="text-xs text-slate-deep">
+              <span className="text-xs text-black">
                 {showHistory ? "Hide ▴" : "Show ▾"}
               </span>
             </button>
             {showHistory && (
-              <ul className="max-h-48 overflow-y-auto border-t border-sand-200">
+              <ul className="max-h-48 overflow-y-auto border-t border-soft-gray">
                 {pastEmails.map((p) => (
                   <li key={p.id}>
                     <button
                       type="button"
                       onClick={() => handleLoadPast(p)}
-                      className="flex w-full items-start justify-between gap-3 border-b border-sand-100 px-3 py-2 text-left text-xs hover:bg-cream/60"
+                      className="flex w-full items-start justify-between gap-3 border-b border-off-white px-3 py-2 text-left text-xs hover:bg-white/60"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <StatusChip status={p.status} />
-                          <span className="truncate font-medium text-navy">
+                          <span className="truncate font-medium text-black">
                             {p.subject || "(no subject)"}
                           </span>
                         </div>
-                        <p className="mt-0.5 line-clamp-2 text-slate-deep">
+                        <p className="mt-0.5 line-clamp-2 text-black">
                           {p.body_markdown.slice(0, 160)}
                           {p.body_markdown.length > 160 && "…"}
                         </p>
                       </div>
-                      <span className="shrink-0 font-mono text-[10px] text-slate-mid">
+                      <span className="shrink-0 font-mono text-[10px] text-gray">
                         {new Date(p.created_at).toLocaleString("en-GB", {
                           timeZone: "Asia/Bangkok",
                           hour12: false,
@@ -492,8 +492,8 @@ export function ColdEmailDialog(props: Props) {
 
         {/* Main pane */}
         {isAwaiting && (
-          <div className="space-y-3 rounded-md border border-dashed border-sand-200 bg-cream/40 p-5 text-center">
-            <p className="text-sm text-charcoal">
+          <div className="space-y-3 rounded-md border border-dashed border-soft-gray bg-white/40 p-5 text-center">
+            <p className="text-sm text-black">
               Pick a past draft above, or draft a fresh one with the current
               model + language.
             </p>
@@ -538,7 +538,7 @@ export function ColdEmailDialog(props: Props) {
         {/* /scrollable middle */}
 
         {/* Sticky footer */}
-        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-sand-200 bg-warm-white px-6 py-4 sm:flex-row sm:justify-end sm:gap-2">
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-soft-gray bg-white px-6 py-4 sm:flex-row sm:justify-end sm:gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -577,36 +577,36 @@ function StreamingPane({
 }) {
   const hasAny = partialSubject.length > 0 || partialBody.length > 0;
   return (
-    <div className="space-y-3 rounded-md border border-dashed border-sand-200 bg-cream/40 p-4">
+    <div className="space-y-3 rounded-md border border-dashed border-soft-gray bg-white/40 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-info" />
-          <p className="text-sm font-medium text-navy">
+          <p className="text-sm font-medium text-black">
             {model === "claude-opus-4-7" ? "Opus 4.7" : "Haiku 4.5"} is
             drafting…
           </p>
         </div>
       </div>
       {!hasAny ? (
-        <p className="text-xs text-slate-mid">
+        <p className="text-xs text-gray">
           Waiting for the first token. Usually 2-4 seconds.
         </p>
       ) : (
         <div className="space-y-3">
           <div>
-            <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-deep">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-black">
               Subject
             </p>
-            <p className="rounded-sm bg-warm-white px-3 py-2 text-sm text-navy">
-              {partialSubject || <span className="text-slate-mid">…</span>}
+            <p className="rounded-sm bg-white px-3 py-2 text-sm text-black">
+              {partialSubject || <span className="text-gray">…</span>}
             </p>
           </div>
           <div>
-            <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-deep">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-black">
               Body
             </p>
-            <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-sm bg-warm-white px-3 py-2 font-sans text-sm text-charcoal">
-              {partialBody || <span className="text-slate-mid">…</span>}
+            <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-sm bg-white px-3 py-2 font-sans text-sm text-black">
+              {partialBody || <span className="text-gray">…</span>}
             </pre>
           </div>
         </div>
@@ -635,7 +635,7 @@ function EditablePane({
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+        <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
           Subject
         </label>
         <Input
@@ -646,7 +646,7 @@ function EditablePane({
         />
       </div>
       <div>
-        <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-deep">
+        <label className="mb-1 block text-[11px] uppercase tracking-wide text-black">
           Body
         </label>
         <Textarea
@@ -657,7 +657,7 @@ function EditablePane({
           disabled={sending}
           className="font-sans text-sm leading-relaxed"
         />
-        <p className="mt-1 text-[10px] text-slate-mid">
+        <p className="mt-1 text-[10px] text-gray">
           Edits stay client-side until you click Send.
         </p>
       </div>
@@ -666,17 +666,17 @@ function EditablePane({
           HTML when the saved signature is HTML so the H+ logo block +
           divider preview accurately. Plain text falls back to <pre>. */}
       {signature ? (
-        <div className="rounded-md border border-sand-200 bg-cream/40">
-          <div className="flex items-center justify-between border-b border-sand-200 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-wide text-slate-deep">
+        <div className="rounded-md border border-soft-gray bg-white/40">
+          <div className="flex items-center justify-between border-b border-soft-gray px-3 py-2">
+            <p className="text-[11px] uppercase tracking-wide text-black">
               Signature{" "}
-              <span className="text-slate-mid normal-case">
+              <span className="text-gray normal-case">
                 · appended automatically
               </span>
             </p>
             <Link
               href="/settings/email-composer"
-              className="text-[11px] text-terracotta-700 underline-offset-2 hover:underline"
+              className="text-[11px] text-black underline-offset-2 hover:underline"
             >
               Edit →
             </Link>
@@ -687,19 +687,19 @@ function EditablePane({
               <div dangerouslySetInnerHTML={{ __html: signature }} />
             </div>
           ) : (
-            <pre className="whitespace-pre-wrap px-3 py-2 font-sans text-xs leading-relaxed text-charcoal">
+            <pre className="whitespace-pre-wrap px-3 py-2 font-sans text-xs leading-relaxed text-black">
               {signature}
             </pre>
           )}
         </div>
       ) : (
-        <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-charcoal">
+        <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-black">
           <p>
             <strong>No signature configured.</strong> The email will go out
             with just the body. Set one up at{" "}
             <Link
               href="/settings/email-composer"
-              className="text-terracotta-700 underline-offset-2 hover:underline"
+              className="text-black underline-offset-2 hover:underline"
             >
               Settings → Email composer
             </Link>
@@ -709,11 +709,11 @@ function EditablePane({
       )}
 
       {rationale && (
-        <details className="rounded-md border border-sand-200 bg-cream/40">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-navy">
+        <details className="rounded-md border border-soft-gray bg-white/40">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-black">
             Why this hook (Claude&apos;s rationale)
           </summary>
-          <p className="border-t border-sand-200 px-3 py-2 text-xs text-charcoal">
+          <p className="border-t border-soft-gray px-3 py-2 text-xs text-black">
             {rationale}
           </p>
         </details>
@@ -724,7 +724,7 @@ function EditablePane({
 
 function StatusChip({ status }: { status: PastEmail["status"] }) {
   const styles: Record<PastEmail["status"], string> = {
-    drafted: "bg-sand-100 text-charcoal",
+    drafted: "bg-off-white text-black",
     sent: "bg-success/10 text-success",
     failed: "bg-danger/15 text-danger",
     discarded: "bg-warning/15 text-warning",

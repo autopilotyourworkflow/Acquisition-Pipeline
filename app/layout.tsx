@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Montserrat } from "next/font/google";
 import "./globals.css";
 
@@ -35,7 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${montserrat.variable} ${inter.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-cream text-charcoal flex flex-col">
+      <body className="min-h-full bg-white text-black flex flex-col">
         {children}
       </body>
     </html>

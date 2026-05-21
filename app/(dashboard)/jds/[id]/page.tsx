@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { JdEditor } from "../jd-editor.client";
 import { SourceCandidatesDialog } from "./source-dialog.client";
@@ -27,8 +27,8 @@ export default async function EditJdPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-medium text-navy">Edit JD</h1>
-          <p className="mt-1 text-sm text-charcoal">
+          <h1 className="font-display text-3xl font-medium text-black">Edit JD</h1>
+          <p className="mt-1 text-sm text-black">
             Updating must-haves or the threshold will affect future scoring runs;
             existing scores keep their original `prompt_version` for traceability.
           </p>

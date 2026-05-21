@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+﻿import { createAdminClient } from "@/lib/supabase/admin";
 import { SOURCING_PLATFORM_LABELS } from "@/lib/sourcing/types";
 import type { SourcingPlatform } from "@/lib/sourcing/types";
 
@@ -30,34 +30,34 @@ export async function SourcingHistory({ jdId }: { jdId: string }) {
   const rows = (runs ?? []) as SourcingRunRow[];
 
   return (
-    <section className="rounded-lg border border-sand-200 bg-warm-white p-6">
-      <h2 className="font-display text-lg text-navy">Recent sourcing runs</h2>
-      <p className="mt-1 text-xs text-slate-deep">
+    <section className="rounded-lg border border-soft-gray bg-white p-6">
+      <h2 className="font-display text-lg text-black">Recent sourcing runs</h2>
+      <p className="mt-1 text-xs text-black">
         Last 5 outbound runs against this JD.
       </p>
       {rows.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-mid">
+        <p className="mt-4 text-sm text-gray">
           No sourcing runs yet. Click <em>Find candidates for this JD</em> to
           start one.
         </p>
       ) : (
-        <ul className="mt-4 divide-y divide-sand-100">
+        <ul className="mt-4 divide-y divide-off-white">
           {rows.map((r) => (
             <li key={r.id} className="py-3 text-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="font-mono text-xs text-slate-deep">
+                  <span className="font-mono text-xs text-black">
                     {new Date(r.started_at).toLocaleString("en-GB", {
                       timeZone: "Asia/Bangkok",
                       hour12: false,
                     })}
                   </span>
-                  <span className="text-charcoal">
+                  <span className="text-black">
                     {r.platforms.map((p) => SOURCING_PLATFORM_LABELS[p]).join(", ")}
                   </span>
                   <StatusPill status={r.status} />
                 </div>
-                <div className="text-xs text-slate-deep font-mono">
+                <div className="text-xs text-black font-mono">
                   {r.n_found}/{r.n_requested} found · ${Number(r.cost_usd).toFixed(2)}
                 </div>
               </div>

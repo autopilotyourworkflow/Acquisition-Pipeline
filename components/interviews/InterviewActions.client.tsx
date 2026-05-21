@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -207,7 +207,7 @@ export function InterviewActions({
           </DialogHeader>
           <form onSubmit={handleReschedule} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="resched-when" className="text-xs text-slate-deep">
+              <Label htmlFor="resched-when" className="text-xs text-black">
                 New date &amp; time
               </Label>
               <input
@@ -216,13 +216,13 @@ export function InterviewActions({
                 step={900}
                 value={whenAt}
                 onChange={(e) => setWhenAt(e.target.value)}
-                className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+                className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
               />
             </div>
             <div className="space-y-1.5">
               <Label
                 htmlFor="resched-duration"
-                className="text-xs text-slate-deep"
+                className="text-xs text-black"
               >
                 Duration
               </Label>
@@ -230,7 +230,7 @@ export function InterviewActions({
                 id="resched-duration"
                 value={durationMin}
                 onChange={(e) => setDurationMin(Number(e.target.value))}
-                className="h-9 w-full rounded-md border border-sand-200 bg-cream px-3 text-sm text-navy"
+                className="h-9 w-full rounded-md border border-soft-gray bg-white px-3 text-sm text-black"
               >
                 {DURATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -242,7 +242,7 @@ export function InterviewActions({
             <div className="space-y-1.5">
               <Label
                 htmlFor="resched-notes"
-                className="text-xs text-slate-deep"
+                className="text-xs text-black"
               >
                 Optional notes
               </Label>
@@ -252,7 +252,7 @@ export function InterviewActions({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add context the candidate should see…"
                 rows={2}
-                className="w-full rounded-md border border-sand-200 bg-cream px-3 py-2 text-sm text-navy"
+                className="w-full rounded-md border border-soft-gray bg-white px-3 py-2 text-sm text-black"
               />
             </div>
             <ConflictWarning conflicts={conflicts} checking={checking} />
@@ -279,7 +279,7 @@ export function InterviewActions({
             <DialogTitle>Cancel this interview?</DialogTitle>
             <DialogDescription>
               The Google Calendar event will be canceled and{" "}
-              <span className="font-medium text-navy">{candidateName}</span>{" "}
+              <span className="font-medium text-black">{candidateName}</span>{" "}
               will receive the standard cancellation email. The interview row
               stays on file (marked &ldquo;canceled&rdquo;) for audit.
             </DialogDescription>

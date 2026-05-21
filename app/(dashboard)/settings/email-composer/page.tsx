@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -31,14 +31,14 @@ export default async function EmailComposerPage() {
       <div>
         <Link
           href="/settings"
-          className="text-xs text-slate-deep underline-offset-4 hover:underline"
+          className="text-xs text-black underline-offset-4 hover:underline"
         >
           ← Back to settings
         </Link>
-        <h1 className="mt-2 font-display text-3xl font-medium text-navy">
+        <h1 className="mt-2 font-display text-3xl font-medium text-black">
           Email composer
         </h1>
-        <p className="mt-1 text-sm text-charcoal">
+        <p className="mt-1 text-sm text-black">
           Defaults applied to every cold-outreach email sent from this
           account. Gmail still uses your real account as the sender —
           these just control how recipients see the message.
