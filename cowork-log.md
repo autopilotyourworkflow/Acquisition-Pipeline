@@ -821,6 +821,22 @@ The marketing root itself went through three iterations in one chat — first th
 
 ---
 
-*46 cowork-log entries. Redesign Phases 0–3 shipped; landing page rewritten as premium minimal; auth round-trip deduped + tracker/JDs selects trimmed + Schedule google-sync deferred to `after()`. Phase 4 (page-by-page polish) and Phase 5 (favicon, brand finish) are nice-to-haves before tomorrow's 13:00 Bangkok submission; final-phase reviewer-access + secrets audit are the must-do items.*
+## 47. The SOP is a corpus first, a page second
+
+Beam asked for "a full, extensive SOP for the HR user — easy to read, easy to follow, and droppable into an AI chat for Q&A." Three jobs in one sentence: a runbook to read once, a reference to look up, and a corpus to feed to a model. Most docs pages pick one and accidentally fail at the others.
+
+The naïve build is Markdown-rendered-as-HTML — fine for reading, useless as a corpus (the AI can't fetch the rendered page back as clean text without scraping HTML noise). The other naïve build is a raw `.md` URL — fine for the AI, hostile to the human eye. The move that mattered was to write the SOP once as structured data (`SopSection[]`) and render it two ways: a styled page for humans, a serialized Markdown string for clipboard. One source of truth. The "Copy as Markdown" button copies the same content the page displays. Drift is impossible by construction.
+
+The corpus framing changed the content shape too. Each chapter ends in a yellow-tinted "Common mistakes" callout — a section a typical HR runbook would banish to a separate FAQ at the back. But the AI-Q&A use case rewards explicit failure-mode coverage: "what's wrong with X?" is the second-most-asked category after "how do I X?". Putting the mistakes inline against the procedure means the model has the right context adjacent to the right steps. The page reads as a runbook; the corpus performs as Q&A.
+
+Twelve chapters, twelve "Common mistakes" boxes, one glossary, one intro callout teaching the AI-drop pattern, a sticky TOC with `IntersectionObserver` scroll-spy on desktop and a `<details>` collapse on mobile. Public route at `/sop` with one line of middleware allowlist. A "Help" link in the dashboard nav opens it in a new tab so HR never loses their place inside the app.
+
+The smallest detail that surprised me was the deep-linking. Every section gets `id="chapter-N"` and `scroll-mt-24` so the sticky yellow nav doesn't eat the anchor target. The reviewer who skims one section gets the right content with the right offset and a TOC that lights up around them as they scroll. Twelve lines of CSS that turn a long page into a navigable document.
+
+**Write for the read path, the lookup path, and the model path at the same time. The structure that satisfies all three is structured data with two renderers.**
+
+---
+
+*47 cowork-log entries. Redesign Phases 0–3 shipped; landing page rewritten as premium minimal; auth round-trip deduped + tracker/JDs selects trimmed + Schedule google-sync deferred to `after()`. Public HR SOP shipped at `/sop` with Copy-as-Markdown for the AI-Q&A use case. Phase 4 (page-by-page polish) and Phase 5 (favicon, brand finish) are nice-to-haves before tomorrow's 13:00 Bangkok submission; final-phase reviewer-access + secrets audit are the must-do items.*
 
 ---
