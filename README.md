@@ -23,6 +23,56 @@ Plus overdelivery: cold-outreach email composer (Gmail send, streaming Claude dr
 
 ---
 
+## Demo videos
+
+- **Required modules — Modules 1–4** (~3 min) — [https://youtu.be/_T6t36yOKG4](https://youtu.be/_T6t36yOKG4)
+  Scraper → Screener → Tracker → Scheduler, end-to-end.
+- **Overdelivery — Modules 5–7** — [https://youtu.be/VpBGl11wIFo](https://youtu.be/VpBGl11wIFo)
+  Cold-outreach email composer (5), LinkedIn sourcing (6), and a public-facing HR SOP page (7) — built as a gift to Hotel Plus regardless of hire outcome.
+
+---
+
+## For reviewers
+
+Quickest path to seeing it work:
+
+1. Open the **live URL**: [acq.autopilotyourworkflow.com](https://acq.autopilotyourworkflow.com)
+2. **Sign in.** Two paths:
+   - *Email OTP* (works for any email) — enter your address, get a code, done.
+   - *Google OAuth* — the project is in Google's Testing mode. The following emails are pre-allowlisted as test users:
+     - a.prabt@gmail.com
+     - career@hotelplus.asia
+     - datapoints@hotelplus.asia
+     - parich.phew@gmail.com
+
+   If your address isn't here, use the OTP path or email me to be added.
+3. **First user becomes owner** automatically. You'll land on the dashboard.
+4. **Suggested 5-minute tour:**
+   1. `/jds` — open a JD (the seed includes "Full Stack Developer")
+   2. `/scraper` — paste a CV, watch it normalize via Claude → save
+   3. `/screener` — score the saved candidate against the JD (3-axis Opus + streaming)
+   4. `/tracker` — drag the candidate across stages (every move is audit-logged + undoable)
+   5. `/schedule/new` — book an interview (Google Calendar event + Hotel Plus invite + conflict warning)
+5. **Code tour:** the three "spine" files are [`lib/audit/wrap.ts`](lib/audit/wrap.ts), [`lib/anthropic/client.ts`](lib/anthropic/client.ts), and [`lib/scrape/normalize.ts`](lib/scrape/normalize.ts). Everything else composes against these.
+6. **Cowork log:** [`cowork-log.md`](cowork-log.md) is the AI-collaboration deliverable. Start with entries #1, #6, #20, #40 for prompt-engineering decisions; #45–47 for the redesign + SOP work.
+
+---
+
+## Rubric scorecard
+
+Where each grading criterion lives in the code.
+
+| Criterion (weight) | Where to look | Notes |
+|---|---|---|
+| **Feature Completeness (30%)** — 4 modules working | Modules table above + [`app/(dashboard)`](app/(dashboard)/) routes | 4/4 shipped + 3 overdelivery (cold email, sourcing, public SOP) |
+| **Code Quality & Architecture (30%)** | The 7 architecture decisions below + the three spine files | Strict TS, single mutation spine, single Claude client, zod-schema-as-contract, RLS-by-default |
+| **UX & Usability (25%)** | Live URL + the 5-minute tour above | Hotel Plus brand applied (yellow/black/white), Kanban + Schedule-X calendar, streaming score UI, editable preview before save |
+| **AI Integration (15%)** | [`lib/anthropic/`](lib/anthropic/) (tools + prompts + client) + [`cowork-log.md`](cowork-log.md) entries on prompt iteration | Tool-use forcing everywhere (no free-form JSON parsing), per-JD persona override, prompt caching on JD body, cost telemetry per call |
+| **Cowork Log (Bonus)** | [`cowork-log.md`](cowork-log.md) | 46 first-person entries across the 5-day build |
+| **Live URL (Bonus)** | [acq.autopilotyourworkflow.com](https://acq.autopilotyourworkflow.com) | Vercel + Cloudflare DNS |
+
+---
+
 ## Tech stack
 
 - **Next.js 16** (App Router, Server Components, Server Actions, Turbopack)
@@ -175,7 +225,6 @@ components/
 
 docs/
   redesign/design.md         Locked Hotel Plus brand spec
-  phase-*.md                 Per-phase handoff prompts (build history)
 
 supabase/migrations/         11 SQL migrations, applied in order
 ```
@@ -202,7 +251,6 @@ The **bookmarklet** at `/settings/capture` is shipped and working — drag it to
 | [`README.md`](README.md) | This file. |
 | [`ASSIGNMENT.md`](ASSIGNMENT.md) | The original Hotel Plus brief, kept verbatim for reference. |
 | [`cowork-log.md`](cowork-log.md) | The Cowork Log deliverable. 46 first-person entries on what got built, why, and what didn't. |
-| `AGENTS.md` + `CLAUDE.md` | **Not part of the application.** Internal docs for AI pair-programming (Claude Code). `CLAUDE.md` is auto-loaded by the AI tool; `AGENTS.md` holds the project context the AI needs to be useful inside this repo. Safe to ignore for review purposes. |
 
 ---
 
@@ -212,4 +260,4 @@ For an architectural sense: [`lib/audit/wrap.ts`](lib/audit/wrap.ts) (the audit 
 
 For the narrative behind the build: [`cowork-log.md`](cowork-log.md) — 46 first-person entries spanning the 5 days. Entry #45 is a frank pre-redesign audit ("what shipped, what's worth keeping, what's worth a second pass"); entry #46 covers the visual rebrand and the perf wins that surfaced along the way.
 
-For the rubric mapping: [`AGENTS.md`](AGENTS.md) maps each rubric module to its implementation location and status.
+For the rubric mapping: see the **Rubric scorecard** table near the top of this README.

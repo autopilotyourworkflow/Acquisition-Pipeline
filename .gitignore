@@ -41,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Internal AI-pair-programming docs (kept on local disk, not committed)
+/AGENTS.md
+/CLAUDE.md
+/docs/phase-*.md
+/docs/planning-*.md
+/docs/pre-phase-*.md
