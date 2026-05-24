@@ -17,6 +17,7 @@ type KeyStatus = {
   proxycurlUpdatedAt: string | null;
   apifySaved: boolean;
   apifyUpdatedAt: string | null;
+  apifySystemDefault: boolean;
 };
 
 export function ApiKeysPanel({ status }: { status: KeyStatus }) {
@@ -35,6 +36,7 @@ export function ApiKeysPanel({ status }: { status: KeyStatus }) {
         description="LinkedIn outbound sourcing (JD → 'Find candidates' dialog). Free $5/month credit covers most demos. Token from apify.com → Settings → Integrations → API."
         saved={status.apifySaved}
         updatedAt={status.apifyUpdatedAt}
+        systemDefault={status.apifySystemDefault}
         getKeyHref="https://console.apify.com/account/integrations"
         onSave={(v) => saveApifyToken({ value: v })}
         onClear={() => clearApifyToken()}
@@ -58,6 +60,7 @@ function KeyRow({
   description,
   saved,
   updatedAt,
+  systemDefault = false,
   getKeyHref,
   onSave,
   onClear,
@@ -66,6 +69,7 @@ function KeyRow({
   description: string;
   saved: boolean;
   updatedAt: string | null;
+  systemDefault?: boolean;
   getKeyHref: string;
   onSave: (v: string) => Promise<{ ok: boolean; error?: string }>;
   onClear: () => Promise<{ ok: boolean; error?: string }>;
@@ -123,7 +127,7 @@ function KeyRow({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {saved ? (
           <span className="inline-flex items-center gap-1.5 rounded-sm bg-success/10 px-2 py-1 text-xs font-medium text-success">
             <span aria-hidden>✓</span> Saved
@@ -136,12 +140,28 @@ function KeyRow({
               </span>
             )}
           </span>
+        ) : systemDefault ? (
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-yellow/30 px-2 py-1 text-xs font-medium text-black">
+            <span aria-hidden>✓</span> System default in use
+          </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 rounded-sm bg-soft-gray/40 px-2 py-1 text-xs font-medium text-black">
             Not configured
           </span>
         )}
+        {systemDefault && saved && (
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-yellow/20 px-2 py-1 text-[10px] font-medium text-black">
+            System default also available
+          </span>
+        )}
       </div>
+      {systemDefault && !saved && (
+        <p className="mt-2 text-[11px] text-gray">
+          A workspace-level key is configured so outbound sourcing works for
+          you without pasting your own. Paste a personal key only if you want
+          runs billed to your Apify account instead.
+        </p>
+      )}
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <Input

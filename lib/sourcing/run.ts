@@ -113,8 +113,17 @@ export async function* runSourcing(
       .eq("user_id", req.userId)
       .maybeSingle();
 
-    const apifyToken = decryptIfPresent(settings?.apify_api_token_encrypted);
-    const serpapiKey = decryptIfPresent(settings?.serpapi_key_encrypted);
+    // Per-user key wins; fall back to a system-level env var so a
+    // reviewer-mode user (guest, fresh signup, etc.) can still test
+    // outbound sourcing without having to bring their own Apify account.
+    const apifyToken =
+      decryptIfPresent(settings?.apify_api_token_encrypted) ??
+      process.env.APIFY_API_TOKEN ??
+      null;
+    const serpapiKey =
+      decryptIfPresent(settings?.serpapi_key_encrypted) ??
+      process.env.SERPAPI_API_KEY ??
+      null;
 
     // 4. Split N across enabled platforms (LinkedIn + JobsDB participate;
     // the stubs return [] but we still emit provider_started/done for

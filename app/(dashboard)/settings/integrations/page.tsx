@@ -87,6 +87,7 @@ export default async function IntegrationsPage() {
     apifyUpdatedAt: settingsRow?.updated_at
       ? (settingsRow.updated_at as string)
       : null,
+    apifySystemDefault: Boolean(process.env.APIFY_API_TOKEN),
   };
 
   return (
