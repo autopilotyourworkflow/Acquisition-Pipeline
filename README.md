@@ -37,15 +37,16 @@ Plus overdelivery: cold-outreach email composer (Gmail send, streaming Claude dr
 Quickest path to seeing it work:
 
 1. Open the **live URL**: [acq.autopilotyourworkflow.com](https://acq.autopilotyourworkflow.com)
-2. **Sign in.** Two paths:
-   - *Email OTP* (works for any email) — enter your address, get a code, done.
+2. **Sign in.** Three paths, fastest first:
+   - **Continue as guest** (recommended for review) — one click, anonymous Supabase session, full access to all features except Calendar/Gmail (those need real Google scopes).
    - *Google OAuth* — the project is in Google's Testing mode. The following emails are pre-allowlisted as test users:
      - a.prabt@gmail.com
      - career@hotelplus.asia
      - datapoints@hotelplus.asia
      - parich.phew@gmail.com
 
-   If your address isn't here, use the OTP path or email me to be added.
+     Use this path if you want to test the calendar booking + cold-email-send flows end-to-end. If your address isn't here, email me to be added.
+   - *Email OTP* — fallback. (Note: my Supabase email provider is currently throttling new sign-ups, so this path may show "Error sending confirmation email" until I get Resend reconnected. Use the Guest path instead.)
 3. **First user becomes owner** automatically. You'll land on the dashboard.
 4. **Suggested 5-minute tour:**
    1. `/jds` — open a JD (the seed includes "Full Stack Developer")

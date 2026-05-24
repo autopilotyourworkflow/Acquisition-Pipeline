@@ -93,6 +93,19 @@ export function LoginForm() {
     router.refresh();
   }
 
+  async function handleGuest() {
+    setPending(true);
+    setError(null);
+    const { error } = await supabase.auth.signInAnonymously();
+    setPending(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.push(next);
+    router.refresh();
+  }
+
   if (step === "code-sent") {
     return (
       <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -194,9 +207,19 @@ export function LoginForm() {
         </button>
       </form>
 
-      <p className="text-center text-[11px] text-gray">
-        New here? You&apos;ll need an invitation from an existing teammate.
-      </p>
+      <div className="border-t border-soft-gray pt-5">
+        <button
+          type="button"
+          onClick={handleGuest}
+          disabled={pending}
+          className="inline-flex h-11 w-full items-center justify-center rounded-sm border border-black bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-black hover:text-yellow disabled:opacity-50"
+        >
+          {pending ? "Signing in…" : "Continue as guest"}
+        </button>
+        <p className="mt-2 text-center text-[11px] text-gray">
+          Reviewer demo path. Calendar &amp; email features need Google sign-in.
+        </p>
+      </div>
     </div>
   );
 }
