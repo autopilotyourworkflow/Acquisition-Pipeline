@@ -46,7 +46,7 @@ Quickest path to seeing it work:
      - parich.phew@gmail.com
 
      Use this path if you want to test the calendar booking + cold-email-send flows end-to-end. If your address isn't here, email me to be added.
-   - *Email OTP* — fallback. (Note: my Supabase email provider is currently throttling new sign-ups, so this path may show "Error sending confirmation email" until I get Resend reconnected. Use the Guest path instead.)
+   - *Email OTP* — receive a 6-digit code (or magic link) at any email address. Useful if you want a persistent session tied to a real address but don't want to grant Google scopes.
 3. **First user becomes owner** automatically. You'll land on the dashboard.
 4. **Suggested 5-minute tour:**
    1. `/jds` — open a JD (the seed includes "Full Stack Developer")
